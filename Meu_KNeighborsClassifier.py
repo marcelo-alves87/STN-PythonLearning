@@ -1,0 +1,83 @@
+import numpy as np
+from sklearn import preprocessing, cross_validation, neighbors
+import pandas as pd
+
+df = pd.read_csv('STN_DATA.csv')
+df.replace('?', -99999, inplace=True)
+df.fillna(-99999, inplace=True)
+df.drop(['id'], 1, inplace=True)
+
+X = np.array(df.drop(['class'], 1))
+y = np.array(df['class'])
+
+
+X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y)
+
+clf = neighbors.KNeighborsClassifier()
+clf.fit(X_train, y_train)
+
+accuracy = clf.score(X_test, y_test)
+print(accuracy)
+
+
+
+
+##number_of_tests = 1
+##df_test = []
+##
+##def fitCSVClass(clazz, filePath):
+##    df = pd.read_csv(filePath)
+##    for i in range(number_of_tests):
+##        j = random.randrange(len(df))
+##        y = df.iloc[j]
+##        df_test.append(y)
+##        df = df.drop(df.index[j])
+##    df['class'] = [clazz for i in range(len(df))]
+##    return df
+##
+##df_class1 = fitCSVClass(1, 'csv/H1NAD_1.csv')
+##df_class2 = fitCSVClass(2, 'csv/H1D10AD_2.csv')
+##df_class3 = fitCSVClass(3, 'csv/H1D15AD_3.csv')
+##df_class4 = fitCSVClass(4, 'csv/H1D50AD-20_4.csv')
+
+##df_class3.to_csv('out3.csv')
+
+##df_class1 = df_class1.sample(frac=1)
+##df_class2 = df_class2.sample(frac=1)
+##df_class3 = df_class3.sample(frac=1)
+##df_class4 = df_class4.sample(frac=1)
+##
+##x_class1 = np.array(df_class1.drop(['class'],1))
+##x_class2 = np.array(df_class2.drop(['class'],1))
+##x_class3 = np.array(df_class3.drop(['class'],1))
+##x_class4 = np.array(df_class4.drop(['class'],1))
+##
+##y_class1 = np.array(df_class1['class'])
+##y_class2 = np.array(df_class2['class'])
+##y_class3 = np.array(df_class3['class'])
+##y_class4 = np.array(df_class4['class'])
+##
+##X = np.concatenate((x_class1, x_class2, x_class3, x_class4), axis=0)
+##y = np.concatenate((y_class1, y_class2, y_class3, y_class4), axis=0)
+##
+##X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y, test_size=0.2)
+##
+##
+### Normalizando dados
+##from sklearn.preprocessing import StandardScaler
+##sc = StandardScaler()
+##X_train = sc.fit_transform(X_train)
+##X_test = sc.transform(X_test)
+##
+##clf = neighbors.KNeighborsClassifier()
+##
+##clf.fit(X_train, y_train)
+##
+##accuracy = clf.score(X_test, y_test)
+##
+##print(accuracy)
+##
+##example_measures = np.array(df_test)
+##
+##prediction = clf.predict(example_measures)
+##print(prediction)

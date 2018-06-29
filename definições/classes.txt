@@ -1,0 +1,14 @@
+Haste de 1 metro desgaste a 10 cm de 10cm
+haste de 1 metro desgaste a 15 cm de 10cm
+haste de 1 metro desgaste a 50 cm de 20cm
+haste de 1 metro sem desgaste
+
+classe 1 H1N: sem desgaste
+classe 2 H1D80: desgaste a 80 cm de 10cm
+classe 3 H1D15: desgaste a 15 cm de 10 cm
+classe 4 H1D50-20: desgaste a 50 cm de 20 cm
+classe 5 H1D10: desgaste a 10 cm de 10cm
+classe 6 H1D25: desgaste a 25cm de 10cm
+classe 7 H1D30-20: desgaste a 30cm de 20cm
+classe 8 H1D65: desgaste a 65cm de 10 cm
+classe 9 H175: desgaste a 75cm de 10 cm
