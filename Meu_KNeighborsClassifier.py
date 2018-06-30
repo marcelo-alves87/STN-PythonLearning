@@ -2,7 +2,23 @@ import numpy as np
 from sklearn import preprocessing, cross_validation, neighbors
 import pandas as pd
 
-df = pd.read_csv('STN_DATA.csv')
+#### Normalize CSV ###########
+FileName = 'data/STN_DATA_DESGASTE.csv'
+needToNorm = True
+
+if '.' in open(FileName).read():
+    needToNorm = False
+    
+if needToNorm:
+    with open(FileName) as f:
+        newText=f.read().replace(',','.')
+        newText=newText.replace(';',',')
+
+    with open(FileName, "w") as f:
+        f.write(newText)
+#############################
+
+df = pd.read_csv(FileName, low_memory=False)
 df.replace('?', -99999, inplace=True)
 df.fillna(-99999, inplace=True)
 df.drop(['id'], 1, inplace=True)
