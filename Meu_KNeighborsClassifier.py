@@ -1,99 +1,79 @@
 import numpy as np
 from sklearn import preprocessing, cross_validation, neighbors
 import pandas as pd
+import pickle
 
-#### Normalize CSV ###########
-FileName = 'data/STN_DATA_DESGASTE.csv'
-needToNorm = True
 
-if '.' in open(FileName).read():
-    needToNorm = False
+number_of_predictions = range(5, 25)
+
+def input_file_csv(filename, clazz):
+    normalize_csv(filename)
+    df = pd.read_csv(filename, low_memory=False)
+    df.replace('?', -99999, inplace=True)
+    df.fillna(-99999, inplace=True)
+    df.drop(['id'], 1, inplace=True)
+    X = np.array(df).T
+    y = np.full(len(X), clazz, dtype=np.float64)
+    return X, y
+
+def normalize_csv(filename):
+
+    fileread = open(filename).read()    
+    needToNorm = True
+
+    if 'id,' in fileread:
+        needToNorm = False
+       
+    if needToNorm:
+        newtext=fileread.replace(',','.')
+        newtext=newtext.replace(';',',')
+
+        with open(filename, "w") as f:
+            f.write(newtext)
+
+def append_array(filename, clazz):
+    global X
+    global y
+
+    X1, y1 = input_file_csv(filename, clazz)
+    y = np.append(y, y1)
+    X = np.append(X, X1, axis=0)
     
-if needToNorm:
-    with open(FileName) as f:
-        newText=f.read().replace(',','.')
-        newText=newText.replace(';',',')
+X, y = input_file_csv('medidas/desgaste/H1N_FASE_2.csv', 1)
+#append_array('medidas/desgaste/H1D10.csv', 2)
+append_array('medidas/desgaste/H1D15_FASE_2.csv', 2)
+#append_array('medidas/desgaste/H1D25.csv', 2)
+#append_array('medidas/desgaste/H1D30-20.csv', 2)
+#append_array('medidas/desgaste/H1D50-20.csv', 2)
+#append_array('medidas/desgaste/H1D65.csv', 2)
+#append_array('medidas/desgaste/H1D75.csv', 2)
+#append_array('medidas/desgaste/H1D80.csv', 2)
 
-    with open(FileName, "w") as f:
-        f.write(newText)
-#############################
+Z = np.c_[X.reshape(len(X), -1), y.reshape(len(y), -1)]    
+np.random.shuffle(Z)
 
-df = pd.read_csv(FileName, low_memory=False)
-df.replace('?', -99999, inplace=True)
-df.fillna(-99999, inplace=True)
-df.drop(['id'], 1, inplace=True)
+X = np.delete(Z, -1, axis=1)
+y = Z[:,-1]
 
-X = np.array(df.drop(['class'], 1))
-y = np.array(df['class'])
+X_predict = X[number_of_predictions]
+X = np.delete(X, number_of_predictions, axis=0)
 
+y_predict = y[number_of_predictions]
+y = np.delete(y, number_of_predictions, axis=0)
 
-X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y)
+X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y, test_size=0.2)
 
 clf = neighbors.KNeighborsClassifier()
 clf.fit(X_train, y_train)
 
+with open('neighborsclassifier.pickle', 'wb') as f:
+    pickle.dump(clf, f)
+
+pickle_in = open('neighborsclassifier.pickle', 'rb')
+clf = pickle.load(pickle_in)    
+
 accuracy = clf.score(X_test, y_test)
 print(accuracy)
 
-
-
-
-##number_of_tests = 1
-##df_test = []
-##
-##def fitCSVClass(clazz, filePath):
-##    df = pd.read_csv(filePath)
-##    for i in range(number_of_tests):
-##        j = random.randrange(len(df))
-##        y = df.iloc[j]
-##        df_test.append(y)
-##        df = df.drop(df.index[j])
-##    df['class'] = [clazz for i in range(len(df))]
-##    return df
-##
-##df_class1 = fitCSVClass(1, 'csv/H1NAD_1.csv')
-##df_class2 = fitCSVClass(2, 'csv/H1D10AD_2.csv')
-##df_class3 = fitCSVClass(3, 'csv/H1D15AD_3.csv')
-##df_class4 = fitCSVClass(4, 'csv/H1D50AD-20_4.csv')
-
-##df_class3.to_csv('out3.csv')
-
-##df_class1 = df_class1.sample(frac=1)
-##df_class2 = df_class2.sample(frac=1)
-##df_class3 = df_class3.sample(frac=1)
-##df_class4 = df_class4.sample(frac=1)
-##
-##x_class1 = np.array(df_class1.drop(['class'],1))
-##x_class2 = np.array(df_class2.drop(['class'],1))
-##x_class3 = np.array(df_class3.drop(['class'],1))
-##x_class4 = np.array(df_class4.drop(['class'],1))
-##
-##y_class1 = np.array(df_class1['class'])
-##y_class2 = np.array(df_class2['class'])
-##y_class3 = np.array(df_class3['class'])
-##y_class4 = np.array(df_class4['class'])
-##
-##X = np.concatenate((x_class1, x_class2, x_class3, x_class4), axis=0)
-##y = np.concatenate((y_class1, y_class2, y_class3, y_class4), axis=0)
-##
-##X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y, test_size=0.2)
-##
-##
-### Normalizando dados
-##from sklearn.preprocessing import StandardScaler
-##sc = StandardScaler()
-##X_train = sc.fit_transform(X_train)
-##X_test = sc.transform(X_test)
-##
-##clf = neighbors.KNeighborsClassifier()
-##
-##clf.fit(X_train, y_train)
-##
-##accuracy = clf.score(X_test, y_test)
-##
-##print(accuracy)
-##
-##example_measures = np.array(df_test)
-##
-##prediction = clf.predict(example_measures)
-##print(prediction)
+print(clf.predict(X_predict))
+print(y_predict)
