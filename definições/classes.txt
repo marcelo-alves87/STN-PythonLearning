@@ -31,10 +31,6 @@ classe 7 H1D30: 30cm
 classe 8 H1D65: 65cm
 classe 9 H175: 75cm
 
-*******************************************
-
-NIVEL
-
-classe 1 H1N: 0 cm
-classe 2 H1D80, H1D15, H1D10, H1D25, H1D65, H175: 10cm
-classe 3 H1D50-20, H1D30-20: 20cm
+***********************************
+GRAU
+Todas possuem 50% de desgaste
