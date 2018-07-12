@@ -40,14 +40,14 @@ def append_array(filename, clazz):
     X = np.append(X, X1, axis=0)
     
 X, y = input_file_csv('medidas/desgaste/H1N_FASE_2.csv', 1)
-#append_array('medidas/desgaste/H1D10.csv', 2)
+append_array('medidas/desgaste/H1D10.csv', 2)
 append_array('medidas/desgaste/H1D15_FASE_2.csv', 2)
-#append_array('medidas/desgaste/H1D25.csv', 2)
-#append_array('medidas/desgaste/H1D30-20.csv', 2)
-#append_array('medidas/desgaste/H1D50-20.csv', 2)
-#append_array('medidas/desgaste/H1D65.csv', 2)
-#append_array('medidas/desgaste/H1D75.csv', 2)
-#append_array('medidas/desgaste/H1D80.csv', 2)
+append_array('medidas/desgaste/H1D25.csv', 2)
+append_array('medidas/desgaste/H1D30-20.csv', 2)
+append_array('medidas/desgaste/H1D50-20.csv', 2)
+append_array('medidas/desgaste/H1D65.csv', 2)
+append_array('medidas/desgaste/H1D75.csv', 2)
+append_array('medidas/desgaste/H1D80.csv', 2)
 
 Z = np.c_[X.reshape(len(X), -1), y.reshape(len(y), -1)]    
 np.random.shuffle(Z)
