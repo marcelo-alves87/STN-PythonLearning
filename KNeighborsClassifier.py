@@ -1,10 +1,13 @@
 import numpy as np
 from sklearn import preprocessing, cross_validation, neighbors
 import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib import style
 import pickle
 
+style.use('fivethirtyeight')
 
-number_of_predictions = range(5, 25)
+number_of_predictions = range(5, 6)
 
 def input_file_csv(filename, clazz):
     normalize_csv(filename)
@@ -52,8 +55,11 @@ append_array('medidas/desgaste/H1D80.csv', 2)
 Z = np.c_[X.reshape(len(X), -1), y.reshape(len(y), -1)]    
 np.random.shuffle(Z)
 
-X = np.delete(Z, -1, axis=1)
+#X = np.delete(Z, -1, axis=1)
+X = Z[:,range(800,1000)]
 y = Z[:,-1]
+
+print(X,y)
 
 X_predict = X[number_of_predictions]
 X = np.delete(X, number_of_predictions, axis=0)
@@ -75,5 +81,11 @@ clf = pickle.load(pickle_in)
 accuracy = clf.score(X_test, y_test)
 print(accuracy)
 
-print(clf.predict(X_predict))
-print(y_predict)
+xs = clf.predict(X_predict)
+ys = y_predict
+print(xs)
+print(ys)
+plt.plot(xs,ys, color='g')
+plt.xlabel('Predictions')
+plt.ylabel('Real Values')
+plt.show()
