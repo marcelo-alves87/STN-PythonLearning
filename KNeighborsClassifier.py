@@ -53,7 +53,7 @@ append_array('medidas/desgaste/H1D75.csv', 2)
 append_array('medidas/desgaste/H1D80.csv', 2)
 
 Z = np.c_[X.reshape(len(X), -1), y.reshape(len(y), -1)]    
-np.random.shuffle(Z)
+#np.random.shuffle(Z)
 
 #X = np.delete(Z, -1, axis=1)
 X = Z[:,range(800,1000)]
