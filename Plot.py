@@ -14,7 +14,7 @@ def input_file_csv(filename, file_label, file_color):
     df.fillna(-99999, inplace=True)
     xs = np.array(df['id'])
     df.drop(['id'], 1, inplace=True)
-    ys = np.array(df.std(axis=1))
+    ys = np.array(df.mean(axis=1))
     plt.plot(xs,ys, color=file_color, label=file_label)
                     
 def normalize_csv(filename):
@@ -53,7 +53,7 @@ input_file_csv('data/medidas/H1D80.csv', 'H1D80', 'darkgray')
 ##input_file_csv('data/medidas/H1D80_FASE.csv', 'H1D80_FASE', 'darkgray')
 
 plt.xlabel('Frequency (MHz)')
-plt.ylabel('Standard Deviation (σ)')
+plt.ylabel('|S111| Means')
 plt.legend()
 plt.show()
 
