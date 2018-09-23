@@ -7,7 +7,6 @@ style.use('fivethirtyeight')
 
 def input_file_csv(type1):
     xs, ys = normalize_csv(type1 + '.csv')
-    plt.ylabel(type1)
     plt.plot(xs,ys)
 
 def normalize_csv(filename):
@@ -22,11 +21,12 @@ def normalize_csv(filename):
                 ys.append(row[1])
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
      
-#input_file_csv('MLOGarithmic')
-input_file_csv('PHASe')
+input_file_csv('MLOGarithmic')
+#input_file_csv('PHASe')
 #input_file_csv('SWR')
 
 
 plt.xlabel('Frequencies')
+plt.ylabel('Values')    
 plt.show()
 
