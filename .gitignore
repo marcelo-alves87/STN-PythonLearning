@@ -1,3 +1,4 @@
-*.pickle
-/data/
-/medidas/
+#ignore all kind of files
+*
+#except php files
+!*.py
