@@ -1,4 +1,8 @@
-#ignore all kind of files
+# ignore everything
 *
-#except php files
+
+# but don't ignore files ending with slash = directories
+!*/
+
+# and don't ignore files ending with ".php"
 !*.py
