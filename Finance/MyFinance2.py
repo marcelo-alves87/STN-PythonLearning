@@ -8,7 +8,8 @@ import matplotlib.dates as mdates
 
 style.use('ggplot')
 
-df = pd.read_csv('natura.csv', parse_dates=True, index_col=0)
+#df = pd.read_csv('natura.csv', parse_dates=True, index_col=0)
+df = pd.read_csv('stock_dfs/VALE3.csv', parse_dates=True, index_col=0)
 
 df_ohlc = df['Adj Close'].resample('W-MON').ohlc()
 df_volume = df['Volume'].resample('W-MON').sum()
