@@ -5,7 +5,7 @@ import csv
 
 style.use('seaborn-darkgrid')
 
-colors = ['red', 'gray', 'olive', 'brown', 'green', 'blue', 'y', 'deeppink', 'indigo', 'darkorange', 'turquoise', 'springgreen', 'tan', 'goldenrod', 'mediumslateblue', 'teal', 'salmon']
+markers = ['x', 'o', 'P', 's']
 
 def input_file_csv(type1, clazz=1):
     xs = []
@@ -42,7 +42,7 @@ def input_file_csv(type1, clazz=1):
     global x
     x += 1
     
-    plt.scatter(mean,clazz, label=type1, c=colors[x - 1])
+    plt.scatter(mean,clazz, label=type1,marker=markers[(x-1)%len(markers)])
 
 def normalize_csv(filename, parameter, impedance, xs, ys):
     begin_index = 0

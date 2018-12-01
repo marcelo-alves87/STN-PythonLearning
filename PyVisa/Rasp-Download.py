@@ -1,6 +1,6 @@
 import requests
 
-rasp_ip = '192.168.43.49'
+rasp_ip = '177.58.246.103'
 
 file_url = "http://{}/Measures/{}.csv"
 

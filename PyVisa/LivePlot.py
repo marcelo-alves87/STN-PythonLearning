@@ -12,10 +12,10 @@ ax1 = fig.add_subplot(111)
 def animate(i):
     ax1.clear()
     input_file_csv('MLOGarithmic')
-   # input_file_csv('PHASe')
-   # input_file_csv('SWR')
-   # input_file_csv('SMITh')
-   # input_file_csv('SMITh',2)
+    #input_file_csv('PHASe')
+    #input_file_csv('SWR')
+    #input_file_csv('SMITh')
+    #input_file_csv('SMITh',2)
 
 
 def input_file_csv(type1,column=1):
