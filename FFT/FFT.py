@@ -1,8 +1,7 @@
 #https://www.youtube.com/watch?v=su9YSmwZmPg
 import numpy as np
 import matplotlib.pyplot as plt
-from numpy.fft import fft, fftfreq
-#ifft
+from numpy.fft import fft, fftfreq,ifft
 
 #number of points
 n = 1000
@@ -12,12 +11,13 @@ T = 100
 
 #angular frequency
 w = 2 * np.pi / T
+#print('w',w)
 
 #Create n seconds, from 0 to T
 x = np.linspace(0, T, n)
 
 #Create individual signals
-y1 = 1*np.cos(5*w*x)
+y1 = 2*np.cos(5*w*x)
 y2 = 1*np.sin(10*w*x)
 y3 = 0.5*np.sin(20*w*x)
 
@@ -48,5 +48,13 @@ plt.xlabel('Frequency (Hz)')
 plt.ylabel('Amplitude')
 plt.plot(freqs[mask], fft_theo[mask])
 
+#print(freqs[mask])
+##td_values = ifft(fft_vals)
+##
+##plt.figure(2)
+##plt.title('Time Domain Signal')
+##plt.xlabel('Time (seconds)')
+##plt.ylabel('Amplitude')
+##plt.plot(x, td_values)
 
 plt.show()

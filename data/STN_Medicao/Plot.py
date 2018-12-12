@@ -2,11 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import style
 import csv
+import pickle
 
 style.use('seaborn-darkgrid')
 
 def input_file_csv(type1):
     xs, ys = normalize_csv(type1 + '.csv')
+
+    with open(type1 + '.pickle', 'wb') as f:
+        pickle.dump(ys,f)
+        
     plt.plot(xs,ys, label=type1)
 
 def normalize_csv(filename):
@@ -21,7 +26,7 @@ def normalize_csv(filename):
             if s.find('END') >= 0:
                end_index += 1 
                #1 S11, 2 Phase, 3 SWR, 4 Real/Imaginary 
-               if end_index == 4: 
+               if end_index == 1: 
                    break
                else:
                    xs = []
@@ -30,12 +35,12 @@ def normalize_csv(filename):
                 xs.append(row[0])
                 if len(row) > 2:
                     #1 Real, 2 Imaginary
-                    ys.append(row[2])
+                    ys.append(row[1])
                 else:
                     ys.append(row[1])
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
      
-input_file_csv('L05c1-T176.2-EA/1GHz/NN-L05c1-T176.2-EA-1G')
+#input_file_csv('L05c1-T176.2-EA/1GHz/NN-L05c1-T176.2-EA-1G')
 ##input_file_csv('L05c1-T176.2-EA/1GHz/NS-L05c1-T176.2-EA-1G')
 ##input_file_csv('L05c1-T176.2-EA/1GHz/SN-L05c1-T176.2-EA-1G')
 ##input_file_csv('L05c1-T176.2-EA/1GHz/SS-L05c1-T176.2-EA-1G')
@@ -53,7 +58,7 @@ input_file_csv('L05c1-T176.2-EA/1GHz/NN-L05c1-T176.2-EA-1G')
 ##input_file_csv('L05c1-T176.2-EB/6GHz/SN-L05c1-T176.2-EB-6G')
 ##input_file_csv('L05c1-T176.2-EB/6GHz/SS-L05c1-T176.2-EB-6G')
 
-input_file_csv('L05c1-T176.2-ED/1GHz/NN-L05c1-T176.2-ED-1G')
+#input_file_csv('L05c1-T176.2-ED/1GHz/NN-L05c1-T176.2-ED-1G')
 ##input_file_csv('L05c1-T176.2-ED/1GHz/NS-L05c1-T176.2-ED-1G')
 ##input_file_csv('L05c1-T176.2-ED/1GHz/SN-L05c1-T176.2-ED-1G')
 ##input_file_csv('L05c1-T176.2-ED/1GHz/SS-L05c1-T176.2-ED-1G')
@@ -111,7 +116,7 @@ input_file_csv('L05c1-T176.2-ED/1GHz/NN-L05c1-T176.2-ED-1G')
 ##input_file_csv('L05c1-T189.1-EB/6GHz/SN-L05c1-T189.1-EB-6G')
 ##input_file_csv('L05c1-T189.1-EB/6GHz/SS-L05c1-T189.1-EB-6G')
 
-input_file_csv('L05c1-T189.1-EC/1GHz/NN-L05c1-T189.1-EC-1G')
+#input_file_csv('L05c1-T189.1-EC/1GHz/NN-L05c1-T189.1-EC-1G')
 ##input_file_csv('L05c1-T189.1-EC/1GHz/NS-L05c1-T189.1-EC-1G')
 ##input_file_csv('L05c1-T189.1-EC/1GHz/SN-L05c1-T189.1-EC-1G')
 ##input_file_csv('L05c1-T189.1-EC/1GHz/SS-L05c1-T189.1-EC-1G')
@@ -129,7 +134,7 @@ input_file_csv('L05c1-T189.1-EC/1GHz/NN-L05c1-T189.1-EC-1G')
 ##input_file_csv('L05c1-T189.1-ED/6GHz/SN-L05c1-T189.1-ED-6G')
 ##input_file_csv('L05c1-T189.1-ED/6GHz/SS-L05c1-T189.1-ED-6G')
 ##
-input_file_csv('L05c1-T197.2-EB/1GHz/NN-L05c1-T197.2-EB-1G')
+#input_file_csv('L05c1-T197.2-EB/1GHz/NN-L05c1-T197.2-EB-1G')
 ##input_file_csv('L05c1-T197.2-EB/6GHz/NN-L05c1-T197.2-EB-6G')
 ##
 #input_file_csv('L05c1-T197.2-EC/1GHz/NN-L05c1-T197.2-EC-1G')
@@ -141,7 +146,7 @@ input_file_csv('L05c1-T197.2-EB/1GHz/NN-L05c1-T197.2-EB-1G')
 ##input_file_csv('L05c1-T197.2-EC/6GHz/SN-L05c1-T197.2-EC-6G')
 ##input_file_csv('L05c1-T197.2-EC/6GHz/SS-L05c1-T197.2-EC-6G')
 ##
-##input_file_csv('L05c1-T205.1-EA/1GHz/NN-L05c1-T205.1-EA-1G')
+#input_file_csv('L05c1-T205.1-EA/1GHz/NN-L05c1-T205.1-EA-1G')
 ##input_file_csv('L05c1-T205.1-EA/1GHz/NS-L05c1-T205.1-EA-1G')
 ##input_file_csv('L05c1-T205.1-EA/1GHz/SN-L05c1-T205.1-EA-1G')
 ##input_file_csv('L05c1-T205.1-EA/1GHz/SS-L05c1-T205.1-EA-1G')
@@ -150,7 +155,7 @@ input_file_csv('L05c1-T197.2-EB/1GHz/NN-L05c1-T197.2-EB-1G')
 ##input_file_csv('L05c1-T205.1-EA/6GHz/SN-L05c1-T205.1-EA-6G')
 ##input_file_csv('L05c1-T205.1-EA/6GHz/SS-L05c1-T205.1-EA-6G')
 ##
-#input_file_csv('L05c1-T205.1-EB/1GHz/NN-L05c1-T205.1-EB-1G')
+input_file_csv('L05c1-T205.1-EB/1GHz/NN-L05c1-T205.1-EB-1G')
 ##input_file_csv('L05c1-T205.1-EB/1GHz/NS-L05c1-T205.1-EB-1G')
 ##input_file_csv('L05c1-T205.1-EB/1GHz/SN-L05c1-T205.1-EB-1G')
 ##input_file_csv('L05c1-T205.1-EB/1GHz/SS-L05c1-T205.1-EB-1G')
