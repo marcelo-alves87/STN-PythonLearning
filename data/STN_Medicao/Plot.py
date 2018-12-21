@@ -86,7 +86,7 @@ def normalize_csv(filename):
 ##input_file_csv('L05c1-T188.1-EB/6GHz/SN-L05c1-T188.1-EB-6G')
 ##input_file_csv('L05c1-T188.1-EB/6GHz/SS-L05c1-T188.1-EB-6G')
 
-##input_file_csv('L05c1-T188.1-EC/1GHz/NN-L05c1-T188.1-EC-1G')
+#input_file_csv('L05c1-T188.1-EC/1GHz/NN-L05c1-T188.1-EC-1G')
 ##input_file_csv('L05c1-T188.1-EC/1GHz/NS-L05c1-T188.1-EC-1G')
 ##input_file_csv('L05c1-T188.1-EC/1GHz/SN-L05c1-T188.1-EC-1G')
 ##input_file_csv('L05c1-T188.1-EC/1GHz/SS-L05c1-T188.1-EC-1G')
@@ -155,7 +155,7 @@ def normalize_csv(filename):
 ##input_file_csv('L05c1-T205.1-EA/6GHz/SN-L05c1-T205.1-EA-6G')
 ##input_file_csv('L05c1-T205.1-EA/6GHz/SS-L05c1-T205.1-EA-6G')
 ##
-input_file_csv('L05c1-T205.1-EB/1GHz/NN-L05c1-T205.1-EB-1G')
+#input_file_csv('L05c1-T205.1-EB/1GHz/NN-L05c1-T205.1-EB-1G')
 ##input_file_csv('L05c1-T205.1-EB/1GHz/NS-L05c1-T205.1-EB-1G')
 ##input_file_csv('L05c1-T205.1-EB/1GHz/SN-L05c1-T205.1-EB-1G')
 ##input_file_csv('L05c1-T205.1-EB/1GHz/SS-L05c1-T205.1-EB-1G')
