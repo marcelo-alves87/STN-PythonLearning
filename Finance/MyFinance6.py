@@ -10,7 +10,14 @@ style.use('ggplot')
 ##    df['ABEV3'].plot()
 ##    plt.show()
 
-
+def visualize_data2():
+    df = pd.read_csv('ibovespa_joined_closes.csv')
+    df_corr = df.corr()
+    for index, data in df_corr.iteritems():
+        for index1, data1 in data.iteritems():
+            if data1 >= 0.92 and index != index1:
+                print(('{} e {} fator de correlação: {}').format(index, index1, data1))
+    
 def visualize_data():
     df = pd.read_csv('ibovespa_joined_closes.csv')
     df_corr = df.corr()
@@ -37,4 +44,4 @@ def visualize_data():
     plt.show()
 
 
-visualize_data()    
+visualize_data2()    
