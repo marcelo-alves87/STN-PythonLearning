@@ -15,17 +15,28 @@ def formatTicker(ticker, tickers):
         tickers.append(removeReference(split[1].strip()))   
     tickers.append(removeReference(split[0].strip()))
 
+##def save_ibovespa_tickers():
+##    resp = requests.get('https://pt.wikipedia.org/wiki/Lista_de_companhias_citadas_no_Ibovespa')
+##    soup = bs.BeautifulSoup(resp.text, 'lxml')
+##    table = soup.find('table', {'class': 'wikitable sortable'})
+##    tickers = []
+##    for row in table.findAll('tr')[1:]:
+##        ticker = row.findAll('td')[0].text
+##        formatTicker(ticker, tickers)
+##        
+##    with open("ibovespatickers.pickle","wb") as f:
+##        pickle.dump(tickers,f)
+
+
 def save_ibovespa_tickers():
-    resp = requests.get('https://pt.wikipedia.org/wiki/Lista_de_companhias_citadas_no_Ibovespa')
+    resp = requests.get('https://br.advfn.com/indice/ibovespa')
     soup = bs.BeautifulSoup(resp.text, 'lxml')
-    table = soup.find('table', {'class': 'wikitable sortable'})
+    tds = soup.findAll('td', {'class': 'String Column2'})
     tickers = []
-    for row in table.findAll('tr')[1:]:
-        ticker = row.findAll('td')[0].text
-        formatTicker(ticker, tickers)
-        
+    for row in tds:
+        tickers.append(row.text.strip())
+
     with open("ibovespatickers.pickle","wb") as f:
         pickle.dump(tickers,f)
-
         
 save_ibovespa_tickers()
