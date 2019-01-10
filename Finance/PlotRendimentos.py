@@ -15,7 +15,7 @@ i=9
 #Taxa de Juros Mensal (Real) (%)
 ii=[]
 #Prazo (Meses, Começa em 1)
-n=60
+n=1
 
 i = i / 100
 [x/100 for x in ii]
@@ -49,7 +49,7 @@ def validar_parametros():
     x = len(MM)
     y = len(ii)
     assert x == y,"O tamanho da lista de Aportes e Juros são diferentes"
-    assert n >= x,"O prazo em meses é menor que a lista de Aportes Mensais"
+    assert n > x,"O prazo em meses é menor que a lista de Aportes Mensais"
     
 validar_parametros()
 plotar_grafico()
