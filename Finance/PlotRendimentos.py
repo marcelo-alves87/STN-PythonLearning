@@ -15,7 +15,7 @@ i=9
 #Taxa de Juros Mensal (Real) (%)
 ii=[]
 #Prazo (Meses, Começa em 1)
-n=4
+n=60
 
 i = i / 100
 [x/100 for x in ii]
