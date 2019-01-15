@@ -5,7 +5,7 @@ import numpy as np
 style.use('ggplot')
 
 #Valor Inicial
-P=0
+P=100
 #Aporte Mensal (Meta)
 M=500
 #Aporte Mensal (Real)
@@ -15,30 +15,26 @@ i=9
 #Taxa de Juros Mensal (Real) (%)
 ii=[]
 #Prazo (Meses, Começa em 1)
-n=1
+n=60
 
-i = i / 100
-[x/100 for x in ii]
 
-def get_juros_compostos(n,m,i):
-    #http://fazaconta.com/valor-futuro-investimentos.htm
-    n+=1
-    if n == 1:
-        return m
+def formula_juros(exponencial,juros):
+    return (1 + juros/100)**exponencial
+
+def plotar_grafico_por_meses(aportes, juros, periodo=n, rendimentos=0):
+    if periodo == 0:
+        text = ('Total Poupado R$ {}\nJuros Recebidos R$ {}'
+                        + '\nMontante Final R$ {}\n\n\n\n').format(P + sum(aportes),rendimentos - sum(aportes),P + rendimentos)
+        plt.text(0.02, 0.5,text)
+        print(text)
     else:
-        return P*(1 + i)**n + m*(((1 + i)**n - 1)/i)
-
-def plotar_grafico_por_meses(aportes, juros):
-    for j in range(n):
-        y = get_juros_compostos(j,aportes[j],juros[j])
-        w = (n * aportes[j] + P)
-        if j == n - 1:
-            text = ('Total Poupado R$ {}\nJuros Recebidos R$ {}'
-                     + '\nMontante Final R$ {}\n\n\n\n').format(w,y - w,y)
-            print(text)             
-            plt.text(0.02, 0.5,text)
-        plt.scatter(j + 1,y)
-
+        if periodo == n:
+            rendimentos += P*formula_juros(n-1,juros[n-1]) + aportes[0]
+        else:
+            rendimentos += aportes[periodo]*formula_juros(periodo,juros[periodo])
+        plt.scatter(n-periodo,rendimentos)
+        plotar_grafico_por_meses(aportes,juros,periodo-1,rendimentos)
+      
 def plotar_grafico():
     x = n - len(MM)
     aportes = MM + x*[M]
@@ -49,7 +45,7 @@ def validar_parametros():
     x = len(MM)
     y = len(ii)
     assert x == y,"O tamanho da lista de Aportes e Juros são diferentes"
-    assert n > x,"O prazo em meses é menor que a lista de Aportes Mensais"
+    assert n >= x,"O prazo em meses é menor que a lista de Aportes Mensais"
     
 validar_parametros()
 plotar_grafico()
