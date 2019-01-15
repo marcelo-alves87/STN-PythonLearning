@@ -7,7 +7,7 @@ style.use('ggplot')
 #Valor Inicial
 P=1000
 #Aporte Mensal (Meta)
-M=100
+M=500
 #Aporte Mensal (Real)
 MM=[]
 #Taxa de Juros Mensal (Meta) (%)
@@ -31,18 +31,23 @@ def plotar_grafico_por_meses(aportes, juros, periodo=n, rendimentos=0):
         plt.scatter(n-periodo+1,rendimentos)
         plotar_grafico_por_meses(aportes,juros,periodo-1,rendimentos)
       
-def plotar_grafico():
-    x = n - len(MM)
-    aportes = MM + x*[M]
-    juros = ii + x*[i]
+def plotar_grafico(aportes,juros):
     plotar_grafico_por_meses(aportes, juros)
 
-def validar_parametros():
-    x = len(MM)
-    y = len(ii)
+def validar_parametros(aportes,juros):
+    x = len(aportes)
+    y = len(juros)
     assert x == y,"O tamanho da lista de Aportes e Juros são diferentes"
     assert n >= x,"O prazo em meses é menor que a lista de Aportes Mensais"
-    
-validar_parametros()
-plotar_grafico()
+
+def ajustar_parametros():
+    x = n - len(MM)
+    y = n - len(ii)
+    aportes = MM + x*[M]
+    juros = ii + y*[i]
+    return aportes,juros
+
+aportes,juros = ajustar_parametros()
+validar_parametros(aportes,juros)
+plotar_grafico(aportes,juros)
 plt.show()
