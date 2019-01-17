@@ -5,13 +5,13 @@ import numpy as np
 style.use('ggplot')
 
 #Valor Inicial
-P=1000
+P=500
 #Aporte Mensal (Meta)
 M=500
 #Aporte Mensal (Real)
-MM=[]
+MM=[0]
 #Taxa de Juros Mensal (Meta) (%)
-i=8
+i=9
 #Taxa de Juros Mensal (Real) (%)
 ii=[]
 #Prazo (Meses, Começa em 1)
