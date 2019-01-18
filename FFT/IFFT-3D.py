@@ -42,7 +42,6 @@ y_1891_ED_i = ifft(y_1891_ED)
 y_2051_EA_i = ifft(y_2051_EA)
 y_2051_EB_i = ifft(y_2051_EB)
 
-
 ax = plt.subplot(111, projection='smith')
-plt.plot(50*y_1891_EC_i, datatype=SmithAxes.Z_PARAMETER)
+plt.plot(50*y_1891_EC_i, y_2051_EB,datatype=SmithAxes.Z_PARAMETER)
 plt.show()
