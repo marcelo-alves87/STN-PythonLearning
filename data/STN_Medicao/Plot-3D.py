@@ -18,10 +18,10 @@ def plot_ifft(frequencies, reals, imaginaries):
 
     modulos = []
     for i,value in enumerate(reals):
-        modulos.append(abs(complex(reals[i],imaginaries[i])))
+        modulos.append(complex(reals[i],imaginaries[i]))
 
     y_modulos = ifft(modulos)
-
+    
     modulos = []
     for i,value in enumerate(y_modulos):
         modulos.append(abs(y_modulos[i]))
