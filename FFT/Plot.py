@@ -8,12 +8,8 @@ style.use('seaborn-darkgrid')
 
 def input_file_csv(type1):
     xs, ys = normalize_csv(type1 + '.csv')
-
-    with open(type1 + '.pickle', 'wb') as f:
-        pickle.dump(ys,f)
-        
-    plt.plot(xs,ys, label=type1)
-
+    return xs, ys
+    
 def normalize_csv(filename):
     xs = []
     ys = []
@@ -40,11 +36,6 @@ def normalize_csv(filename):
                     ys.append(row[1])
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
      
-input_file_csv('MLog')
-
-
-
-plt.xlabel('Frequencies (GHz)')
-plt.ylabel('MLOGarithmic (dB)')
+xs,ys = input_file_csv('/H1-A/HC1N')
+plt.plot(xs,ys)
 plt.show()
-

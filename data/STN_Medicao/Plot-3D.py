@@ -9,16 +9,16 @@ from numpy.fft import fft, fftfreq, ifft
 
 def plot_smith_chart(reals, imaginaries):
     ax = plt.subplot(111, projection='smith')
-    plt.plot(50*reals,50*imaginaries, datatype=SmithAxes.Z_PARAMETER)
+    plt.plot(reals,imaginaries, datatype=SmithAxes.Z_PARAMETER)
     plt.show()
 
 def plot_ifft(frequencies, reals, imaginaries):
     x = 1/frequencies
     x = x[::-1]
-
+    x = x * 0.66 * 3 * 10 ** 8
     modulos = []
     for i,value in enumerate(reals):
-        modulos.append(abs(complex(reals[i],imaginaries[i])))
+        modulos.append(complex(reals[i],imaginaries[i]))
 
     y_modulos = ifft(modulos)
     
@@ -47,7 +47,8 @@ def normalize_csv(filename, real_or_imaginary):
             if s.find('END') >= 0:
                end_index += 1 
                #1 S11, 2 Phase, 3 SWR, 4 Real/Imaginary 
-               if end_index == 4: 
+               #1 Smith 
+               if end_index == 1: 
                    break
                else:
                    xs = []
@@ -61,9 +62,9 @@ def normalize_csv(filename, real_or_imaginary):
                     ys.append(row[1])
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
      
-frequencies, reals, imaginaries = input_file_csv('L05c1-T176.2-EA/1GHz/NN-L05c1-T176.2-EA-1G')
+frequencies, reals, imaginaries = input_file_csv('Smith')
 plot_ifft(frequencies, reals, imaginaries)
-plot_smith_chart(reals, imaginaries)
+#plot_smith_chart(reals, imaginaries)
 
 
 

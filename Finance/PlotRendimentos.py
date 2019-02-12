@@ -11,7 +11,7 @@ M=500
 #Aporte Mensal (Real)
 MM=[0]
 #Taxa de Juros Mensal (Meta) (%)
-i=9
+i=10
 #Taxa de Juros Mensal (Real) (%)
 ii=[]
 #Prazo (Meses, Começa em 1)
