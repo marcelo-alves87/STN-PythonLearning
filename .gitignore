@@ -6,4 +6,3 @@
 
 # and don't ignore files ending with ".php"
 !*.py
-!*.csv

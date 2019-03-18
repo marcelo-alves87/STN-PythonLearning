@@ -6,33 +6,37 @@ import pickle
 
 style.use('classic')
 
-def input_file_csv(type1,angle):
+dates = ['08-03-2019','11-03-2019','25-02-2019','26-02-2019','27-02-2019']
 
-    date = '08-03-2019' 
-    normalize_csv(date,type1,angle)
+def input_file_csv(type1):
+   input_file_csv_(type1,'0')
+   #input_file_csv_(type1,'90')
+   #input_file_csv_(type1,'180')
    
-    date = '11-03-2019'
-    normalize_csv(date,type1,angle)
-    
-    date = '25-02-2019'
-    normalize_csv(date,type1,angle)
-    
-    date = '26-02-2019'
-    normalize_csv(date,type1,angle)
-    
-    date = '27-02-2019'
-    normalize_csv(date,type1,angle)
+def input_file_csv_(type1,angle):
+    y = []
+    x = []
+    for date in dates:
+        x,y1 = normalize_csv(date,type1,angle)
+        y.append(y1)
+    plt.plot(x,np.mean(y,axis=0),label=type1+'/'+angle) 
     
 def normalize_csv(date,type1,angle):
     csv_path = date + '/' + type1 + '/' + angle + '/'  
     try:
-        normalize_csv_(date,csv_path + type1)
+        return normalize_csv_(csv_path + type1)
     except FileNotFoundError:
-        normalize_csv_(date,csv_path + 'DTF')
-
-def normalize_csv_(date,csv_path):
-    x,y = normalize_csv__(csv_path + '.csv')
-    plt.plot(x,y,label=date)
+        try:
+            return normalize_csv_(csv_path + 'DTF')
+        except FileNotFoundError:
+            try:
+                return normalize_csv_(date + '/' + type1 + '/' + 'DTF')
+            except FileNotFoundError:
+                return normalize_csv_(date + '/' + type1 + '/' + type1)
+            
+def normalize_csv_(csv_path):
+    return normalize_csv__(csv_path + '.csv')
+    
     
 def normalize_csv__(filename):
     xs = []
@@ -61,13 +65,13 @@ def normalize_csv__(filename):
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
 
 
-#input_file_csv('H1D25','0')
-#input_file_csv('H1D30-20','0')
-#input_file_csv('H1D50-20','0')
-#input_file_csv('H1D65','0')
-#input_file_csv('H1D75','0')
-input_file_csv('H1D80','0')
-#input_file_csv('H1N','0')
+input_file_csv('H1D25')
+input_file_csv('H1D30-20')
+input_file_csv('H1D50-20')
+input_file_csv('H1D65')
+input_file_csv('H1D75')
+input_file_csv('H1D80')
+input_file_csv('H1N')
 
 
 
