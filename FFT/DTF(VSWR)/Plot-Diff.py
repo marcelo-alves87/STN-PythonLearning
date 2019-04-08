@@ -6,7 +6,7 @@ import pickle
 
 style.use('classic')
 
-def input_file_csv(type1,angle):
+def input_file_csv(type1,angle=None):
 
     date = '08-03-2019' 
     normalize_csv(date,type1,angle)
@@ -24,14 +24,18 @@ def input_file_csv(type1,angle):
     normalize_csv(date,type1,angle)
     
 def normalize_csv(date,type1,angle):
-    csv_path = date + '/' + type1 + '/' + angle + '/'  
+    if angle == None:
+        csv_path = date + '/' + type1 + '/' 
+    else:
+        csv_path = date + '/' + type1 + '/' + angle + '/'  
     try:
-        normalize_csv_(date,csv_path + type1)
+        normalize_csv_(type1,date,csv_path + type1)
     except FileNotFoundError:
-        normalize_csv_(date,csv_path + 'DTF')
+        normalize_csv_(type1,date,csv_path + 'DTF')
 
-def normalize_csv_(date,csv_path):
+def normalize_csv_(type1,date,csv_path):
     x,y = normalize_csv__(csv_path + '.csv')
+    plt.title(type1)
     plt.plot(x,y,label=date)
     
 def normalize_csv__(filename):
@@ -66,12 +70,12 @@ def normalize_csv__(filename):
 #input_file_csv('H1D50-20','0')
 #input_file_csv('H1D65','0')
 #input_file_csv('H1D75','0')
-input_file_csv('H1D80','0')
-#input_file_csv('H1N','0')
+#input_file_csv('H1D80','0')
+input_file_csv('H1N')
 
 
 
-
+#plt.xticks(np.arange(0, 5, step=0.1))
 plt.xlabel('Meters')
 plt.ylabel('VSWR')
 plt.legend()

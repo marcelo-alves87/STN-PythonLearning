@@ -8,30 +8,37 @@ style.use('classic')
 
 dates = ['08-03-2019','11-03-2019','25-02-2019','26-02-2019','27-02-2019']
 
-def input_file_csv(type1):
-   input_file_csv_(type1,'0')
-   #input_file_csv_(type1,'90')
-   #input_file_csv_(type1,'180')
+def input_file_csv(type1,angle=None):
+   #input_file_csv_(type1,'0','DVHR')
+   #input_file_csv_(type1,'90','DVPN')
+   #input_file_csv_(type1,'180','DVCR')
+   input_file_csv_(type1,angle)
    
-def input_file_csv_(type1,angle):
+def input_file_csv_(type1,angle=None,label=None):
     y = []
     x = []
     for date in dates:
         x,y1 = normalize_csv(date,type1,angle)
         y.append(y1)
-    plt.plot(x,np.mean(y,axis=0),label=type1+'/'+angle) 
+    if angle == None:    
+       plt.plot(x,np.mean(y,axis=0),label=type1)
+    else:
+       plt.plot(x,np.mean(y,axis=0),label=type1) 
     
 def normalize_csv(date,type1,angle):
-    csv_path = date + '/' + type1 + '/' + angle + '/'  
-    try:
+   if angle == None:
+      csv_path = date + '/' + type1 + '/'
+   else:      
+      csv_path = date + '/' + type1 + '/' + angle + '/'  
+   try:
         return normalize_csv_(csv_path + type1)
-    except FileNotFoundError:
-        try:
+   except FileNotFoundError:
+      try:
             return normalize_csv_(csv_path + 'DTF')
-        except FileNotFoundError:
-            try:
+      except FileNotFoundError:
+         try:
                 return normalize_csv_(date + '/' + type1 + '/' + 'DTF')
-            except FileNotFoundError:
+         except FileNotFoundError:
                 return normalize_csv_(date + '/' + type1 + '/' + type1)
             
 def normalize_csv_(csv_path):
@@ -65,17 +72,17 @@ def normalize_csv__(filename):
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
 
 
-input_file_csv('H1D25')
-input_file_csv('H1D30-20')
-input_file_csv('H1D50-20')
-input_file_csv('H1D65')
-input_file_csv('H1D75')
-input_file_csv('H1D80')
+input_file_csv('H1D25','0')
+#input_file_csv('H1D30-20')
+input_file_csv('H1D50-20','0')
+#input_file_csv('H1D65')
+#input_file_csv('H1D75')
+input_file_csv('H1D80','0')
 input_file_csv('H1N')
 
 
 
-
+plt.xticks(np.arange(0,5,step=0.1))
 plt.xlabel('Meters')
 plt.ylabel('VSWR')
 plt.legend()
