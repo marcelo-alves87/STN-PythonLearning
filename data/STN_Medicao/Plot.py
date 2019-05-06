@@ -26,7 +26,7 @@ def normalize_csv(filename):
             if s.find('END') >= 0:
                end_index += 1 
                #1 S11, 2 Phase, 3 SWR, 4 Real/Imaginary 
-               if end_index == 1: 
+               if end_index == 3: 
                    break
                else:
                    xs = []
@@ -104,7 +104,7 @@ def normalize_csv(filename):
 ##input_file_csv('L05c1-T188.1-ED/6GHz/SN-L05c1-T188.1-ED-6G')
 ##input_file_csv('L05c1-T188.1-ED/6GHz/SS-L05c1-T188.1-ED-6G')
 
-#input_file_csv('L05c1-T189.1-EA/1GHz/NN-L05c1-T189.1-EA-1G')
+input_file_csv('L05c1-T189.1-EA/1GHz/NN-L05c1-T189.1-EA-1G')
 ##input_file_csv('L05c1-T189.1-EA/6GHz/NN-L05c1-T189.1-EA-6G')
 
 #input_file_csv('L05c1-T189.1-EB/1GHz/NN-L05c1-T189.1-EB-1G')
@@ -186,9 +186,9 @@ def normalize_csv(filename):
 plt.xlabel('Frequencies (GHz)')
 #plt.ylabel('MLOGarithmic (dB)')
 #plt.ylabel('PHASe (Degrees)')
-#plt.ylabel('SWR (dB)')
+plt.ylabel('SWR (dB)')
 #plt.ylabel('Resistance (Ω)')
-plt.ylabel('Reactance (Ω)')
+#plt.ylabel('Reactance (Ω)')
 
 plt.legend(loc=1, prop={'size': 10})
 plt.show()

@@ -18,7 +18,7 @@ for ticker in tickers:
         df['SMA'] = df['Adj Close'].rolling(window=40, min_periods=0).mean()
         df['EMA'] = df['Adj Close'].ewm(span=9, adjust=False).mean()
         diff = df['EMA'][-1] - df['SMA'][-1]
-        if last_volume > 10**7:
+        if last_volume > 10**6:
            data.append([ticker, diff])
     except:
         pass
@@ -29,6 +29,7 @@ data = sorted(data,key=lambda x: x[1])
 
 for row in data:
     plt.scatter(row[0], row[1])
-    
+
+plt.yticks(np.arange(0, 0.3, step=0.1))    
 plt.show()
     

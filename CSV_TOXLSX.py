@@ -47,14 +47,12 @@ def csv_to_xlsx_group(group):
     worksheet_imag = workbook.add_worksheet('Zin Imaginary')
     print_header(worksheet_imag)
 
-    letters = ['A','B','C','D','E','F','G','H','I','J'] 
-    
-    for i in range(len(letters)):
-       input_file_csv(worksheet_s11,i,group,letters[i],0)
-       input_file_csv(worksheet_phase,i,group,letters[i],1)   
-       input_file_csv(worksheet_vswr,i,group,letters[i],2)
-       input_file_csv(worksheet_real,i,group,letters[i],3)
-       input_file_csv(worksheet_imag,i,group,letters[i],3,2)
+    for i in range(20):
+       input_file_csv(worksheet_s11,i,group,chr(i + 65),0)
+       input_file_csv(worksheet_phase,i,group,chr(i + 65),1)   
+       input_file_csv(worksheet_vswr,i,group,chr(i + 65),2)
+       input_file_csv(worksheet_real,i,group,chr(i + 65),3)
+       input_file_csv(worksheet_imag,i,group,chr(i + 65),3,2)
 
     workbook.close()
          
@@ -75,7 +73,9 @@ def make_groups(files):
     
 
 files = os.listdir()
+print(files)
 groups = make_groups(files)
 for group in groups:
     csv_to_xlsx_group(group)
+
 

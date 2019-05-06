@@ -4,7 +4,7 @@ from matplotlib import style
 import csv
 import pickle
 
-style.use('classic')
+style.use('dark_background')
 
 dates = ['08-03-2019','11-03-2019','25-02-2019','26-02-2019','27-02-2019']
 
@@ -20,11 +20,11 @@ def input_file_csv_(type1,angle=None,label=None):
     for date in dates:
         x,y1 = normalize_csv(date,type1,angle)
         y.append(y1)
-    if angle == None:    
-       plt.plot(x,np.mean(y,axis=0),label=type1)
-    else:
-       plt.plot(x,np.mean(y,axis=0),label=type1) 
-    
+    y = np.mean(y,axis=0)
+    for i in range(48,93):
+       print(y[i])
+    #plt.plot(x[48:100],y[48:100],label=type1,c='y',marker="D",markevery=[26,32]) 
+
 def normalize_csv(date,type1,angle):
    if angle == None:
       csv_path = date + '/' + type1 + '/'
@@ -72,19 +72,19 @@ def normalize_csv__(filename):
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
 
 
-input_file_csv('H1D25','0')
+#input_file_csv('H1D25','0')
 #input_file_csv('H1D30-20')
 input_file_csv('H1D50-20','0')
 #input_file_csv('H1D65')
 #input_file_csv('H1D75')
-input_file_csv('H1D80','0')
-input_file_csv('H1N')
+#input_file_csv('H1D80','0')
+#input_file_csv('H1N')
 
 
 
-plt.xticks(np.arange(0,5,step=0.1))
+plt.xticks(np.arange(1.2,2.5,step=0.1))
 plt.xlabel('Meters')
 plt.ylabel('VSWR')
-plt.legend()
-plt.grid()
-plt.show()
+#plt.legend(prop= {'size' : 20})
+#plt.grid()
+#plt.show()

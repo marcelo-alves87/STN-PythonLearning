@@ -31,9 +31,9 @@ from numpy.fft import fft, fftfreq, ifft
 ##pickle_in = open('T188.1-ED.pickle', 'rb')
 ##y_1881_ED = pickle.load(pickle_in)
 ##
-###Haste T189.1-EA
-##pickle_in = open('T189.1-EA.pickle', 'rb')
-##y_1891_EA = pickle.load(pickle_in)
+#Haste T189.1-EA
+pickle_in = open('T189.1-EA.pickle', 'rb')
+y_1891_EA = pickle.load(pickle_in)
 ##
 ###Haste T189.1-EB
 ##pickle_in = open('T189.1-EB.pickle', 'rb')
@@ -72,13 +72,13 @@ from numpy.fft import fft, fftfreq, ifft
 ##y_2051_ED = pickle.load(pickle_in)
 
 #MLog
-pickle_in = open('MLog.pickle', 'rb')
-y_mlog = pickle.load(pickle_in)
+#pickle_in = open('MLog.pickle', 'rb')
+#y_mlog = pickle.load(pickle_in)
 
 #GHz
-start=0.003
-stop=50
-freqs = np.linspace(start,stop,225)
+start=0.002
+stop=1
+freqs = np.linspace(start,stop,1001)
 x = 1/freqs
 
 #n = 1001
@@ -107,9 +107,9 @@ x = 1/freqs
 ##y_2051_EC_i = ifft(y_2051_EC)
 ##y_2051_ED_i = ifft(y_2051_ED)
 
-y_mlog_i = ifft(y_mlog)
+y_mlog_i = ifft(y_1891_EA)
         
-x = x[::-1]
+#x = x[::-1]
 
 #velocidade em 6,33m
 #x = x[::-1]*0.0958
@@ -168,16 +168,16 @@ x = x[::-1]
 ##sort = np.argsort(-y_2051_ED_i)
 ##print('T205.1-ED', x[sort[1]])
 
-y = abs(y_mlog_i)
-sort = sorted(y)
-max_y = sort[-4]
-print(sort[-10:])
-plt.plot(x,y)
-z = x[np.where(y == max_y)]
-vp = 0.9/(z*(10**-9))
-fv=vp/(3*(10**8))
-print(z,fv)
-
+#y = abs(y_mlog_i)
+##sort = sorted(y)
+##max_y = sort[-4]
+##print(sort[-10:])
+plt.plot(x,y_mlog_i)
+##z = x[np.where(y == max_y)]
+##vp = 0.9/(z*(10**-9))
+##fv=vp/(3*(10**8))
+##print(z,fv)
+##
 plt.xlabel('ns')
 plt.ylabel('S11')
 plt.show()

@@ -55,7 +55,7 @@ def main(label1,fator_correcao):
 
         #----------------------------- Dipolo cruzado ----------------------------------------
 
-        XL1=FF(p,2*w,lamb,teta).real #calcula a reatancia indutiva #1 da cruz
+        XL1=FF(p,2*w,lamb,teta) #calcula a reatancia indutiva #1 da cruz
         Bg= ((d)/p)*FF(p,g,lamb,teta) #calcula a susceptância da cruz
         Bd= (4*(2*w+g)/p)*FF(p,p-d,lamb,teta) # calcula a susceptancia da cruz
         BC1=(Bg+Bd).real #calcula a susceptancia da cruz
@@ -66,7 +66,7 @@ def main(label1,fator_correcao):
         lamb1=d/0.5
         f2=30/lamb1 
         XL3=(d/p)*FF(p,2*h,lamb1,teta)
-        BC2=((1/XL3)*((freq/f2)**2)).real #A suceptância BC2 é utilizada para suavizar a frequência central f2
+        BC2=((1/XL3)*((freq/f2)**2)) #A suceptância BC2 é utilizada para suavizar a frequência central f2
 
         #------------------------- Cálculo das admitâncias ------------------------
 
@@ -82,9 +82,10 @@ def main(label1,fator_correcao):
         #------------------------- Platagem das curvas  ---------------------------
 
         ct.append(1/cmath.sqrt(1+.25*((Yt)**2))) #calcula e armazena o coeficiente de transmissão no vetor ct (dB)
-        pt.append((ct[ii]**2).real) #calcula e armazena a potência transmitida no vetor pt
+        pt.append((ct[ii]**2)) #calcula e armazena a potência transmitida no vetor pt
         pr.append(1-ct[ii])  #calcula e armazena a potência refletida no vetor pr
-        ctdb.append(10*cmath.log10( (1/cmath.sqrt(1+.25*((Yt)**2)).real)))
+        ctdb_item = 10*cmath.log10( (1/cmath.sqrt(1+.25*((Yt)**2))))
+        ctdb.append(ctdb_item)
         crdb.append(20*cmath.log10(1-ct[ii]))
         cr.append(cmath.sqrt(pr[ii])) #calcula e armazena o coeficiente de reflexao no vetor cr
 
