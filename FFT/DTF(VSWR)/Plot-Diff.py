@@ -65,13 +65,13 @@ def normalize_csv__(filename):
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
 
 
-#input_file_csv('H1D25','0')
+input_file_csv('H1D25','0')
 #input_file_csv('H1D30-20','0')
 #input_file_csv('H1D50-20','0')
 #input_file_csv('H1D65','0')
 #input_file_csv('H1D75','0')
 #input_file_csv('H1D80','0')
-input_file_csv('H1N')
+#input_file_csv('H1N')
 
 
 

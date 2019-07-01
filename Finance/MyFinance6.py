@@ -15,7 +15,7 @@ def visualize_data2():
     df_corr = df.corr()
     for index, data in df_corr.iteritems():
         for index1, data1 in data.iteritems():
-            if data1 >= 0.96 and index != index1:
+            if data1 >= 0.97 and index != index1:
                 print(('{} e {} fator de correlação: {}').format(index, index1, data1))
     
 def visualize_data():

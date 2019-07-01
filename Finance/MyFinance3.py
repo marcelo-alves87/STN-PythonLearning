@@ -45,10 +45,11 @@ import pandas as pd
 def save_ibovespa_tickers():
     tickers = []
     df = pd.read_excel('FREE-FLOAT.xlsx', sheet_name='FreeFloat')
-    for i in df['Unnamed: 2']:
-        if type(i) is str and i != 'Código':
+    for i in df['Código']:
+        if type(i) is str:
+            print(i)
             tickers.append(i)
-
+    
     with open("ibovespatickers.pickle","wb") as f:
         pickle.dump(tickers,f)
 

@@ -9,13 +9,13 @@ P=500
 #Aporte Mensal (Meta)
 M=500
 #Aporte Mensal (Real)
-MM=[0]
+MM=[]
 #Taxa de Juros Mensal (Meta) (%)
-i=10
+i=0.57
 #Taxa de Juros Mensal (Real) (%)
 ii=[]
 #Prazo (Meses, Começa em 1)
-n=60
+n=48
 
 def plotar_grafico_por_meses(aportes, juros, periodo=n, rendimentos=0):
     if periodo == 0:

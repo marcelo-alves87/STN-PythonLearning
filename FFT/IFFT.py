@@ -153,7 +153,7 @@ y_mlog_i = ifft(y_1891_EA)
 ##print('T189.1-ED', x[sort[1]])
 ##
 ##sort = np.argsort(-y_1972_EB_i)
-##print('T197.2-EB', x[sort[1]])
+##print('T197.2-EB', x[sort[1]]) 
 ##sort = np.argsort(-y_1972_EC_i)
 ##print('T197.2-EC', x[sort[1]])
 ##

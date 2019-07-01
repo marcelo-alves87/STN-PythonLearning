@@ -22,8 +22,8 @@ def input_file_csv_(type1,angle=None,label=None):
         y.append(y1)
     y = np.mean(y,axis=0)
     for i in range(48,93):
-       print(y[i])
-    #plt.plot(x[48:100],y[48:100],label=type1,c='y',marker="D",markevery=[26,32]) 
+       #print(y[i])
+       plt.plot(x[48:100],y[48:100],label=type1,c='y',marker="D",markevery=[26,32]) 
 
 def normalize_csv(date,type1,angle):
    if angle == None:
@@ -32,13 +32,13 @@ def normalize_csv(date,type1,angle):
       csv_path = date + '/' + type1 + '/' + angle + '/'  
    try:
         return normalize_csv_(csv_path + type1)
-   except FileNotFoundError:
+   except:
       try:
             return normalize_csv_(csv_path + 'DTF')
-      except FileNotFoundError:
+      except:
          try:
                 return normalize_csv_(date + '/' + type1 + '/' + 'DTF')
-         except FileNotFoundError:
+         except:
                 return normalize_csv_(date + '/' + type1 + '/' + type1)
             
 def normalize_csv_(csv_path):
@@ -85,6 +85,6 @@ input_file_csv('H1D50-20','0')
 plt.xticks(np.arange(1.2,2.5,step=0.1))
 plt.xlabel('Meters')
 plt.ylabel('VSWR')
-#plt.legend(prop= {'size' : 20})
-#plt.grid()
-#plt.show()
+plt.legend(prop= {'size' : 20})
+plt.grid()
+plt.show()
