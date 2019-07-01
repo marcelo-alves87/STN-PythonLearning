@@ -17,8 +17,8 @@ for ticker in tickers:
         last_volume = df['Volume'][-2]
         df['SMA'] = df['Adj Close'].rolling(window=40, min_periods=0).mean()
         df['EMA'] = df['Adj Close'].ewm(span=9, adjust=False).mean()
-        diff = df['EMA'][-1] - df['SMA'][-1]
-        if last_volume >= 10**6.5 and last_volume < 10**7:
+        diff = df['SMA'][-1] - df['EMA'][-1]
+        if last_volume > 10**6.5 and last_volume < 10**7:
            data.append([ticker, diff])
     except:
         pass
