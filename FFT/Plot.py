@@ -29,13 +29,19 @@ def normalize_csv(filename):
                    ys = []               
             elif(s.find('!') < 0 and s.find('BEGIN') < 0 and s.find('END') < 0):
                 xs.append(row[0])
-                if len(row) > 2:
+                if len(row) > 1:
                     #1 Real, 2 Imaginary
                     ys.append(row[1])
                 else:
                     ys.append(row[1])
     return np.array(xs, dtype=np.float64), np.array(ys, dtype=np.float64)
      
-xs,ys = input_file_csv('/H1-A/HC1N')
+xs,ys = input_file_csv('H3_DT')
+xs = [np.cos(0.174533)*x for x in xs]
+plt.xticks(np.arange(0,max(xs),0.1))
+plt.title('H3')
+plt.xlabel('Metros (m)')
+plt.ylabel('VSWR')
 plt.plot(xs,ys)
 plt.show()
+

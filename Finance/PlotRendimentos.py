@@ -5,22 +5,22 @@ import numpy as np
 style.use('ggplot')
 
 #Valor Inicial
-P=500
+P=0
 #Aporte Mensal (Meta)
-M=500
+M=0
 #Aporte Mensal (Real)
-MM=[]
+MM=[900]*10
 #Taxa de Juros Mensal (Meta) (%)
-i=0.57
+i=8
 #Taxa de Juros Mensal (Real) (%)
-ii=[]
+ii=[0]*10
 #Prazo (Meses, Começa em 1)
-n=48
+n=120
 
 def plotar_grafico_por_meses(aportes, juros, periodo=n, rendimentos=0):
     if periodo == 0:
-        text = ('Total Poupado R$ {}\nJuros Recebidos R$ {}'
-                        + '\nMontante Final R$ {}\n\n\n\n').format(P + sum(aportes),rendimentos - sum(aportes) - P,rendimentos)
+        text = ('Total Poupado R$ {} mil\nJuros Recebidos R$ {} milhões'
+                        + '\nMontante Final R$ {} milhões\n\n\n\n').format((P + sum(aportes))/1000,(rendimentos - sum(aportes) - P)/1000000,rendimentos/1000000)
         print(text)
         plt.text(0.02, 0.5,text)
     else:

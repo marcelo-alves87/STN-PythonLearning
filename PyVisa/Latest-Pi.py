@@ -57,24 +57,24 @@ def calibrate(device, scount):
     device.write(':DISPlay:WINDow:SPLit %s' % ('D1'))
 
 rm = visa.ResourceManager()
-device = rm.open_resource('TCPIP0::169.254.6.22::inst0::INSTR')
-
-if(device != None and config(device)):
-    temp_values = device.query_ascii_values(':SENSe:CORRection:COLLect:GUIDed:SCOunt?')
-    scount = int(temp_values[0])
-    if(scount > 0):
-        #calibrate(device, scount)
-        input('Pluge o cabo na haste de ancora')
-        device.write(':DISPlay:WINDow:SPLit %s' % ('D1'))
-        dump_csv_parameter(device, 'PHASe')
-        dump_csv_parameter(device, 'MLOGarithmic')
-        dump_csv_parameter(device, 'SWR')
-        dump_csv_parameter(device, 'SMITh')
-    else:
-        print('Houve um erro na configuracao do instrumento. Por favor, tente novamente!')
-    device.close()
-else:
-    print('Nao foi possivel realizar a conexao com o intrumento!')      
+device = rm.open_resource('TCPIP0::169.254.118.86::inst0::INSTR')
+print(device)
+##if(device != None and config(device)):
+##    temp_values = device.query_ascii_values(':SENSe:CORRection:COLLect:GUIDed:SCOunt?')
+##    scount = int(temp_values[0])
+##    if(scount > 0):
+##        #calibrate(device, scount)
+##        input('Pluge o cabo na haste de ancora')
+##        device.write(':DISPlay:WINDow:SPLit %s' % ('D1'))
+##        dump_csv_parameter(device, 'PHASe')
+##        dump_csv_parameter(device, 'MLOGarithmic')
+##        dump_csv_parameter(device, 'SWR')
+##        dump_csv_parameter(device, 'SMITh')
+##    else:
+##        print('Houve um erro na configuracao do instrumento. Por favor, tente novamente!')
+##    device.close()
+##else:
+##    print('Nao foi possivel realizar a conexao com o intrumento!')      
 rm.close()    
 
 # end of untitled
