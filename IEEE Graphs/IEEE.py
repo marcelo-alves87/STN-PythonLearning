@@ -3,7 +3,7 @@ import matplotlib as mpl
 #mpl.use('pdf')
 import matplotlib.pyplot as plt
 
-plt.rc('font', family='times')
+plt.rc('font', family='sans')
 plt.rc('xtick', labelsize='x-small')
 plt.rc('ytick', labelsize='x-small')
 plt.rc('text', usetex=True)
