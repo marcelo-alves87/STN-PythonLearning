@@ -14,11 +14,12 @@ for ticker in tickers:
     try:
         df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
         df.set_index('Date', inplace=True)
-        last_volume = df['Volume'][-2]
+        last_volume = df['Volume'][-1]
         df['SMA'] = df['Adj Close'].rolling(window=40, min_periods=0).mean()
         df['EMA'] = df['Adj Close'].ewm(span=9, adjust=False).mean()
+##        diff = (df['EMA'][-1] - df['SMA'][-1])/df['SMA'][-1]        
         diff = df['EMA'][-1] - df['SMA'][-1]
-        if diff > -0.4 and diff < 0.4 and last_volume > 10**6 and last_volume < 10**8:
+        if last_volume >= 10**5 and last_volume < 10**6:
            data.append([ticker, diff])
     except:
         pass

@@ -1,5 +1,7 @@
 import bs4 as bs
 import datetime as dt
+from datetime import date, timedelta
+import timedelta
 import os
 import pandas as pd
 import pandas_datareader.data as web
@@ -41,8 +43,9 @@ def get_data_from_yahoo(reload_ibovespa=False):
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
 
-    start = dt.datetime(2019, 1, 1)
+    start = dt.datetime(2019, 11, 14)
     end = dt.datetime.now()
+    yesterday = dt.date.today() - dt.timedelta(days=1)
     for ticker in tickers:
         print(ticker)
         # just in case your connection breaks, we'd like to save our progress!

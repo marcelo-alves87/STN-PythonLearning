@@ -44,7 +44,7 @@ import pandas as pd
 #Updated in 17/1/2019
 def save_ibovespa_tickers():
     tickers = []
-    df = pd.read_excel('FREE-FLOAT.xlsx', sheet_name='FreeFloat')
+    df = pd.read_excel('Free-Float.xlsx', sheet_name='FreeFloat')
     for i in df['Código']:
         if type(i) is str:
             print(i)
