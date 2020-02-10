@@ -65,9 +65,9 @@ def calibrate(device, scount):
     device.write(':DISPlay:WINDow:SPLit %s' % ('D1'))
 
 rm = visa.ResourceManager()
-device = rm.open_resource('TCPIP0::192.168.0.174::inst0::INSTR')
+device = rm.open_resource('TCPIP0::169.254.157.218::inst0::INSTR')
 amps = [3, 4 , 5 , 6, 8, 10]
-vf = 1
+vf = 1.1
 while vf > 0:
     vf = vf - 0.1
     device.write('*OPC')
@@ -80,7 +80,7 @@ while vf > 0:
         device.write(':SENSe:CORRection:LOSS:COAX %s' % (amp))
         device.write('*OPC')
         time.sleep(1)    
-        dump(device, 'H1' + 'HR2' + str(vf) + 'dB' + amp)
+        dump(device, 'H3_' + 'HR6_' + str(vf) + '_dB_' + str(amp))
         print(amp)
        
 ##while amp <= 20:

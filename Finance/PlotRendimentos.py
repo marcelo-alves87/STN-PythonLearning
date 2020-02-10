@@ -7,13 +7,13 @@ style.use('ggplot')
 #Valor Inicial
 P=0
 #Aporte Mensal (Meta)
-M=0
+M=900
 #Aporte Mensal (Real)
-MM=[900]*10
+MM=[0]
 #Taxa de Juros Mensal (Meta) (%)
-i=8
+i=6
 #Taxa de Juros Mensal (Real) (%)
-ii=[0]*10
+ii=[0]
 #Prazo (Meses, Começa em 1)
 n=120
 
