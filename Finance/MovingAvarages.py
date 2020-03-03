@@ -10,7 +10,8 @@ def plot_range(volume_min, volume_max, plot_type):
     with open("ibovespatickers.pickle", "rb") as f:
         tickers = pickle.load(f)
         
-    data = []    
+    data = []
+    monotonic_factor = -3 # dois dias anteriores
     for ticker in tickers:
         try:
             df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
@@ -25,7 +26,7 @@ def plot_range(volume_min, volume_max, plot_type):
                if plot_type == 0: 
                    data.append([ticker, diff])
 
-               elif plot_type == 1 and df['EMA'][-3:].is_monotonic and df['SMA'][-3:].is_monotonic_decreasing:    
+               elif plot_type == 1 and df['EMA'][monotonic_factor:].is_monotonic and df['SMA'][monotonic_factor:].is_monotonic_decreasing:    
                    data.append([ticker, diff])
                
         except:
@@ -56,7 +57,7 @@ plot_range(10**6,10**7,0)
 
 plt.subplot(212)
 plt.title('MA Cross')
-plot_range(10**6,10**8,1)
+plot_range(10**6,10**9,1)
 
 
 plt.show()
