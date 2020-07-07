@@ -43,7 +43,7 @@ def get_data_from_yahoo(reload_ibovespa=False):
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
 
-    start = dt.datetime(2019, 11, 20)
+    start = dt.datetime(2020, 4, 1)
     end = dt.datetime.now()
     yesterday = dt.date.today() - dt.timedelta(days=1)
     for ticker in tickers:
@@ -51,7 +51,7 @@ def get_data_from_yahoo(reload_ibovespa=False):
         # just in case your connection breaks, we'd like to save our progress!
         if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
             try:
-                df = web.DataReader(ticker + '.SA', 'yahoo', start, end)
+                df = web.DataReader(ticker + '.SA', 'yahoo', start, yesterday)
                 df.to_csv('stock_dfs/{}.csv'.format(ticker))
             except:
                 print(ticker,'não foi encontrado')
