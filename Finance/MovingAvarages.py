@@ -28,7 +28,7 @@ def plot_range(volume_min, volume_max, plot_type):
                if plot_type == 1 and diff <= 0 and df['EMA'][monotonic_factor:].is_monotonic:
                    data.append([ticker, diff])
 
-               elif plot_type == 2 and diff >= 0 and df['SMA'][monotonic_factor:].is_monotonic_decreasing:    
+               elif plot_type == 2 and diff <= 0 and df['SMA'][monotonic_factor:].is_monotonic_decreasing:    
                    data.append([ticker, diff])    
 
                elif plot_type == 3 and df['EMA'][monotonic_factor:].is_monotonic and df['SMA'][monotonic_factor:].is_monotonic_decreasing:    
