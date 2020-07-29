@@ -51,7 +51,7 @@ def get_data_from_yahoo(reload_ibovespa=False):
         # just in case your connection breaks, we'd like to save our progress!
         if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
             try:
-                df = web.DataReader(ticker + '.SA', 'yahoo', start, yesterday)
+                df = web.DataReader(ticker + '.SA', 'yahoo', start, end)
                 df.to_csv('stock_dfs/{}.csv'.format(ticker))
             except:
                 print(ticker,'não foi encontrado')
