@@ -96,7 +96,7 @@ main('Dielectric Permissivity',1.5)
 plt.xlabel('Freq (GHz)')
 plt.ylabel('S21 (dB)')
 plt.xticks(np.arange(0,25,1))
-plt.grid()
+#plt.grid()
 plt.legend()
 plt.show()
 

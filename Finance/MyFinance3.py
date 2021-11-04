@@ -42,9 +42,9 @@ import pandas as pd
 
 #Data from http://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/ibovespa.htm
 #Updated in 17/1/2019
-def save_ibovespa_tickers():
+def save_xlsx_ibovespa_tickers():
     tickers = []
-    df = pd.read_excel('Free-Float.xlsx', sheet_name='Free-Float')
+    df = pd.read_excel('Free-Float_5-2021.xlsx', sheet_name='Free-Float_5-2021')
     for i in df['Código']:
         if type(i) is str:
             print(i)
@@ -53,4 +53,16 @@ def save_ibovespa_tickers():
     with open("ibovespatickers.pickle","wb") as f:
         pickle.dump(tickers,f)
 
-save_ibovespa_tickers()
+def save_csv_ibovespa_tickers():
+    tickers = []
+    df = pd.read_csv('Free-Float_9-2021.csv', delimiter=';')
+    for i in df['Codigo']:
+        if type(i) is str:
+            print(i)
+            tickers.append(i)
+
+    with open("ibovespatickers.pickle","wb") as f:
+        pickle.dump(tickers,f)
+        
+            
+save_csv_ibovespa_tickers()

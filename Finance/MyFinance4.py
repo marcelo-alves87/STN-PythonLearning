@@ -7,6 +7,9 @@ import pandas as pd
 import pandas_datareader.data as web
 import pickle
 import requests
+import yfinance as yfin
+
+yfin.pdr_override()
 
 def removeReference(ticker):
     index = ticker.find('[')
@@ -42,16 +45,13 @@ def get_data_from_yahoo(reload_ibovespa=False):
             tickers = pickle.load(f)
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
-
-    start = dt.datetime(2020, 4, 1)
-    end = dt.datetime.now()
-    yesterday = dt.date.today() - dt.timedelta(days=1)
+    
     for ticker in tickers:
         print(ticker)
         # just in case your connection breaks, we'd like to save our progress!
         if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
             try:
-                df = web.DataReader(ticker + '.SA', 'yahoo', start, end)
+                df = web.get_data_yahoo(ticker + '.SA', start='2021-08-01', end='2021-11-04')
                 df.to_csv('stock_dfs/{}.csv'.format(ticker))
             except:
                 print(ticker,'não foi encontrado')

@@ -2,6 +2,7 @@ import visa
 import time
 import sys
 
+
 def ext_query_bin_data_to_file(device, query, pc_file_path):
     file_data = device.query_binary_values(query, datatype='s')[0]
     

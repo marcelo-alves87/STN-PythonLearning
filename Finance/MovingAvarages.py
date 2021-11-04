@@ -11,7 +11,7 @@ def plot_range(volume_min, volume_max, plot_type):
         tickers = pickle.load(f)
         
     data = []
-    monotonic_factor = -3 # dois dias anteriores
+    monotonic_factor = -2 # dois dias anteriores
     for ticker in tickers:
         try:
             df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
@@ -54,15 +54,15 @@ plt.figure()
 
 plt.subplot(221)
 plt.title('EMA')
-plot_range(10**6,10**8,1)
+plot_range(10**7,10**9,1)
 
 plt.subplot(222)
 plt.title('SMA')
-plot_range(10**6,10**8,2)
+plot_range(10**7,10**9,2)
 
 plt.subplot(212)
 plt.title('MA Cross')
-plot_range(10**6,10**8,3)
+plot_range(10**7,10**9,3)
 
 
 plt.show()
