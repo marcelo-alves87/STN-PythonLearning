@@ -45,13 +45,15 @@ def get_data_from_yahoo(reload_ibovespa=False):
             tickers = pickle.load(f)
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
+
+    tomorrow = dt.date.today() + dt.timedelta(days=1)    
     
     for ticker in tickers:
         print(ticker)
         # just in case your connection breaks, we'd like to save our progress!
         if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
             try:
-                df = web.get_data_yahoo(ticker + '.SA', start='2021-03-01', end='2021-11-09')
+                df = web.get_data_yahoo(ticker + '.SA', start='2021-03-01', end=tomorrow.strftime('%Y-%m-%d'))
                 df.to_csv('stock_dfs/{}.csv'.format(ticker))           
             except:
                 print(ticker,'não foi encontrado')

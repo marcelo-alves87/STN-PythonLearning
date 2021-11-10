@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 import pandas as pd
 import numpy as np
+import datetime
 
 style.use('ggplot')
 
@@ -21,6 +22,20 @@ def create_dict():
         except:
             pass
     return data
+
+def print_corr():
+    dict1 = create_dict()
+    print(data['LWSA3'])
+
+    df = pd.read_csv('ibovespa_joined_closes.csv')
+    df_corr = df.corr()
+    for index, data in df_corr.iteritems():
+        for index1, data1 in data.iteritems():
+            if data1 >= 0.98 and index != index1:
+                print(('{} e {}  fator de correlação: {}').format(index, index1, data1))
+                
+
+
 
 def plot(ticker1, ticker2):
 
@@ -43,28 +58,43 @@ def plot(ticker1, ticker2):
     if df1.max() > df2.max():
         df1 = df1.divide(df2)        
         df1 = df1.subtract(1)
+        roll = df1.rolling(window=10, min_periods=0).mean()
+        roll.plot(ax=ax2, c='lightcoral')        
         df1.plot(ax=ax2, c='purple')
     else:
         df2 = df2.divide(df1)
         df2 = df2.subtract(1)
         roll = df2.rolling(window=10, min_periods=0).mean()
-        roll.plot(ax=ax2, c='lightcoral')
-        print('roll',roll['2021-09-15'])
-        print(df2['2021-09-15'])
+        roll.plot(ax=ax2, c='lightcoral')        
         df2.plot(ax=ax2, c='brown')
     
     ax1.fill_between(df.index.values, list1, list2, color="grey", alpha="0.3")    
     ax1.legend()
-    #plt.show()
-    
-dict1 = create_dict()
-#print(data['LWSA3'])
+    plt.show()
 
-##df = pd.read_csv('ibovespa_joined_closes.csv')
-##df_corr = df.corr()
-##for index, data in df_corr.iteritems():
-##    for index1, data1 in data.iteritems():
-##        if data1 >= 0.98 and index != index1:
-##            print(('{} e {}  fator de correlação: {}').format(index, index1, data1))
-##            
-plot('AMAR3', 'MTRE3')
+def mean_diff(date):    
+    date_str = date.strftime('%Y-%m-%d')
+    df = pd.read_csv('ibovespa_joined_closes.csv')
+    df_corr = df.corr()
+    for index, data in df_corr.iteritems():
+        for index1, data1 in data.iteritems():
+           if data1 >= 0.98 and index != index1:
+               df1 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
+               df1 = df1['Adj Close']
+               df2 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
+               df2 = df2['Adj Close']
+               value1 = df1[date_str]
+               value2 = df2[date_str]
+               if value1 > value2:
+                   df1 = df1.divide(df2)
+                   df1 = df1.subtract(1)
+                   value1 = df1[date_str]
+                   mean10 = df1.rolling(window=10, min_periods=0).mean()
+                   mean10_value = mean10[date_str]                
+                   print(('Data: {} : {} e {};  Fator de correlação: {}, Diferença com média: {}').format(date_str,index, index1, data1, value1 - mean10_value))
+
+mean_diff(datetime.datetime(2021, 9, 20))
+
+plot('USIM3','USIM5')
+
+            
