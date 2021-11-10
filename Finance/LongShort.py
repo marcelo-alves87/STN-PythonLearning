@@ -72,29 +72,42 @@ def plot(ticker1, ticker2):
     ax1.legend()
     plt.show()
 
+def sort_(e):
+    return e['diff']
+
 def mean_diff(date):    
     date_str = date.strftime('%Y-%m-%d')
     df = pd.read_csv('ibovespa_joined_closes.csv')
     df_corr = df.corr()
+    tickets = []
     for index, data in df_corr.iteritems():
         for index1, data1 in data.iteritems():
            if data1 >= 0.98 and index != index1:
-               df1 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
-               df1 = df1['Adj Close']
-               df2 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
-               df2 = df2['Adj Close']
-               value1 = df1[date_str]
-               value2 = df2[date_str]
-               if value1 > value2:
-                   df1 = df1.divide(df2)
-                   df1 = df1.subtract(1)
+               try: 
+                   df1 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
+                   df1 = df1['Adj Close']
+                   df2 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
+                   df2 = df2['Adj Close']
                    value1 = df1[date_str]
-                   mean10 = df1.rolling(window=10, min_periods=0).mean()
-                   mean10_value = mean10[date_str]                
-                   print(('Data: {} : {} e {};  Fator de correlação: {}, Diferença com média: {}').format(date_str,index, index1, data1, value1 - mean10_value))
+                   value2 = df2[date_str]                   
+                   if value1 > value2:
+                       df1 = df1.divide(df2)
+                       df1 = df1.subtract(1)
+                       value1 = df1[date_str]
+                       mean10 = df1.rolling(window=10, min_periods=0).mean()
+                       mean10_value = mean10[date_str]
+                       tickets.append({'date' : date_str, 'ticket1' :index, 'ticket2' :index1, 'corr' :data1, 'diff' : value1 - mean10_value})                   
+                       #print(('Data: {} : {} e {};  Fator de correlação: {}, Diferença com média: {}').format(date_str,index, index1, data1, value1 - mean10_value))
+               except:
+                   pass
+               
+    return tickets
 
-mean_diff(datetime.datetime(2021, 9, 20))
+tickets = mean_diff(datetime.datetime(2021, 9, 20))
+tickets.sort(reverse=True, key=sort_)
+for ticket in tickets:
+    print(('Data: {} : {} e {};  Fator de correlação: {}, Diferença com média: {}').format(ticket['date'],ticket['ticket1'], ticket['ticket2'], ticket['corr'], ticket['diff']))
 
-plot('USIM3','USIM5')
+#plot('USIM3','USIM5')
 
             
