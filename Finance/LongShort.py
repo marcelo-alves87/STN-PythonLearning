@@ -68,12 +68,15 @@ def plot(ticker1, ticker2):
         roll.plot(ax=ax2, c='lightcoral')        
         df2.plot(ax=ax2, c='brown')
     
-    ax1.fill_between(df.index.values, list1, list2, color="grey", alpha="0.3")    
+    #ax1.fill_between(df.index.values, list1, list2, color="grey", alpha="0.3")    
     ax1.legend()
     plt.show()
 
 def sort_(e):
     return e['diff']
+
+def sort2_(e):
+    return e['corr']
 
 def mean_diff(date):    
     date_str = date.strftime('%Y-%m-%d')
@@ -82,7 +85,7 @@ def mean_diff(date):
     tickets = []
     for index, data in df_corr.iteritems():
         for index1, data1 in data.iteritems():
-           if data1 >= 0.98 and index != index1:
+           if data1 >= 0.96 and index != index1:
                try: 
                    df1 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
                    df1 = df1['Adj Close']
@@ -96,18 +99,19 @@ def mean_diff(date):
                        value1 = df1[date_str]
                        mean10 = df1.rolling(window=10, min_periods=0).mean()
                        mean10_value = mean10[date_str]
-                       tickets.append({'date' : date_str, 'ticket1' :index, 'ticket2' :index1, 'corr' :data1, 'diff' : value1 - mean10_value})                   
-                       #print(('Data: {} : {} e {};  Fator de correlação: {}, Diferença com média: {}').format(date_str,index, index1, data1, value1 - mean10_value))
+                       tickets.append({'date' : date_str, 'ticket1' :index, 'ticket2' :index1, 'corr' :data1, 'diff' : value1 - mean10_value})                                          
                except:
                    pass
                
     return tickets
 
-tickets = mean_diff(datetime.datetime(2021, 9, 20))
+tickets = mean_diff(datetime.datetime(2021, 11, 9))
 tickets.sort(reverse=True, key=sort_)
+#tickets = tickets[:100]
+#tickets.sort(reverse=True, key=sort2_)
 for ticket in tickets:
     print(('Data: {} : {} e {};  Fator de correlação: {}, Diferença com média: {}').format(ticket['date'],ticket['ticket1'], ticket['ticket2'], ticket['corr'], ticket['diff']))
-
-#plot('USIM3','USIM5')
+ 
+#plot('LREN3','AMAR3')
 
             
