@@ -1,9 +1,16 @@
+###
+## 1. Se a linha roxa estiver acima da linha lightcoral , vende-se a ação vermelha pois ela vai cair e compra a linha azul que vai subir
+## 2. Se a linha roxa estiver abaixo da linha lightcoral, vende-se a ação azul pois ela vai cair e compra a linha vermelha que vai subir
+
+
 import pickle
 import matplotlib.pyplot as plt
 from matplotlib import style
+import matplotlib.dates as mdates
 import pandas as pd
 import numpy as np
-import datetime
+import datetime as dt
+import pdb
 
 style.use('ggplot')
 
@@ -40,18 +47,26 @@ def print_corr():
 def plot(ticker1, ticker2):
 
     
-    ax1 = plt.subplot2grid((6,1), (0,0), rowspan=4, colspan=1)
-    ax2 = plt.subplot2grid((6,1), (5,0), rowspan=1, colspan=1, sharex=ax1)
-    ax1.xaxis_date()
+    ax1 = plt.subplot2grid((6,1), (0,0), rowspan=2, colspan=1)
+    ax2 = plt.subplot2grid((6,1), (2,0), rowspan=2, colspan=1)
+    ax3 = plt.subplot2grid((6,1), (4,0), rowspan=1, colspan=1)
 
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    ax3.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    
+    ax1.get_shared_x_axes().join(ax1, ax3)
+    ax1.get_shared_x_axes().join(ax2, ax3)
+    ax1.get_shared_x_axes().join(ax1, ax2)
+    
     df = pd.read_csv('stock_dfs/' + ticker1 + '.csv', parse_dates=True, index_col=0)
     df1 = df['Adj Close']
-    df1.plot(ax=ax1,label=ticker1) 
+    df1.plot(ax=ax1,label=ticker1, c='red') 
     list1 = df['Adj Close'].tolist()    
 
     df = pd.read_csv('stock_dfs/' + ticker2 + '.csv', parse_dates=True, index_col=0)
     df2 = df['Adj Close']
-    df2.plot(ax=ax1,label=ticker2)
+    df2.plot(ax=ax2,label=ticker2, c='blue')
     list2 = df['Adj Close'].tolist()
     
     
@@ -59,14 +74,14 @@ def plot(ticker1, ticker2):
         df1 = df1.divide(df2)        
         df1 = df1.subtract(1)
         roll = df1.rolling(window=10, min_periods=0).mean()
-        roll.plot(ax=ax2, c='lightcoral')        
-        df1.plot(ax=ax2, c='purple')
+        roll.plot(ax=ax3, c='lightcoral')        
+        df1.plot(ax=ax3, c='purple')
     else:
         df2 = df2.divide(df1)
         df2 = df2.subtract(1)
         roll = df2.rolling(window=10, min_periods=0).mean()
-        roll.plot(ax=ax2, c='lightcoral')        
-        df2.plot(ax=ax2, c='brown')
+        roll.plot(ax=ax3, c='lightcoral')        
+        df2.plot(ax=ax3, c='brown')
     
     #ax1.fill_between(df.index.values, list1, list2, color="grey", alpha="0.3")    
     ax1.legend()
@@ -78,31 +93,34 @@ def sort_(e):
 def sort2_(e):
     return e['corr']
 
-def mean_diff(date):    
+def mean_diff(date):
+    
     date_str = date.strftime('%Y-%m-%d')
+    yesterday = date - dt.timedelta(days=1)
+    yesterday_str = yesterday.strftime('%Y-%m-%d')
     df = pd.read_csv('ibovespa_joined_closes.csv')
     df_corr = df.corr()
     tickets = []
     for index, data in df_corr.iteritems():
         for index1, data1 in data.iteritems():
-           if data1 >= 0.95 and index != index1:
-               try: 
+           if data1 >= 0.9 and index != index1:
+               try:                   
                    df1 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
                    df1 = df1['Adj Close']
 
                    df11 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
                    df11 = df11['Volume']
-                   df11_value = round(df11[date_str] / 10**6,3)
+                   df11_value = round(df11[yesterday_str] / 10**6,3)
                   
                    df2 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
                    df2 = df2['Adj Close']
 
                    df22 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
                    df22 = df22['Volume'] 
-                   df22_value = round(df22[date_str] / 10**6,3)
+                   df22_value = round(df22[yesterday_str] / 10**6,3)
                    
-                   value1 = df1[date_str]
-                   value2 = df2[date_str]
+                   value1 = df1[yesterday_str]
+                   value2 = df2[yesterday_str]
                    
                    if value1 > value2 and df11_value > 1 and df22_value > 1:
                        df1 = df1.divide(df2)
@@ -118,13 +136,12 @@ def mean_diff(date):
                
     return tickets
 
-tickets = mean_diff(datetime.datetime(2021, 11, 10))
+tickets = mean_diff(dt.date.today())
 tickets.sort(reverse=True, key=sort_)
-#tickets = tickets[:100]
-#tickets.sort(reverse=True, key=sort2_)
 for ticket in tickets:
-    print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticket['date'],ticket['ticket1'], ticket['ticket2'], ticket['vol1'], ticket['vol2'], ticket['corr'], ticket['diff']))
+    if ticket['diff'] > 0:
+       print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticket['date'],ticket['ticket1'], ticket['ticket2'], ticket['vol1'], ticket['vol2'], ticket['corr'], ticket['diff']))
     
-#plot('JSRE11','DMVF3')
+#plot('ALPA4','GFSA3')
 
             

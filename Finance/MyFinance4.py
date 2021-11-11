@@ -37,12 +37,15 @@ def save_ibovespa_tickers():
         pickle.dump(tickers,f)
 
 
-def get_data_from_yahoo(reload_ibovespa=False):
-    if reload_ibovespa:
-        tickers = save_ibovespa_tickers()
-    else:
+def get_data_from_yahoo(tickers = None):
+    if tickers == None:      
         with open("ibovespatickers.pickle", "rb") as f:
             tickers = pickle.load(f)
+    elif isinstance(tickers, str):
+        ticker = tickers
+        tickers = []
+        tickers.append(ticker)
+        
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
 
@@ -59,6 +62,5 @@ def get_data_from_yahoo(reload_ibovespa=False):
                 print(ticker,'não foi encontrado')
         else:
             print('Already have {}'.format(ticker))
-
 
 get_data_from_yahoo()
