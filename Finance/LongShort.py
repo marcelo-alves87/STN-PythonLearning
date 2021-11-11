@@ -85,6 +85,7 @@ def plot(ticker1, ticker2):
     
     #ax1.fill_between(df.index.values, list1, list2, color="grey", alpha="0.3")    
     ax1.legend()
+    ax2.legend()
     plt.show()
 
 def sort_(e):
@@ -139,9 +140,9 @@ def mean_diff(date):
 tickets = mean_diff(dt.date.today())
 tickets.sort(reverse=True, key=sort_)
 for ticket in tickets:
-    if ticket['diff'] > 0:
+    if ticket['diff'] > 0.5:
        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticket['date'],ticket['ticket1'], ticket['ticket2'], ticket['vol1'], ticket['vol2'], ticket['corr'], ticket['diff']))
     
-#plot('ALPA4','GFSA3')
+#plot('AMER3', 'TCSA3')
 
             
