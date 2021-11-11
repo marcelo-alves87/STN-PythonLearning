@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import pdb
+import math
 
 style.use('ggplot')
 
@@ -89,10 +90,15 @@ def plot(ticker1, ticker2):
     plt.show()
 
 def sort_(e):
-    return e['diff']
+    i = float(e['diff'])
+    if math.isnan(i):
+        i = 0
+    return i
 
-def sort2_(e):
-    return e['corr']
+def load_tickers():
+    with open("tickers.pickle", "rb") as f:
+        tickers = pickle.load(f)
+    return tickers
 
 def mean_diff(date):
     
@@ -101,7 +107,7 @@ def mean_diff(date):
     yesterday_str = yesterday.strftime('%Y-%m-%d')
     df = pd.read_csv('ibovespa_joined_closes.csv')
     df_corr = df.corr()
-    tickets = []
+    tickers = []
     for index, data in df_corr.iteritems():
         for index1, data1 in data.iteritems():
            if data1 >= 0.9 and index != index1:
@@ -120,10 +126,10 @@ def mean_diff(date):
                    df22 = df22['Volume'] 
                    df22_value = round(df22[yesterday_str] / 10**6,3)
                    
-                   value1 = df1[yesterday_str]
+                   value1 = df1[yesterday_str] 
                    value2 = df2[yesterday_str]
                    
-                   if value1 > value2 and df11_value > 1 and df22_value > 1:
+                   if value1 > value2:
                        df1 = df1.divide(df2)
                        df1 = df1.subtract(1)
                        value1 = df1[date_str]
@@ -131,18 +137,24 @@ def mean_diff(date):
                        mean10_value = mean10[date_str]
                        diff = round(abs(value1 - mean10_value),3)
                        
-                       tickets.append({'date' : date_str, 'ticket1' :index, 'ticket2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value})                                          
+                       tickers.append({'date' : date_str, 'ticker1' :index, 'ticker2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value})                                          
                except:
                    pass
-               
-    return tickets
 
-tickets = mean_diff(dt.date.today())
-tickets.sort(reverse=True, key=sort_)
-for ticket in tickets:
-    if ticket['diff'] > 0.5:
-       print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticket['date'],ticket['ticket1'], ticket['ticket2'], ticket['vol1'], ticket['vol2'], ticket['corr'], ticket['diff']))
-    
-#plot('AMER3', 'TCSA3')
+    tickers.sort(reverse=True, key=sort_)               
+    with open("tickers.pickle","wb") as f:
+        pickle.dump(tickers,f)
+
+
+#mean_diff(dt.date.today())
+
+tickers = load_tickers()
+
+for ticker in tickers:
+    if ticker['diff'] > 1 and ticker['vol1'] > 1 and ticker['vol2'] > 1:
+        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
+
+     
+#plot('VALE3', 'AMER3')
 
             
