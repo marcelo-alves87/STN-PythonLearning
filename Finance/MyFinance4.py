@@ -8,6 +8,7 @@ import pandas_datareader.data as web
 import pickle
 import requests
 import yfinance as yfin
+import pdb
 
 yfin.pdr_override()
 
@@ -63,4 +64,59 @@ def get_data_from_yahoo(tickers = None):
         else:
             print('Already have {}'.format(ticker))
 
-get_data_from_yahoo()
+def get_data_from_brinvesting():
+
+    headers = {
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
+    }
+
+    links = []
+    resp = requests.get('http://br.investing.com/indices/bovespa-components', headers=headers)
+    soup = bs.BeautifulSoup(resp.text, 'lxml')
+    table = soup.find('table', {'id': 'cr1'})
+    tickers = []
+    for row in table.findAll('tr')[1:]:
+        link = row.find('a')
+        links.append('http://br.investing.com' + link['href'] + '-historical-data')
+    for link in links:
+        resp = requests.get(link, headers=headers)
+
+        soup = bs.BeautifulSoup(resp.text, 'lxml')
+        title = soup.title.text
+
+        title = title.partition('(')[2]
+        title = title.partition(')')[0]
+
+        print(title)
+        
+        df = pd.read_html(resp.text, thousands='.', decimal=',')
+        i = 0
+        hasNotFound = True
+        while hasNotFound:
+            if i == len(df):
+                raise Exception('Table not found')
+            else:
+                if 'Vol.' in df[i].columns and 'Último' in df[i].columns:
+                    hasNotFound = False
+                else:    
+                    i = i + 1
+        df = df[i]
+        
+        df['Date'] = pd.to_datetime(df['Data'].astype(str), format='%d%m%Y')
+        df['Adj Close'] = df['Último'].astype(float)
+
+        df['Volume'] = df['Vol.'].str.replace('M','0000')
+        df['Volume'] = df['Volume'].str.replace(',','')
+        df = df.drop('Vol.', 1)
+        df = df.drop('Último', 1)
+        df = df.drop('Máxima', 1)
+        df = df.drop('Abertura', 1)
+        df = df.drop('Var%', 1)
+        df = df.drop('Data', 1)
+        df = df.drop('Mínima', 1)
+        df.set_index('Date', inplace=True)
+        df.to_csv('stock_dfs/{}.csv'.format(title))   
+
+       
+#get_data_from_yahoo()
+get_data_from_brinvesting()

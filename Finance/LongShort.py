@@ -148,13 +148,12 @@ def mean_diff(date):
 
 #mean_diff(dt.date.today())
 
-tickers = load_tickers()
+##tickers = load_tickers()
+##
+##for ticker in tickers:    
+##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
 
-for ticker in tickers:
-    if ticker['diff'] > 1 and ticker['vol1'] > 1 and ticker['vol2'] > 1:
-        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
-
-     
-#plot('VALE3', 'AMER3')
+  
+plot('GFSA3', 'NTCO3')
 
             
