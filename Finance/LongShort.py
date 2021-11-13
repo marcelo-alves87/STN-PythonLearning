@@ -100,79 +100,102 @@ def load_tickers():
         tickers = pickle.load(f)
     return tickers
 
-def mean_diff(date):
+def mean_diff_value(df1,df2,date_str):
+       df1 = df1.divide(df2)
+       df1 = df1.subtract(1)
+
+       if isinstance(df1[date_str],pd.Series):                                                  
+           value1 = float(df1[date_str][0])
+       elif isinstance(df1[date_str],np.float64):
+           value1 = float(df1[date_str])
+
+
+       
+       mean10 = df1.rolling(window=10, min_periods=0).mean()
+
+       if isinstance(mean10[date_str],pd.Series):                                                  
+           mean10_value = float(mean10[date_str][0])
+       elif isinstance(mean10[date_str],np.float64):
+           mean10_value = float(mean10[date_str])                  
+
+        
+       diff = round(abs(value1 - mean10_value),3)
+       return diff
+
+def mean_diff_ticker(index, index1, date_str, yesterday_str):
+
+    try:           
+       df1 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
+       df1 = df1['Adj Close']
+
+       df11 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
+       df11 = df11['Volume']
+       
+      
+       df2 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
+       df2 = df2['Adj Close']
+
+       df22 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
+       df22 = df22['Volume'] 
+       
+       if isinstance(df11[yesterday_str],pd.Series):                      
+           df11_value = round(float(df11[yesterday_str][0]) / 10**6,3)
+           value1 = float(df1[yesterday_str][0])
+       elif isinstance(df11[yesterday_str],np.int64):
+           df11_value = round(float(df11[yesterday_str]) / 10**6,3)
+           value1 = float(df1[yesterday_str])
+           
+       if isinstance(df22[yesterday_str],pd.Series):                       
+           df22_value = round(float(df22[yesterday_str][0]) / 10**6,3)
+           value2 = float(df2[yesterday_str][0])
+       elif isinstance(df22[yesterday_str],np.int64):
+           df22_value = round(float(df22[yesterday_str]) / 10**6,3)    
+           value2 = float(df2[yesterday_str])
+       
+       
+       if value1 > value2:                       
+           diff = mean_diff_value(df1, df2, date_str)
+       else:
+           diff = mean_diff_value(df2, df1, date_str)
+
+       return diff, df11_value, df22_value    
+    except:                   
+       print(traceback.format_exc())                   
+       pass
+
+
+def mean_diff(date, ticker1 = None, ticker2 = None):
         
     date_str = date.strftime('%Y-%m-%d')
     yesterday = date - dt.timedelta(days=1)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
     df = pd.read_csv('ibovespa_joined_closes.csv')
     df_corr = df.corr()
-    tickers = []
-    for index, data in df_corr.iteritems():
-        for index1, data1 in data.iteritems():
-           if data1 >= 0.9 and index != index1:
-               try:                 
-                   
-                   df1 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
-                   df1 = df1['Adj Close']
-
-                   df11 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
-                   df11 = df11['Volume']
-                   
-                  
-                   df2 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
-                   df2 = df2['Adj Close']
-
-                   df22 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
-                   df22 = df22['Volume'] 
-                   
-                   if isinstance(df11[yesterday_str],pd.Series):                      
-                       df11_value = round(float(df11[yesterday_str][0]) / 10**6,3)
-                       value1 = float(df1[yesterday_str][0])
-                   elif isinstance(df11[yesterday_str],np.int64):
-                       df11_value = round(float(df11[yesterday_str]) / 10**6,3)
-                       value1 = float(df1[yesterday_str])
-                       
-                   if isinstance(df22[yesterday_str],pd.Series):                       
-                       df22_value = round(float(df22[yesterday_str][0]) / 10**6,3)
-                       value2 = float(df2[yesterday_str][0])
-                   elif isinstance(df22[yesterday_str],np.int64):
-                       df22_value = round(float(df22[yesterday_str]) / 10**6,3)    
-                       value2 = float(df2[yesterday_str])
-                   
-                   
-                   if value1 > value2:                       
-                       df1 = df1.divide(df2)
-                       df1 = df1.subtract(1)
     
-                       if isinstance(df1[date_str],pd.Series):                                                  
-                           value1 = float(df1[date_str][0])
-                       elif isinstance(df1[date_str],np.float64):
-                           value1 = float(df1[date_str])
-                    
+    if ticker1 == None or ticker2 == None:
+        tickers = []
+        for index, data in df_corr.iteritems():
+            for index1, data1 in data.iteritems():
+               if data1 >= 0.9 and index != index1:
+                   diff, df11_value, df22_value = mean_diff_ticker(index, index1, date_str, yesterday_str)
+                   tickers.append({'date' : date_str, 'ticker1' :index, 'ticker2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value})                                           
+        tickers.sort(reverse=True, key=sort_)
 
-                       
-                       mean10 = df1.rolling(window=10, min_periods=0).mean()
-
-                       if isinstance(mean10[date_str],pd.Series):                                                  
-                           mean10_value = float(mean10[date_str][0])
-                       elif isinstance(mean10[date_str],np.float64):
-                           mean10_value = float(mean10[date_str])                  
-
-                        
-                       diff = round(abs(value1 - mean10_value),3)
-                       
-                       tickers.append({'date' : date_str, 'ticker1' :index, 'ticker2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value})                                          
-               except:                   
-                   print(traceback.format_exc())                   
-                   pass
-
-    tickers.sort(reverse=True, key=sort_)               
-    with open("tickers.pickle","wb") as f:
-        pickle.dump(tickers,f)
+        with open("tickers.pickle","wb") as f:
+            pickle.dump(tickers,f)
+    else:
+        for index, data in df_corr.iteritems():
+            for index1, data1 in data.iteritems():
+                if index == ticker1 and index1 == ticker2:
+                    diff, df11_value, df22_value = mean_diff_ticker(index, index1, date_str, yesterday_str)
+                    print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(date_str,index, index1, df11_value, df22_value, round(data1,3), diff))
+                    break
+        
+    
 
 
 #mean_diff(dt.date.today() - dt.timedelta(days=1))
+mean_diff(dt.date.today() - dt.timedelta(days=1), 'VALE3', 'AMER3')
 
 ##tickers = load_tickers()
 ##
@@ -182,6 +205,6 @@ def mean_diff(date):
 
 
 
-plot('GFSA3', 'HGBS11')
+plot('GFSA3', 'NTCO3')
 
             
