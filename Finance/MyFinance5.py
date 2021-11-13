@@ -1,7 +1,9 @@
 import pandas as pd
 import pickle
+import pdb
 
 def compile_data():
+    
     with open("ibovespatickers.pickle", "rb") as f:
         tickers = pickle.load(f)
 
@@ -15,7 +17,10 @@ def compile_data():
             df.set_index('Date', inplace=True)
 
             df.rename(columns={'Adj Close': ticker}, inplace=True)
-            df.drop(['Open', 'High', 'Low', 'Close', 'Volume'], 1, inplace=True)
+            if 'Volume' in df.columns:
+                df.drop(['Volume'], 1, inplace=True)
+            if 'Open' in df.columns:
+                df.drop(['Open', 'High', 'Low', 'Close'], 1, inplace=True)
 
             if main_df.empty:
                 main_df = df

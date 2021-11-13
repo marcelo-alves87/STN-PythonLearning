@@ -2,7 +2,7 @@
 ## 1. Se a linha roxa estiver acima da linha lightcoral , vende-se a ação vermelha pois ela vai cair e compra a linha azul que vai subir
 ## 2. Se a linha roxa estiver abaixo da linha lightcoral, vende-se a ação azul pois ela vai cair e compra a linha vermelha que vai subir
 
-
+import traceback
 import pickle
 import matplotlib.pyplot as plt
 from matplotlib import style
@@ -101,7 +101,7 @@ def load_tickers():
     return tickers
 
 def mean_diff(date):
-    
+        
     date_str = date.strftime('%Y-%m-%d')
     yesterday = date - dt.timedelta(days=1)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
@@ -117,28 +117,29 @@ def mean_diff(date):
 
                    df11 = pd.read_csv('stock_dfs/' + index + '.csv', parse_dates=True, index_col=0)
                    df11 = df11['Volume']
-                   df11_value = round(df11[yesterday_str] / 10**6,3)
+                   df11_value = round(float(df11[yesterday_str]) / 10**6,3)
                   
                    df2 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
                    df2 = df2['Adj Close']
 
                    df22 = pd.read_csv('stock_dfs/' + index1 + '.csv', parse_dates=True, index_col=0)
                    df22 = df22['Volume'] 
-                   df22_value = round(df22[yesterday_str] / 10**6,3)
+                   df22_value = round(float(df22[yesterday_str]) / 10**6,3)
                    
-                   value1 = df1[yesterday_str] 
-                   value2 = df2[yesterday_str]
+                   value1 = float(df1[yesterday_str])
+                   value2 = float(df2[yesterday_str])
                    
-                   if value1 > value2:
+                   if value1 > value2:                       
                        df1 = df1.divide(df2)
                        df1 = df1.subtract(1)
-                       value1 = df1[date_str]
+                       value1 = float(df1[date_str])
                        mean10 = df1.rolling(window=10, min_periods=0).mean()
-                       mean10_value = mean10[date_str]
+                       mean10_value = float(mean10[date_str])
                        diff = round(abs(value1 - mean10_value),3)
                        
                        tickers.append({'date' : date_str, 'ticker1' :index, 'ticker2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value})                                          
                except:
+                   print(traceback.format_exc())                   
                    pass
 
     tickers.sort(reverse=True, key=sort_)               
@@ -148,12 +149,12 @@ def mean_diff(date):
 
 #mean_diff(dt.date.today())
 
-##tickers = load_tickers()
-##
-##for ticker in tickers:    
-##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
+tickers = load_tickers()
+
+for ticker in tickers:    
+        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
 
   
-plot('GFSA3', 'NTCO3')
+#plot('GFSA3', 'NTCO3')
 
             
