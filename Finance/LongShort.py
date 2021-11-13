@@ -163,8 +163,7 @@ def mean_diff(date):
                        diff = round(abs(value1 - mean10_value),3)
                        
                        tickers.append({'date' : date_str, 'ticker1' :index, 'ticker2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value})                                          
-               except:
-                   pdb.set_trace()
+               except:                   
                    print(traceback.format_exc())                   
                    pass
 
@@ -175,15 +174,14 @@ def mean_diff(date):
 
 #mean_diff(dt.date.today() - dt.timedelta(days=1))
 
-tickers = load_tickers()
-
+##tickers = load_tickers()
+##
 ##for ticker in tickers:
 ##    if ticker['diff'] > 2:
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
 
 
 
-         
-plot('GNDI3', 'RCSL4')
+plot('GFSA3', 'HGBS11')
 
             
