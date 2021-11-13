@@ -132,6 +132,7 @@ def get_data_from_brinvesting(indice):
             print('Already have {}'.format(title))
        
 #get_data_from_yahoo()
-get_data_from_brinvesting('http://br.investing.com/indices/bovespa-components')
-get_data_from_brinvesting('https://br.investing.com/indices/small-cap-index-components')
-get_data_from_brinvesting('https://br.investing.com/indices/corporate-gov-stocks-components')
+##get_data_from_brinvesting('http://br.investing.com/indices/bovespa-components')
+##get_data_from_brinvesting('https://br.investing.com/indices/small-cap-index-components')
+##get_data_from_brinvesting('https://br.investing.com/indices/corporate-gov-stocks-components')
+get_data_from_brinvesting('https://br.investing.com/indices/bm-fbovespa-real-estate-ifix-components')
