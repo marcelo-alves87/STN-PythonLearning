@@ -141,14 +141,14 @@ def mean_diff_ticker(index, index1, date_str, yesterday_str, database):
        if isinstance(df11[yesterday_str],pd.Series):                      
            df11_value = round(float(df11[yesterday_str][0]) / 10**6,3)
            value1 = float(df1[yesterday_str][0])
-       elif isinstance(df11[yesterday_str],np.int64):
+       elif isinstance(df11[yesterday_str],(np.float64, np.int64)):
            df11_value = round(float(df11[yesterday_str]) / 10**6,3)
            value1 = float(df1[yesterday_str])
            
        if isinstance(df22[yesterday_str],pd.Series):                       
            df22_value = round(float(df22[yesterday_str][0]) / 10**6,3)
            value2 = float(df2[yesterday_str][0])
-       elif isinstance(df22[yesterday_str],np.int64):
+       elif isinstance(df22[yesterday_str],(np.float64, np.int64)):
            df22_value = round(float(df22[yesterday_str]) / 10**6,3)    
            value2 = float(df2[yesterday_str])
        
@@ -189,6 +189,7 @@ def mean_diff(date, ticker1 = None, ticker2 = None, database = 'stock_dfs'):
         for index, data in df_corr.iteritems():
             for index1, data1 in data.iteritems():
                 if index == ticker1 and index1 == ticker2:
+                    pdb.set_trace()
                     diff, df11_value, df22_value = mean_diff_ticker(index, index1, date_str, yesterday_str, database)
                     print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(date_str,index, index1, df11_value, df22_value, round(data1,3), diff))
                     break
@@ -196,18 +197,18 @@ def mean_diff(date, ticker1 = None, ticker2 = None, database = 'stock_dfs'):
     
 
 
-##mean_diff(dt.date.today() - dt.timedelta(days=2))
+#mean_diff(dt.date.today() - dt.timedelta(days=2))
 
 
 ##tickers = load_tickers()
 ##
 ##for ticker in tickers:
-##    if ticker['diff'] > 2:
+##    if ticker['diff'] > 3:
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
 ##
- 
+## 
 
-mean_diff(dt.date.today() - dt.timedelta(days=2), 'AMER3', 'VALE3', 'br investing 12-11-2021 22h')
-plot('VALE3', 'AMER3', 'br investing 12-11-2021 22h')
+mean_diff(dt.date.today() - dt.timedelta(days=2), 'MGLU3', 'BBAS3')
+#plot('CCRO3', 'ENBR3')
 
-            
+
