@@ -1,6 +1,8 @@
 ###
 ## 1. Se a linha roxa estiver acima da linha lightcoral , vende-se a ação vermelha pois ela vai cair e compra a linha azul que vai subir
 ## 2. Se a linha roxa estiver abaixo da linha lightcoral, vende-se a ação azul pois ela vai cair e compra a linha vermelha que vai subir
+## 3. Se a linha verde estiver abaixo da linha laranja, vende-se a ação vermelha pois ela vai cair e compra a linha azul que vai subir
+## 4. Se a linha verde estiver acima da linha laranja, vende-se a ação azul pois ela vai cair e compra a linha vermelha que vai subir
 
 import traceback
 import pickle
@@ -81,8 +83,8 @@ def plot(ticker1, ticker2, database='stock_dfs'):
         df2 = df2.divide(df1)
         df2 = df2.subtract(1)
         roll = df2.rolling(window=10, min_periods=0).mean()
-        roll.plot(ax=ax3, c='lightcoral')        
-        df2.plot(ax=ax3, c='brown')
+        roll.plot(ax=ax3, c='orange')        
+        df2.plot(ax=ax3, c='darkgreen')
     
     #ax1.fill_between(df.index.values, list1, list2, color="grey", alpha="0.3")    
     ax1.legend()
@@ -188,8 +190,7 @@ def mean_diff(date, ticker1 = None, ticker2 = None, database = 'stock_dfs'):
     else:
         for index, data in df_corr.iteritems():
             for index1, data1 in data.iteritems():
-                if index == ticker1 and index1 == ticker2:
-                    pdb.set_trace()
+                if index == ticker1 and index1 == ticker2:                    
                     diff, df11_value, df22_value = mean_diff_ticker(index, index1, date_str, yesterday_str, database)
                     print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(date_str,index, index1, df11_value, df22_value, round(data1,3), diff))
                     break
@@ -203,12 +204,12 @@ def mean_diff(date, ticker1 = None, ticker2 = None, database = 'stock_dfs'):
 ##tickers = load_tickers()
 ##
 ##for ticker in tickers:
-##    if ticker['diff'] > 3:
+##    if ticker['diff'] > 1:
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff']))
-##
-## 
+####
+#### 
 
-mean_diff(dt.date.today() - dt.timedelta(days=2), 'MGLU3', 'BBAS3')
-#plot('CCRO3', 'ENBR3')
+#mean_diff(dt.date.today() - dt.timedelta(days=3), 'AMER3', 'VALE3')
+plot('GFSA3', 'NTCO3')
 
 
