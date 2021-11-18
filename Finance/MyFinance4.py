@@ -49,7 +49,7 @@ def get_data_from_yahoo(tickers = None):
         
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
-
+    start = dt.date.today() - dt.timedelta(days=200)    
     tomorrow = dt.date.today() + dt.timedelta(days=1)    
     
     for ticker in tickers:
@@ -57,7 +57,7 @@ def get_data_from_yahoo(tickers = None):
         # just in case your connection breaks, we'd like to save our progress!
         if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
             try:
-                df = web.get_data_yahoo(ticker + '.SA', start='2021-01-01', end=tomorrow.strftime('%Y-%m-%d'))
+                df = web.get_data_yahoo(ticker + '.SA', start=start.strftime('%Y-%m-%d'), end=tomorrow.strftime('%Y-%m-%d'))
                 df.to_csv('stock_dfs/{}.csv'.format(ticker))           
             except:
                 print(ticker,'não foi encontrado')
@@ -131,8 +131,8 @@ def get_data_from_brinvesting(indice):
         else:
             print('Already have {}'.format(title))
        
-get_data_from_yahoo()
-##get_data_from_brinvesting('http://br.investing.com/indices/bovespa-components')
-##get_data_from_brinvesting('https://br.investing.com/indices/small-cap-index-components')
+get_data_from_yahoo() #está com intervalo de 200
+#get_data_from_brinvesting('http://br.investing.com/indices/bovespa-components')
+#get_data_from_brinvesting('https://br.investing.com/indices/small-cap-index-components')
 ##get_data_from_brinvesting('https://br.investing.com/indices/corporate-gov-stocks-components')
 ##get_data_from_brinvesting('https://br.investing.com/indices/bm-fbovespa-real-estate-ifix-components')
