@@ -47,9 +47,8 @@ def print_corr():
 
 
 
-def plot(ticker1, ticker2, database='stock_dfs', until_date = None):
+def plot(ticker1, ticker2, database='stock_dfs', start_date = None, end_date = None):
 
-    
     ax1 = plt.subplot2grid((6,1), (0,0), rowspan=2, colspan=1)
     ax2 = plt.subplot2grid((6,1), (2,0), rowspan=2, colspan=1)
     ax3 = plt.subplot2grid((6,1), (4,0), rowspan=1, colspan=1)
@@ -64,15 +63,20 @@ def plot(ticker1, ticker2, database='stock_dfs', until_date = None):
     
     df = pd.read_csv(database + '/' + ticker1 + '.csv', parse_dates=True, index_col=0)
     df1 = df['Adj Close']
-    if until_date is not None:
-        df1 = df1[:until_date]
+    if start_date is not None:
+        df1 = df1[start_date:]
+    if end_date is not None:
+        df1 = df1[:end_date]
     df1.plot(ax=ax1,label=ticker1, c='red') 
     list1 = df['Adj Close'].tolist()    
 
     df = pd.read_csv(database + '/' + ticker2 + '.csv', parse_dates=True, index_col=0)
     df2 = df['Adj Close']
-    if until_date is not None:
-        df2 = df2[:until_date]
+    if start_date is not None:
+        df2 = df2[start_date:]
+    if end_date is not None:
+        df2 = df2[:end_date]
+        
     df2.plot(ax=ax2,label=ticker2, c='blue')
     list2 = df['Adj Close'].tolist()
     
@@ -212,16 +216,16 @@ def mean_diff(date, ticker1 = None, ticker2 = None, database = 'stock_dfs'):
 #mean_diff(dt.date.today())
 
 
-##tickers = load_tickers()
-##
-##for ticker in tickers:
-##    if ticker['diff'] > 1:
-##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
+tickers = load_tickers()
 
-##    
+for ticker in tickers:
+    if ticker['diff'] > 3 and ticker['vol1'] > 1 and ticker['vol2'] > 1:
+        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
+
+      
 ##     
-mean_diff(dt.date.today(), 'GNDI3', 'RCSL4')
-####                 
-plot('GNDI3', 'RCSL4')
+##mean_diff(dt.datetime.strptime('2021-08-16','%Y-%m-%d'), 'GNDI3', 'RCSL4')
+######                 
+##plot('GNDI3', 'RCSL4', start_date='2021-01-04')
 ##
 

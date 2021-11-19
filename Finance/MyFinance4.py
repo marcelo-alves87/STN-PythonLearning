@@ -38,7 +38,7 @@ def save_ibovespa_tickers():
         pickle.dump(tickers,f)
 
 
-def get_data_from_yahoo(tickers = None):
+def get_data_from_yahoo(tickers = None, interval = 100):
     if tickers == None:      
         with open("ibovespatickers.pickle", "rb") as f:
             tickers = pickle.load(f)
@@ -49,7 +49,7 @@ def get_data_from_yahoo(tickers = None):
         
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
-    start = dt.date.today() - dt.timedelta(days=200)    
+    start = dt.date.today() - dt.timedelta(days=interval)    
     tomorrow = dt.date.today() + dt.timedelta(days=1)    
     
     for ticker in tickers:
@@ -131,7 +131,7 @@ def get_data_from_brinvesting(indice):
         else:
             print('Already have {}'.format(title))
        
-get_data_from_yahoo() #está com intervalo de 200
+get_data_from_yahoo() #está com intervalo de 100
 #get_data_from_brinvesting('http://br.investing.com/indices/bovespa-components')
 #get_data_from_brinvesting('https://br.investing.com/indices/small-cap-index-components')
 ##get_data_from_brinvesting('https://br.investing.com/indices/corporate-gov-stocks-components')
