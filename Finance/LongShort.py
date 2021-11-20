@@ -14,6 +14,7 @@ import numpy as np
 import datetime as dt
 import pdb
 import math
+import os
 
 style.use('ggplot')
 
@@ -189,7 +190,7 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
     yesterday = date - dt.timedelta(days=1)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
     df = pd.read_csv('ibovespa_joined_closes.csv')    
-    df_corr = df.corr(min_periods=1)
+    df_corr = df.corr()
     len1 = len(df_corr)
     i = 0
     if ticker1 == None or ticker2 == None:
@@ -225,14 +226,15 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
         
     
 
-mean_diff(corr=None, verbose=True)
+#mean_diff(date=dt.date.today() - dt.timedelta(days=1), corr=None)
 
+#os.system('shutdown -s')
 
-##tickers = load_tickers()
-##
-##for ticker in tickers:
-##    if ticker['diff'] > 1:
-##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
+tickers = load_tickers()
+
+for ticker in tickers:
+    if ticker['diff'] > 7 and ticker['vol1'] > 1 and ticker['vol2'] > 1:
+        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
 
 #dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
 ##
