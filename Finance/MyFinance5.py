@@ -2,7 +2,7 @@ import pandas as pd
 import pickle
 import pdb
 
-def compile_data(until_date=None):
+def compile_data(start_date = None, end_date = None):
     
     with open("ibovespatickers.pickle", "rb") as f:
         tickers = pickle.load(f)
@@ -17,8 +17,11 @@ def compile_data(until_date=None):
 
             df.set_index('Date', inplace=True)
 
-            if until_date is not None:
-                df = df.loc[:until_date]
+            if start_date is not None:
+                df = df.loc[start_date:]
+
+            if end_date is not None:
+                df = df.loc[:end_date]    
 
             df.rename(columns={'Adj Close': ticker}, inplace=True)
             if 'Volume' in df.columns:
