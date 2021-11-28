@@ -134,13 +134,15 @@ def mean_diff_value(df1,df2,date_str):
 
        if value1 > mean10_value:
            diff_code = 'V'
+           diff = (value1/mean10_value) - 1
        else:
+           diff = (mean10_value/value1) - 1
            diff_code = 'C'
         
-       diff = round(abs(value1 - mean10_value),3)
+       
        return diff, diff_code
 
-def mean_diff_ticker(index, index1, date_str, yesterday_str, database):
+def mean_diff_ticker(index, index1, date_str, yesterday_str, database, start_date = None):
 
     try:           
        df1 = pd.read_csv(database + '/' + index + '.csv', parse_dates=True, index_col=0)
@@ -154,7 +156,14 @@ def mean_diff_ticker(index, index1, date_str, yesterday_str, database):
        df2 = df2['Adj Close']
 
        df22 = pd.read_csv(database + '/' + index1 + '.csv', parse_dates=True, index_col=0)
-       df22 = df22['Volume'] 
+       df22 = df22['Volume']
+
+
+       if not start_date is None:
+           df1 = df1[start_date:]
+           df2 = df2[start_date:]
+           df11 = df11[start_date:]
+           df22 = df22[start_date:]
        
        if isinstance(df11[yesterday_str],pd.Series):                      
            df11_value = round(float(df11[yesterday_str][0]) / 10**6,3)
@@ -184,7 +193,12 @@ def mean_diff_ticker(index, index1, date_str, yesterday_str, database):
        pass
 
 
-def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database = 'stock_dfs', verbose = False, corr = 0.9):
+def exists(ticker, index, index1):
+    return ticker['ticker1'] == index and ticker['ticker2'] == index1   
+    
+
+
+def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database = 'stock_dfs', verbose = False, corr = 0.9, start_date = None):
     
     date_str = date.strftime('%Y-%m-%d')
     yesterday = date - dt.timedelta(days=1)
@@ -196,14 +210,13 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
     if ticker1 == None or ticker2 == None:
         tickers = []
         for index, data in df_corr.iteritems():
-            for index1, data1 in data.iteritems():                
-                
+            for index1, data1 in data.iteritems():                                
                 if index != index1:
                    ret = None 
                    if corr is None:
-                       ret = mean_diff_ticker(index, index1, date_str, yesterday_str, database)
+                       ret = mean_diff_ticker(index, index1, date_str, yesterday_str, database, start_date)
                    elif data1 >= corr and data1 < (corr + 0.1):
-                       ret = mean_diff_ticker(index, index1, date_str, yesterday_str, database)
+                       ret = mean_diff_ticker(index, index1, date_str, yesterday_str, database, start_date)
                    if not ret is None:                       
                        diff, df11_value, df22_value, diff_code = ret
                        tickers.append({'date' : date_str, 'ticker1' :index, 'ticker2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value, 'diff_code' : diff_code})
@@ -226,20 +239,18 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
         
     
 
-#mean_diff(date=dt.date.today() - dt.timedelta(days=1), corr=None)
+mean_diff(corr=None)
+##
+###os.system('shutdown -s')
 
-#os.system('shutdown -s')
-
-tickers = load_tickers()
-
-for ticker in tickers:
-    if ticker['diff'] > 7 and ticker['vol1'] > 1 and ticker['vol2'] > 1:
-        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
+##tickers = load_tickers()
+####
+##for ticker in tickers:
+##    if ticker['corr'] > 0.9 and ticker['ticker1'] == 'SBFG3':
+##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
 
 #dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
 ##
-#mean_diff(ticker1 = 'GNDI3', ticker2 =  'RCSL4')
-######                 
-#plot('RENT3', 'BBRK3')
-##
-
+##mean_diff(ticker1 = 'GNDI3', ticker2 =  'HAPV3')
+##############                 
+#plot('TRAD3', 'BBDC3')
