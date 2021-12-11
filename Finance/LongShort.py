@@ -130,8 +130,8 @@ def mean_diff_value(df1,df2,date_str):
            mean10_value = float(mean10[date_str])
 
         
-           
-
+       
+        
        if value1 > mean10_value:
            diff_code = 'V'
            diff = (value1/mean10_value) - 1
@@ -238,19 +238,19 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
                     break
         
     
-
 mean_diff(corr=None)
 ##
 ###os.system('shutdown -s')
-
+##
 ##tickers = load_tickers()
-####
+############
 ##for ticker in tickers:
-##    if ticker['corr'] > 0.9 and ticker['ticker1'] == 'SBFG3':
+##    if ticker['corr'] > 0.6 and ticker['ticker1'] == 'TIMS3' :
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
 
 #dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
 ##
-##mean_diff(ticker1 = 'GNDI3', ticker2 =  'HAPV3')
-##############                 
-#plot('TRAD3', 'BBDC3')
+#mean_diff(ticker1 = 'B3SA3', ticker2 =  'HAPV3')
+##############
+                          
+#plot('B3SA3', 'HAPV3')
