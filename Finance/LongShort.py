@@ -49,7 +49,7 @@ def print_corr():
 
 
 def plot(ticker1, ticker2, database='stock_dfs', start_date = None, end_date = None):
-
+   
     ax1 = plt.subplot2grid((6,1), (0,0), rowspan=2, colspan=1)
     ax2 = plt.subplot2grid((6,1), (2,0), rowspan=2, colspan=1)
     ax3 = plt.subplot2grid((6,1), (4,0), rowspan=1, colspan=1)
@@ -134,9 +134,9 @@ def mean_diff_value(df1,df2,date_str):
         
        if value1 > mean10_value:
            diff_code = 'V'
-           diff = (value1/mean10_value) - 1
+           diff = (1 - (mean10_value/value1))*100 
        else:
-           diff = (mean10_value/value1) - 1
+           diff = (1 - (value1/mean10_value))*100 
            diff_code = 'C'
         
        
@@ -201,7 +201,7 @@ def exists(ticker, index, index1):
 def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database = 'stock_dfs', verbose = False, corr = 0.9, start_date = None):
     
     date_str = date.strftime('%Y-%m-%d')
-    yesterday = date - dt.timedelta(days=1)
+    yesterday = date - dt.timedelta(days=4)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
     df = pd.read_csv('ibovespa_joined_closes.csv')    
     df_corr = df.corr()
@@ -240,17 +240,17 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
     
 mean_diff(corr=None)
 ##
-###os.system('shutdown -s')
-##
+#os.system('shutdown -s')
+
 ##tickers = load_tickers()
-############
+########
 ##for ticker in tickers:
-##    if ticker['corr'] > 0.6 and ticker['ticker1'] == 'TIMS3' :
+##    if abs(ticker['corr']) >= 0.9 and ticker['diff'] > 3:
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
 
 #dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
 ##
-#mean_diff(ticker1 = 'B3SA3', ticker2 =  'HAPV3')
-##############
-                          
-#plot('B3SA3', 'HAPV3')
+#mean_diff(ticker1 = 'VIVT3', ticker2 =  'ENBR3')
+################
+##                          
+#plot('MBLY3', 'DMVF3')
