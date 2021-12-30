@@ -83,14 +83,14 @@ def plot(ticker1, ticker2, database='stock_dfs', start_date = None, end_date = N
     
     
     if df1.max() > df2.max():
-        df1 = df1.divide(df2)        
-        df1 = df1.subtract(1)
+        dfs = df1.subtract(df2)        
+        df1 = dfs.divide(df1)
         roll = df1.rolling(window=10, min_periods=0).mean()
         roll.plot(ax=ax3, c='lightcoral')        
         df1.plot(ax=ax3, c='purple')
     else:
-        df2 = df2.divide(df1)
-        df2 = df2.subtract(1)
+        dfs = df2.subtract(df1) 
+        df2 = dfs.divide(df2)
         roll = df2.rolling(window=10, min_periods=0).mean()
         roll.plot(ax=ax3, c='orange')        
         df2.plot(ax=ax3, c='darkgreen')
@@ -106,15 +106,15 @@ def sort_(e):
         i = 0
     return i
 
-def load_tickers():
-    with open("tickers.pickle", "rb") as f:
+def load_tickers(file="tickers.pickle"):
+    with open(file, "rb") as f:
         tickers = pickle.load(f)
     return tickers
 
 def mean_diff_value(df1,df2,date_str):
        
-       df1 = df1.divide(df2)
-       df1 = df1.subtract(1)
+       dfs = df1.subtract(df2)
+       df1 = dfs.divide(df1)
 
        if isinstance(df1[date_str],pd.Series):                                                  
            value1 = float(df1[date_str][0])
@@ -134,9 +134,9 @@ def mean_diff_value(df1,df2,date_str):
         
        if value1 > mean10_value:
            diff_code = 'V'
-           diff = (1 - (mean10_value/value1))*100 
+           diff = 1 - (mean10_value/value1)
        else:
-           diff = (1 - (value1/mean10_value))*100 
+           diff = 1 - (value1/mean10_value)
            diff_code = 'C'
         
        
@@ -165,19 +165,19 @@ def mean_diff_ticker(index, index1, date_str, yesterday_str, database, start_dat
            df11 = df11[start_date:]
            df22 = df22[start_date:]
        
-       if isinstance(df11[yesterday_str],pd.Series):                      
-           df11_value = round(float(df11[yesterday_str][0]) / 10**6,3)
-           value1 = float(df1[yesterday_str][0])
-       elif isinstance(df11[yesterday_str],(np.float64, np.int64)):
-           df11_value = round(float(df11[yesterday_str]) / 10**6,3)
-           value1 = float(df1[yesterday_str])
+       if isinstance(df11.max(),pd.Series):                      
+           df11_value = round(float(df11.max()) / 10**6,3)
+           value1 = float(df1.max())
+       elif isinstance(df11.max(),(np.float64, np.int64)):
+           df11_value = round(float(df11.max()) / 10**6,3)
+           value1 = float(df1.max())
            
-       if isinstance(df22[yesterday_str],pd.Series):                       
-           df22_value = round(float(df22[yesterday_str][0]) / 10**6,3)
-           value2 = float(df2[yesterday_str][0])
-       elif isinstance(df22[yesterday_str],(np.float64, np.int64)):
-           df22_value = round(float(df22[yesterday_str]) / 10**6,3)    
-           value2 = float(df2[yesterday_str])
+       if isinstance(df22.max(),pd.Series):                       
+           df22_value = round(float(df22.max()) / 10**6,3)
+           value2 = float(df2.max())
+       elif isinstance(df22.max(),(np.float64, np.int64)):
+           df22_value = round(float(df22.max()) / 10**6,3)    
+           value2 = float(df2.max())
        
        
        if value1 > value2:
@@ -201,7 +201,7 @@ def exists(ticker, index, index1):
 def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database = 'stock_dfs', verbose = False, corr = 0.9, start_date = None):
     
     date_str = date.strftime('%Y-%m-%d')
-    yesterday = date - dt.timedelta(days=4)
+    yesterday = date - dt.timedelta(days=1)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
     df = pd.read_csv('ibovespa_joined_closes.csv')    
     df_corr = df.corr()
@@ -238,19 +238,39 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
                     break
         
     
-mean_diff(corr=None)
+#mean_diff(corr=None)
 ##
 #os.system('shutdown -s')
 
-##tickers = load_tickers()
+#tickers = load_tickers()
 ########
 ##for ticker in tickers:
-##    if abs(ticker['corr']) >= 0.9 and ticker['diff'] > 3:
+##    if abs(ticker['corr']) >= 0.8 and abs(ticker['diff']) > 10 and ticker['vol1'] > 2 and ticker['vol2'] > 2:
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
-
 #dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
 ##
-#mean_diff(ticker1 = 'VIVT3', ticker2 =  'ENBR3')
-################
-##                          
-#plot('MBLY3', 'DMVF3')
+##mean_diff(ticker1 = 'CMIN3', ticker2 =  'CURY3')
+####################
+######                          
+##plot('CMIN3', 'CURY3')
+
+with open("ibovespatickers.pickle", "rb") as f:
+    tickers = pickle.load(f)
+
+ticker_pair = load_tickers()
+data = []
+for ticker in tickers:
+    sum = 0
+    count = 0
+    corr = 0
+    for pair in ticker_pair:
+        if abs(pair['corr']) >= 0.8 and abs(pair['diff']) >= 1 and ((pair['ticker1'] == ticker and pair['diff_code'] == 'V1') or (pair['ticker2'] == ticker and pair['diff_code'] == 'C1')):           
+            count += 1
+            corr += abs(pair['corr'])
+            sum += abs(pair['diff'])
+    if count > 0:        
+        data.append([ticker, count, sum, corr/count, sum*corr])
+data = sorted(data, reverse=True, key=lambda x: x[4])
+
+for datium in data:
+    print(datium)

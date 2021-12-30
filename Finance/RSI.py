@@ -147,16 +147,16 @@ def RSI_diff(ticker, window_length = 14, interval = 1):
 
 with open("ibovespatickers.pickle", "rb") as f:
         tickers = pickle.load(f)
-
-hold = []
-for i in range(1,30):    
-        for count, ticker in enumerate(tickers):
-            ret = RSI_diff(ticker, interval=i)            
-            if ret is not None:
-                rsi, old_rsi, last_volume, date_old_str, old_price, old_open, old_low, high, sma, ema = ret
-                try:
-                    if rsi < old_rsi and high > old_open and ticker not in hold and ema > sma and last_volume > 10**6:
-                        print('Date: {}, Ticker: {}'.format(date_old_str,ticker))
-                        hold.append(ticker)                        
-                except:
-                    pass
+show_bearish_moving(tickers)
+##hold = []
+##for i in range(1,30):    
+##        for count, ticker in enumerate(tickers):
+##            ret = RSI_diff(ticker, interval=i)            
+##            if ret is not None:
+##                rsi, old_rsi, last_volume, date_old_str, old_price, old_open, old_low, high, sma, ema = ret
+##                try:
+##                    if rsi < old_rsi and high > old_open and ticker not in hold and ema > sma and last_volume > 10**6:
+##                        print('Date: {}, Ticker: {}'.format(date_old_str,ticker))
+##                        hold.append(ticker)                        
+##                except:
+##                    pass
