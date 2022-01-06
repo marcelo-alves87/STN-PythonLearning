@@ -195,18 +195,39 @@ def mean_diff_ticker(index, index1, date_str, yesterday_str, database, start_dat
 
 def exists(ticker, index, index1):
     return ticker['ticker1'] == index and ticker['ticker2'] == index1   
+
+
+# so funciona comm a base maior que a data especificada
+# detalhes de date + 1
+def details(ticker, date , database='stock_dfs'):
+
+    df = pd.read_csv(database + '/' + ticker + '.csv', parse_dates=True, index_col=0)
+    df = df.loc[date:]
+ 
+    print(df)
+
+    yesterday_close = df['Adj Close'][0]
+    open = df['Open'][1]
+    high = df['High'][1]
+    low = df['Low'][1]
+    close = df['Adj Close'][1]
     
+    print(yesterday_close, open, high, low, close)   
 
-
-def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database = 'stock_dfs', verbose = False, corr = 0.9, start_date = None):
+    print("Variation of yesterday close and today open: {}%".format((1 - (yesterday_close/open))*100))
+    print("Variation of high and close: {}%".format((1 - (close/high))*100))
+    print("Variation of high and low: {}%".format((1 - (low/high))*100))
+    print("Variation of open and close: {}%".format((1 - (open/close))*100))
+    print("Variation of open and low: {}%".format((1 - (low/open))*100))
+                
+def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database = 'stock_dfs', verbose = False, corr = 0.9, start_date = None, joined_closes = 'ibovespa_joined_closes.csv', pickel_loc = "tickers.pickle"):
     
     date_str = date.strftime('%Y-%m-%d')
     yesterday = date - dt.timedelta(days=1)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
-    df = pd.read_csv('ibovespa_joined_closes.csv')    
+    df = pd.read_csv(joined_closes)    
     df_corr = df.corr()
     len1 = len(df_corr)
-    i = 0
     if ticker1 == None or ticker2 == None:
         tickers = []
         for index, data in df_corr.iteritems():
@@ -222,12 +243,12 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
                        tickers.append({'date' : date_str, 'ticker1' :index, 'ticker2' :index1, 'corr' : round(data1,3), 'diff' : diff, 'vol1' : df11_value , 'vol2' : df22_value, 'diff_code' : diff_code})
 
                 if verbose:
-                    print('Doing ({}) of ({})'.format(i + 1, len1**2))
-                    i = i + 1                    
+                    print('Doing ({}) of ({})'.format(len(tickers), len1**2))
+                                       
                        
         tickers.sort(reverse=True, key=sort_)
 
-        with open("tickers.pickle","wb") as f:
+        with open(pickel_loc,"wb") as f:
             pickle.dump(tickers,f)
     else:
         for index, data in df_corr.iteritems():
@@ -238,39 +259,45 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
                     break
         
     
-#mean_diff(corr=None)
+#mean_diff(corr=None, verbose=True)
 ##
 #os.system('shutdown -s')
 
-#tickers = load_tickers()
-########
+my_ticker = 'LEVE3'
+          
+##tickers = load_tickers()
+####
 ##for ticker in tickers:
-##    if abs(ticker['corr']) >= 0.8 and abs(ticker['diff']) > 10 and ticker['vol1'] > 2 and ticker['vol2'] > 2:
+##    if abs(ticker['corr']) >= 0.8 and abs(ticker['diff']) >= 1 and ticker['ticker1'] == my_ticker: 
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
-#dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
-##
-##mean_diff(ticker1 = 'CMIN3', ticker2 =  'CURY3')
-####################
+
+
+details(my_ticker,'2021-09-29', database='Testes/2021-12-30/stock_dfs')
+          
+##dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
+
+#mean_diff(ticker1 = 'CMIN3', ticker2 =  'CURY3')
+##################
 ######                          
-##plot('CMIN3', 'CURY3')
+#plot('QUAL3', 'GOLL4')
 
-with open("ibovespatickers.pickle", "rb") as f:
-    tickers = pickle.load(f)
-
-ticker_pair = load_tickers()
-data = []
-for ticker in tickers:
-    sum = 0
-    count = 0
-    corr = 0
-    for pair in ticker_pair:
-        if abs(pair['corr']) >= 0.8 and abs(pair['diff']) >= 1 and ((pair['ticker1'] == ticker and pair['diff_code'] == 'V1') or (pair['ticker2'] == ticker and pair['diff_code'] == 'C1')):           
-            count += 1
-            corr += abs(pair['corr'])
-            sum += abs(pair['diff'])
-    if count > 0:        
-        data.append([ticker, count, sum, corr/count, sum*corr])
-data = sorted(data, reverse=True, key=lambda x: x[4])
-
-for datium in data:
-    print(datium)
+##with open("ibovespatickers.pickle", "rb") as f:
+##    tickers = pickle.load(f)
+##
+##ticker_pair = load_tickers()
+##data = []
+##for ticker in tickers:
+##    sum = 0
+##    count = 0
+##    corr = 0
+##    for pair in ticker_pair:
+##        if abs(pair['corr']) >= 0.8 and abs(pair['diff']) >= 1 and ((pair['ticker1'] == ticker and pair['diff_code'] == 'V1') or (pair['ticker2'] == ticker and pair['diff_code'] == 'C1')):           
+##            count += 1
+##            corr += abs(pair['corr'])
+##            sum += abs(pair['diff'])
+##    if count > 0:        
+##        data.append([ticker, count, sum, corr/count, sum*corr])
+##data = sorted(data, reverse=True, key=lambda x: x[4])
+##
+##for datum in data:
+##    print(datum)

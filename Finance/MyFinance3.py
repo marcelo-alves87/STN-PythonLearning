@@ -44,7 +44,7 @@ import pandas as pd
 #Updated in 17/1/2019
 def save_xlsx_ibovespa_tickers():
     tickers = []
-    df = pd.read_excel('Free-Float_5-2021.xlsx', sheet_name='Free-Float_5-2021')
+    df = pd.read_excel('Free-Float_1-2022.xlsx', sheet_name='Free-Float_1-2022')
     for i in df['Código']:
         if type(i) is str:
             print(i)
@@ -55,7 +55,7 @@ def save_xlsx_ibovespa_tickers():
 
 def save_csv_ibovespa_tickers():
     tickers = []
-    df = pd.read_csv('Free-Float_9-2021.csv', delimiter=';')
+    df = pd.read_csv('Free-Float_1-2022.csv', delimiter=';')
     for i in df['Codigo']:
         if type(i) is str:
             print(i)

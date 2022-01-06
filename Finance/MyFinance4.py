@@ -1,6 +1,6 @@
 import bs4 as bs
 import datetime as dt
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import timedelta
 import os
 import pandas as pd
@@ -38,7 +38,7 @@ def save_ibovespa_tickers():
         pickle.dump(tickers,f)
 
 
-def get_data_from_yahoo(tickers = None, interval = 300):
+def get_data_from_yahoo(tickers = None, interval = 300, now = dt.date.today()):
     if tickers == None:      
         with open("ibovespatickers.pickle", "rb") as f:
             tickers = pickle.load(f)
@@ -49,8 +49,8 @@ def get_data_from_yahoo(tickers = None, interval = 300):
         
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
-    start = dt.date.today() - dt.timedelta(days=interval)    
-    tomorrow = dt.date.today() + dt.timedelta(days=1)    
+    start =  now - dt.timedelta(days=interval)    
+    tomorrow = now + dt.timedelta(days=1)    
     
     for ticker in tickers:
         print(ticker)
@@ -130,7 +130,8 @@ def get_data_from_brinvesting(indice):
             df.to_csv('stock_dfs/{}.csv'.format(title))   
         else:
             print('Already have {}'.format(title))
-       
+            
+
 get_data_from_yahoo() #está com intervalo de 300
 #get_data_from_brinvesting('http://br.investing.com/indices/bovespa-components')
 #get_data_from_brinvesting('https://br.investing.com/indices/small-cap-index-components')

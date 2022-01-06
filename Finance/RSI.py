@@ -30,7 +30,7 @@ def show_bearish_moving(tickers):
                 rsi, last_volume, date_str, diff, last_sma = ret
                 try:
                     if rsi[-1] >= 70 and last_sma > diff and last_volume > 10**6 and last_volume < 10**9:
-                        print('Date: {}, Ticker: {} '.format(date_str,ticker))
+                        print('Date: {}, Ticker: {}, RSI: {}'.format(date_str,ticker,rsi[-1]))
                 except:
                     pass
 

@@ -10,7 +10,7 @@ import pdb
 style.use('ggplot')
 
 def sort_(e):    
-    i = float(e[1])
+    i = float(e[3])
     if math.isnan(i):
         i = 0
     return i
@@ -29,6 +29,38 @@ def biggest_highs(tickers):
             pass
     return data
 
+def ret_bullish_bearish_avarages(tickers):
+    data = []    
+    for ticker in tickers:
+        try:            
+            df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
+            df.set_index('Date', inplace=True)
+            last_volume = df['Volume'][-2]
+            df['EMA'] = df['Adj Close'].ewm(span=9, adjust=False).mean()
+            df['SMA'] = df['Adj Close'].rolling(window=40, min_periods=0).mean()
+            if last_volume > 10**6 and last_volume < 10**9:           
+               diff = 1 - df['EMA'][-1]/df['Adj Close'][-1]
+               diff2 = 1 - df['SMA'][-1]/df['Adj Close'].max()
+               data.append([ticker, diff, diff2, diff/diff2])
+        except:
+            pass
+    return data
+
+
+def ret_bullish_avarages(tickers):
+    data = []    
+    for ticker in tickers:
+        try:            
+            df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
+            df.set_index('Date', inplace=True)
+            last_volume = df['Volume'][-2]
+            df['EMA'] = df['Adj Close'].ewm(span=9, adjust=False).mean()
+            if last_volume > 10**6 and last_volume < 10**9:           
+               diff = 1 - df['EMA'][-1]/df['Adj Close'][-1]
+               data.append([ticker, diff])
+        except:
+            pass
+    return data
 
 def ret_bearish_avarages(tickers):
     data = []    
@@ -39,10 +71,8 @@ def ret_bearish_avarages(tickers):
             last_volume = df['Volume'][-2]
             df['SMA'] = df['Adj Close'].rolling(window=40, min_periods=0).mean()
             if last_volume > 10**6 and last_volume < 10**9:           
-               diff = (df['Adj Close'].max() - df['Adj Close'].min())/4
-               diff = 2*diff + df['Adj Close'].min()
-               if df['SMA'][-1] > diff:
-                   data.append([ticker, diff])
+               diff = 1 - df['SMA'][-1]/df['Adj Close'].max()
+               data.append([ticker, diff])
         except:
             pass
     return data
@@ -88,10 +118,12 @@ with open("ibovespatickers.pickle", "rb") as f:
 
 #data = ret_data_moving_avarages(tickers)
 #data = ret_bearish_avarages(tickers)
+#data = ret_bullish_avarages(tickers)
 #data = ret_data_moving_avarages_(tickers)
 #data = biggest_highs(tickers)
-data = sorted(data, key=lambda x: x[1])
-#data.sort(reverse=True, key=sort_)
+#data = sorted(data, key=lambda x: x[1])
+data = ret_bullish_bearish_avarages(tickers)
+data.sort(key=sort_)
 #print(data)
 for row in data:
     #plt.scatter(row[0], row[1])
