@@ -199,7 +199,7 @@ def exists(ticker, index, index1):
 
 # so funciona comm a base maior que a data especificada
 # detalhes de date + 1
-def details(ticker, date , database='stock_dfs', verbose = False):
+def details(ticker, date , database='stock_dfs', verbose = False, testing = True):
 
     df = pd.read_csv(database + '/' + ticker + '.csv', parse_dates=True, index_col=0)
     df = df.loc[date:]
@@ -221,10 +221,13 @@ def details(ticker, date , database='stock_dfs', verbose = False):
     
     print("Variation of today open and close: {}% (today loss)".format((1 - (today_close/today_open))*100))
     print("Variation of tomorrow open and today close: {}% (opening gain)".format((1 - (today_close/tomorrow_open))*100))
-    print("Variation of tomorrow high and close: {}% (tomorrow high loss)".format((1 - (tomorrow_close/tomorrow_high))*100))
-    print("Variation of tomorrow high and low: {}% (tomorrow higher loss)".format((1 - (tomorrow_low/tomorrow_high))*100))
-    print("Variation of tomorrow open and low: {}% (tomorrow opening loss)".format((1 - (tomorrow_low/tomorrow_open))*100))
-    print("Variation of tomorrow open and close: {} (tomorrow loss)%".format((1 - (tomorrow_close/tomorrow_open))*100))
+    if testing:
+        print("Variation of tomorrow open and close: {}% (tomorrow loss, easy level)".format((1 - (tomorrow_close/tomorrow_open))*100))
+        print("Variation of tomorrow open and low: {}% (tomorrow opening loss, normal level)".format((1 - (tomorrow_low/tomorrow_open))*100))
+        print("Variation of tomorrow high and close: {}% (tomorrow high loss, medium level)".format((1 - (tomorrow_close/tomorrow_high))*100))
+        print("Variation of tomorrow high and low: {}% (tomorrow higher loss, high level)".format((1 - (tomorrow_low/tomorrow_high))*100))
+    
+    
     
                 
 def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database = 'stock_dfs', verbose = False, corr = 0.9, start_date = None, joined_closes = 'ibovespa_joined_closes.csv', pickel_loc = "tickers.pickle"):
@@ -270,17 +273,17 @@ def mean_diff(date = dt.date.today(), ticker1 = None, ticker2 = None, database =
 ##
 #os.system('shutdown -s')
 
-my_ticker = 'XPSF11'
-
-          
-##tickers = load_tickers(file="Testes/2021-12-03/tickers.pickle")
+##my_ticker = 'HAPV3'
+##
+##          
+##tickers = load_tickers(file="Testes/2021-12-02/tickers.pickle")
 ####
 ##for ticker in tickers:
 ##    if abs(ticker['corr']) >= 0.8 and abs(ticker['diff']) >= 1 and ticker['ticker1'] == my_ticker: 
 ##        print(('Data: {} : {} e {} = volume ({} milhões e {} milhões);  Fator de correlação: {}, Diferença com média: {}; {}').format(ticker['date'],ticker['ticker1'], ticker['ticker2'], ticker['vol1'], ticker['vol2'], ticker['corr'], ticker['diff'], ticker['diff_code']))
-
 ##
-details(my_ticker,'2021-12-03', database='Testes/2021-12-30/stock_dfs', verbose=True)
+##
+##details(my_ticker,'2021-12-02', database='Testes/2021-12-30/stock_dfs', testing=True)
 ##          
 ##dt.datetime.strptime('2021-08-16','%Y-%m-%d')      
 
@@ -289,23 +292,23 @@ details(my_ticker,'2021-12-03', database='Testes/2021-12-30/stock_dfs', verbose=
 ######                          
 #plot('AMER3', 'LEVE3')
 
-##with open("Testes/2021-12-30/ibovespatickers.pickle", "rb") as f:
-##    tickers = pickle.load(f)
-##
-##ticker_pair = load_tickers(file="Testes/2021-12-03/tickers.pickle")
-##data = []
-##for ticker in tickers:
-##    sum = 0
-##    count = 0
-##    corr = 0
-##    for pair in ticker_pair:
-##        if abs(pair['corr']) >= 0.8 and abs(pair['diff']) >= 1 and ((pair['ticker1'] == ticker and pair['diff_code'] == 'V1') or (pair['ticker2'] == ticker and pair['diff_code'] == 'C1')):
-##            count += 1
-##            corr += abs(pair['corr'])
-##            sum += abs(pair['diff'])
-##    if count > 0:        
-##        data.append([ticker, count, sum, corr/count, sum*corr/count])
-##data = sorted(data, reverse=True, key=lambda x: x[4])
-##
-##for datum in data:
-##    print(datum)
+with open("Testes/2021-12-30/ibovespatickers.pickle", "rb") as f:
+    tickers = pickle.load(f)
+
+ticker_pair = load_tickers(file="Testes/2021-12-02/tickers.pickle")
+data = []
+for ticker in tickers:
+    sum = 0
+    count = 0
+    corr = 0
+    for pair in ticker_pair:
+        if abs(pair['corr']) >= 0.8 and abs(pair['diff']) >= 1 and ((pair['ticker1'] == ticker and pair['diff_code'] == 'V1') or (pair['ticker2'] == ticker and pair['diff_code'] == 'C1')):
+            count += 1
+            corr += abs(pair['corr'])
+            sum += abs(pair['diff'])
+    if count > 0:        
+        data.append([ticker, count, sum, corr/count, sum*corr/count])
+data = sorted(data, reverse=True, key=lambda x: x[4])
+
+for datum in data:
+    print(datum)

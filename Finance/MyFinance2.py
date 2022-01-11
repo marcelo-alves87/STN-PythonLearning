@@ -58,7 +58,7 @@ def RSI(df, axis, window_length = 14):
     #plt.legend(['RSI via EWMA', 'RSI via SMA', 'RSI via RMA/SMMA/MMA (TradingView)'])
     #plt.show()
    
-ticker = 'XPSF11'
+ticker = 'HAPV3'
 database = 'Testes/2021-12-30/stock_dfs/'
 #df = pd.read_csv('natura.csv', parse_dates=True, index_col=0)
 df = pd.read_csv(database + ticker + '.csv', parse_dates=True, index_col=0)
