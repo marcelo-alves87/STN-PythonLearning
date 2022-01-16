@@ -72,15 +72,13 @@ def convert_to_float(x):
         x = x[0] + '.' + x[-2:]
     elif len(x) == 2:
         x = x[0] + '.' + x[1]
-    return float(x)
+    return x
 
 def convert_to_datetime(x):
-    if not isinstance(x, dt.datetime):        
-        mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
-        return dt.datetime.combine(dt.date.today(), mytime)
-    else:
-        return x
-
+    mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
+    date = dt.datetime.combine(dt.date.today(), mytime)
+    return date.strftime("%Y-%m-%d %H:%M:%S")
+    
 def merge_free_float_with_btc():
     #Tickers that allow leverage and BTC
     df1 = get_leverage_btc()
@@ -97,35 +95,50 @@ def update_main_df():
         main_df = pd.merge(main_df, df_btc, on='Papel', how='outer')
         main_df.drop(['Lev._x', 'Nome_x'], 1, inplace=True)
         main_df.rename(columns={'Lev._y': 'Lev.', 'Nome_y': 'Nome'}, inplace=True)
-    else:
-        main_df = pd.DataFrame()    
-    return main_df,df_btc                         
+        main_df.to_pickle(PICKLE_FILE)    
+    return df_btc                         
 
-main_df,df_btc = update_main_df()
 
-url = "https://br.investing.com/indices/bovespa-components"
-driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe")
-driver.get(url)
-while(True):
-    print('Reading ...')
-    html = driver.page_source
-    soup = BeautifulSoup(html)
-    table = soup.find('table', id="cr1")
-    ##
-    df = pd.read_html(str(table))[0]
+def scrap_br_investing():
 
-    df.drop(['Unnamed: 0', 'Unnamed: 9', 'Máxima', 'Mínima', 'Var.', 'Var.%'], 1, inplace=True)
-
-    df = pd.merge(df_btc, df, left_on=df_btc["Nome"].str.lower(), right_on=df["Nome"].str.lower(), how='left')
-
+    df_btc = update_main_df()
+        
     
-    df['Hora'] = df['Hora'].apply(convert_to_datetime)
-    df['Último'] = df['Último'].apply(convert_to_float)
-    df.drop(['key_0', 'Nome_y'],1, inplace=True)
-    df.rename(columns={'Nome_x': 'Nome'}, inplace=True)
-    df = pd.concat([main_df, df]).reset_index(drop=True)
-    print(df)
-    df.to_pickle(PICKLE_FILE) # where to save it usually as a .plk
+    url = "https://br.investing.com/indices/bovespa-components"
+    driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe")
+    driver.get(url)
+    
+    while(True):
+        print('Reading ...')
 
-    print('Sleeping ...')
-    time.sleep(90)
+        if os.path.isfile(PICKLE_FILE): 
+            main_df = pd.read_pickle(PICKLE_FILE)
+        else:
+            main_df = pd.DataFrame()
+
+        html = driver.page_source
+        soup = BeautifulSoup(html, features='lxml')
+        table = soup.find('table', id="cr1")
+        
+        df = pd.read_html(str(table))[0]
+
+        df.drop(['Unnamed: 0', 'Unnamed: 9', 'Máxima', 'Mínima', 'Var.', 'Var.%'], 1, inplace=True)
+
+        df = pd.merge(df_btc, df, left_on=df_btc["Nome"].str.lower(), right_on=df["Nome"].str.lower(), how='left')
+
+           
+        df['Hora'] = df['Hora'].apply(convert_to_datetime)
+        df['Último'] = df['Último'].apply(convert_to_float)
+        df.drop(['key_0', 'Nome_y'],1, inplace=True)
+        df.rename(columns={'Nome_x': 'Nome'}, inplace=True)
+        
+        df = pd.concat([main_df, df]).reset_index(drop=True)
+
+        df.to_pickle(PICKLE_FILE) # where to save it usually as a .plk
+
+        print('Sleeping ...')
+        time.sleep(90)
+
+
+#scrap_br_investing()
+
