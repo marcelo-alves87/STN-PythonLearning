@@ -10,7 +10,7 @@ import os
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = ['5%','10%']
-BTC_FILE = 'BTC Rico.pdf'
+BTC_FILE = 'BTC Rico 17-01-2022-5S0.pdf'
 FREE_FLOAT_FILE = 'Free-Float_9-2021.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
@@ -140,5 +140,56 @@ def scrap_br_investing():
         time.sleep(90)
 
 
+def scrap_rico():
+
+    df_btc = update_main_df()
+        
+    
+    url = "https://rico.com.vc/arealogada/home-broker"
+    driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe")
+    driver.get(url)
+
+    input('Ready?')
+    
+    while(True):
+        print('Reading ...')
+
+        if os.path.isfile(PICKLE_FILE): 
+            main_df = pd.read_pickle(PICKLE_FILE)
+        else:
+            main_df = pd.DataFrame()
+
+        html = driver.page_source
+        soup = BeautifulSoup(html, features='lxml')
+
+        tables = soup.find_all('table', class_='nelo-table-group') 
+        df2 = pd.read_html(tables[0])
+        df2[0].columns
+        pdb.set_trace()
+        #lembrar de mostrar toda a tabela visível
+        #table = soup.find_all('table', 'class'='nelo-table-group')   
+       
+        
+##        df = pd.read_html(str(table))[0]
+##
+##        df.drop(['Unnamed: 0', 'Unnamed: 9', 'Máxima', 'Mínima', 'Var.', 'Var.%'], 1, inplace=True)
+##
+##        df = pd.merge(df_btc, df, left_on=df_btc["Nome"].str.lower(), right_on=df["Nome"].str.lower(), how='left')
+##
+##           
+##        df['Hora'] = df['Hora'].apply(convert_to_datetime)
+##        df['Último'] = df['Último'].apply(convert_to_float)
+##        df.drop(['key_0', 'Nome_y'],1, inplace=True)
+##        df.rename(columns={'Nome_x': 'Nome'}, inplace=True)
+##        
+##        df = pd.concat([main_df, df]).reset_index(drop=True)
+##
+##        df.to_pickle(PICKLE_FILE) # where to save it usually as a .plk
+##
+##        print('Sleeping ...')
+        time.sleep(5)
+
 #scrap_br_investing()
 
+#scrap_rico()
+print(get_leverage_btc())
