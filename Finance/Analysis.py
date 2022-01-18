@@ -1,12 +1,34 @@
 import pandas as pd
 import sys
 import time
+import pdb
+import datetime as dt
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
+periods = ['5min','1min']
 
+def join_cells(x):    
+    return ';'.join(x[x.notnull()].astype(str))
+
+def timestamp_to_str(x):
+    return x.strftime("%H:%M:%S")
+
+def convert_to_datetime(x):
+    if x != x: #is nan
+        return ''
+    else:
+        mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
+        date = dt.datetime.combine(dt.date.today(), mytime)
+        return date
+
+def print_group(period, group, index):
+    color.write(' ' + period + '->' ,"TODO")
+    calc_pct_last_diff(group[index][1],group[index][2])
+        
 def calc_pct_last_diff(sma,ema):
-    value = str(abs(ema[-1] - sma[-1]))
+    value = abs(ema[-1] - sma[-1])
+    value = str(ema[-1]) + ' ' + str(sma[-1])
     if ema[-1] > sma[-1]:
         return color.write(value,"STRING")
     elif ema[-1] == sma[-1]:
@@ -15,45 +37,58 @@ def calc_pct_last_diff(sma,ema):
         return color.write(value,"COMMENT")
     
 def resample(df , period):
-    df_resampled = df.resample(period).last()
     
-    df_resampled['EMA'] = df_resampled['Preco'].ewm(span=9, adjust=False).mean()
-    df_resampled['SMA'] = df_resampled['Preco'].rolling(window=40, min_periods=0).mean()           
+    if pd.isnull(df.index[-1]):
+        return None
+    else:
+        df_resampled = df.resample(period).last()
+        
+        df_resampled['EMA'] = df_resampled['Preco'].ewm(span=9, adjust=False).mean()
+        df_resampled['SMA'] = df_resampled['Preco'].rolling(window=40, min_periods=0).mean()           
 
-    return df_resampled.index[-1],df_resampled['SMA'],df_resampled['EMA']
+        return df_resampled.index[-1],df_resampled['SMA'],df_resampled['EMA']
 
 def analysis():
+   
     df = pd.read_pickle(PICKLE_FILE)
-
-    grouped_df = df.groupby(["Papel"]).agg(lambda x: ','.join(x))
     data = []
-    for name,group in pd.DataFrame(grouped_df).iterrows():
-    
-        ultimos = group['Último'].split(',')
-        mins = group['Hora'].split(',')
-        list_tuples = list(zip(mins, ultimos))  
-        df = pd.DataFrame(list_tuples, columns=['Hora', 'Preco'])
-
-        df['Hora'] = pd.to_datetime(df['Hora'])
-        df['Preco'] = pd.to_numeric(df['Preco'])    
-        df.set_index('Hora', inplace=True)
-
-        df['EMA'] = df['Preco'].ewm(span=9, adjust=False).mean()
-        df['SMA'] = df['Preco'].rolling(window=40, min_periods=0).mean()           
-
-        sma1,ema1 = df['SMA'],df['EMA']
-        time5,sma5,ema5 = resample(df,'5min')
+    grouped_df = df.groupby(["Papel"]).agg(join_cells)
+    for group in grouped_df.iterrows():
+        data1 = []
+        data1.append(group[0])
         
-    ##    calc_pct_last_diff(sma5, ema5)
-    ##    calc_pct_last_diff(df['SMA'],df['EMA'])
+        list1 = group[1]['Hora'].split(';')
+        list2 = group[1]['Último'].split(';')
+        df1 = {'Hora' : list1, 'Último' : list2}
+        df1 = pd.DataFrame(df1)
+        df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
+        df1.set_index('Hora', inplace=True)
+        for period in periods:
+            
+            df_resampled = df1.resample(period).last()
+            df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
+            df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()           
+            data1.append([df_resampled.index[-1],df_resampled['EMA'][-1] - df_resampled['SMA'][-1]])
 
-        data.append([name,sma5,ema5,sma1,ema1])   
-    print('\n')
-    print(time5,df.index[-1])
+            
+            
+        data.append(data1)
+    color.write('\n',"TODO")    
     for group in data:
-        color.write('\n' + group[0] + ': 5min ',"TODO") + calc_pct_last_diff(group[1],group[2]) + color.write(' , 1min ',"TODO") + calc_pct_last_diff(group[3],group[4])
-
+        
+        color.write(group[0] + ' : ' ,"TODO")        
+        for i,period in enumerate(periods):
+            color.write(' ' + period + '(' + timestamp_to_str(group[i + 1][0]) + ') ->',"TODO")
+            value = group[i + 1][1]
+            value_str = ' ' + str(round(abs(value),3))
+            if value > 0:
+                color.write(value_str,"STRING")    
+            elif value < 0:
+                color.write(value_str,"COMMENT")
+            else:
+                color.write(value_str,"KEYWORD")
+        color.write('\n',"TODO")    
 
 while True:
     analysis()
-    time.sleep(90)
+    time.sleep(60)
