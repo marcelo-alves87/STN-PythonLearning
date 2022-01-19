@@ -6,13 +6,13 @@ import datetime as dt
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['5min','1min']
+periods = ['20min','17min','15min','13min','10min', '7min','5min','1min']
 
 def join_cells(x):    
     return ';'.join(x[x.notnull()].astype(str))
 
 def timestamp_to_str(x):
-    return x.strftime("%H:%M:%S")
+    return x.strftime("%H:%M")
 
 def convert_to_datetime(x):
     if x != x: #is nan
@@ -76,11 +76,11 @@ def analysis():
     color.write('\n',"TODO")    
     for group in data:
         
-        color.write(group[0] + ' : ' ,"TODO")        
+        color.write(group[0] + ':' ,"TODO")        
         for i,period in enumerate(periods):
-            color.write(' ' + period + '(' + timestamp_to_str(group[i + 1][0]) + ') ->',"TODO")
+            color.write(' ' + period + '(' + timestamp_to_str(group[i + 1][0]) + ') ',"TODO")
             value = group[i + 1][1]
-            value_str = ' ' + str(round(abs(value),3))
+            value_str =str(round(abs(value),3))
             if value > 0:
                 color.write(value_str,"STRING")    
             elif value < 0:
@@ -91,4 +91,47 @@ def analysis():
 
 while True:
     analysis()
-    time.sleep(60)
+    time.sleep(30)
+
+## Testing 
+##df = pd.read_pickle(PICKLE_FILE)
+##
+##df  = df.iloc[:-1000]
+##
+##papel = 'JBSS3'
+##
+##grouped_df = df.groupby(["Papel"]).agg(join_cells)
+##df2 = grouped_df[grouped_df.index == papel]
+##list1 = df2['Hora'].values
+##list2 = df2['Último'].values
+##df1 = {'Hora' : list1[0].split(';'), 'Último' : list2[0].split(';')}
+##df1 = pd.DataFrame(df1)
+##df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
+##df1.set_index('Hora', inplace=True)
+##
+##
+##color.write(papel + ' : ' ,"TODO") 
+##for period in periods:
+##    
+##    df_resampled = df1.resample(period).last()
+##    df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
+##    df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()           
+##
+##    color.write(' ' + period + '(' + timestamp_to_str(df_resampled.index[-1]) + ') ->',"TODO")
+##    value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]
+##    value_str = ' ' + str(round(abs(value),3))
+##    if value > 0:
+##        color.write(value_str,"STRING")    
+##    elif value < 0:
+##        color.write(value_str,"COMMENT")
+##    else:
+##        color.write(value_str,"KEYWORD")
+##    #data1.append([,])
+##
+##
+##
+####list2 = group[1]['Último'].split(';')
+####df1 = {'Hora' : list1, 'Último' : list2}
+####df1 = pd.DataFrame(df1)
+####print(df1)
+##
