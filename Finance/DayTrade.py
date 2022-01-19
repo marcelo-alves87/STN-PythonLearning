@@ -10,7 +10,7 @@ import os
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 17-01-2022-5S0.pdf'
+BTC_FILE = 'BTC Rico 18-01-2022-Up0.pdf'
 FREE_FLOAT_FILE = 'Free-Float_9-2021.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
@@ -84,12 +84,13 @@ def merge_free_float_with_btc():
     return df
 
 def update_main_df():
+    
     df_btc = merge_free_float_with_btc()
     if os.path.isfile(PICKLE_FILE): 
         main_df = pd.read_pickle(PICKLE_FILE)
         main_df = pd.merge(main_df, df_btc, on='Papel', how='outer')
-        main_df.drop(['Lev._x', 'Nome_x'], 1, inplace=True)
-        main_df.rename(columns={'Lev._y': 'Lev.', 'Nome_y': 'Nome'}, inplace=True)
+        main_df.drop(['Lev._x', 'Nome'], 1, inplace=True)
+        main_df.rename(columns={'Lev._y': 'Lev.'}, inplace=True)
         main_df.to_pickle(PICKLE_FILE)    
     return df_btc                         
 
@@ -120,7 +121,7 @@ def scrap_rico():
         tables = soup.find_all('table', class_='nelo-table-group') 
 
         df = pd.read_html(str(tables[0]))[0]
-
+        
         df = df[['Ativo','Último', 'Data/Hora', 'Financeiro']]
 
         df['Último'] = df['Último']/100
@@ -129,14 +130,15 @@ def scrap_rico():
         df = df[['Papel', 'Lev.', 'Último', 'Data/Hora', 'Financeiro']]
         df = df.dropna()
         df.rename(columns={'Data/Hora': 'Hora', 'Financeiro': 'Volume'}, inplace=True)
-        
+        now = df['Hora'].iloc[-1]
         df = pd.concat([main_df, df]).reset_index(drop=True)
 
         df.to_pickle(PICKLE_FILE) # where to save it usually as a .plk
 
-        print('Sleeping ...')
-        time.sleep(5)
+        print('Read {}, sleeping ...'.format(now))
+        time.sleep(1)
 
+print(get_leverage_btc())
 scrap_rico()
 #print(get_leverage_btc())
 

@@ -17,6 +17,8 @@ def timestamp_to_str(x):
 def convert_to_datetime(x):
     if x != x: #is nan
         return ''
+    elif x == '':
+        return ''
     else:
         mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
         date = dt.datetime.combine(dt.date.today(), mytime)
@@ -41,6 +43,7 @@ def resample(df , period):
     if pd.isnull(df.index[-1]):
         return None
     else:
+        
         df_resampled = df.resample(period).last()
         
         df_resampled['EMA'] = df_resampled['Preco'].ewm(span=9, adjust=False).mean()
@@ -54,8 +57,7 @@ def analysis():
     data = []
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
     for group in grouped_df.iterrows():
-        data1 = []
-        data1.append(group[0])
+        
         
         list1 = group[1]['Hora'].split(';')
         list2 = group[1]['Último'].split(';')
@@ -63,16 +65,27 @@ def analysis():
         df1 = pd.DataFrame(df1)
         df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
         df1.set_index('Hora', inplace=True)
-        for period in periods:
-            
-            df_resampled = df1.resample(period).last()
-            df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
-            df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()           
-            data1.append([df_resampled.index[-1],df_resampled['EMA'][-1] - df_resampled['SMA'][-1]])
+        if len(df1) > 1:
+            data1 = []
+            data1.append(group[0])
+            for period in periods:
+                
+                df_resampled = df1.resample(period).last()
+                df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
+                ema_qt = len(df_resampled['EMA'])
+                df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()
+                sma_qt = len(df_resampled['SMA'])
 
-            
-            
-        data.append(data1)
+                if ema_qt < 9:
+                    value = ema_qt
+                elif sma_qt < 40:
+                    value = sma_qt
+                else:
+                    value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]
+                
+                data1.append([df_resampled.index[-1],value])     
+            data.append(data1)
+                
     color.write('\n',"TODO")    
     for group in data:
         
