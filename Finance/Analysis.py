@@ -6,7 +6,7 @@ import datetime as dt
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['20min','17min','15min','13min','10min', '7min','5min','1min']
+periods = ['15min','13min','11min','9min','7min','5min','3min','1min']
 
 def join_cells(x):    
     return ';'.join(x[x.notnull()].astype(str))
@@ -15,12 +15,17 @@ def timestamp_to_str(x):
     return x.strftime("%H:%M")
 
 def convert_to_datetime(x):
+    
     if x != x: #is nan
         return ''
     elif x == '':
         return ''
     else:
-        mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
+        try:
+            mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
+        except:
+            mytime = dt.datetime.strptime(x,'%Y-%m-%d %H:%M:%S').time()
+            
         date = dt.datetime.combine(dt.date.today(), mytime)
         return date
 
@@ -51,9 +56,14 @@ def resample(df , period):
 
         return df_resampled.index[-1],df_resampled['SMA'],df_resampled['EMA']
 
-def analysis():
-   
-    df = pd.read_pickle(PICKLE_FILE)
+def try_to_get_df():
+    try:
+        df = pd.read_pickle(PICKLE_FILE)
+        return df
+    except:
+        return None
+
+def analysis(df):
     data = []
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
     for group in grouped_df.iterrows():
@@ -65,6 +75,7 @@ def analysis():
         df1 = pd.DataFrame(df1)
         df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
         df1.set_index('Hora', inplace=True)
+        
         if len(df1) > 1:
             data1 = []
             data1.append(group[0])
@@ -100,12 +111,19 @@ def analysis():
                 color.write(value_str,"COMMENT")
             else:
                 color.write(value_str,"KEYWORD")
-        color.write('\n',"TODO")    
+        color.write('\n',"TODO") 
 
 while True:
-    analysis()
-    time.sleep(30)
-
+    df = pd.read_pickle(PICKLE_FILE)
+    analysis(df)
+    time.sleep(10)
+       
+    
+##df = pd.read_pickle(PICKLE_FILE)
+##df['Hora'] = df['Hora'].apply(convert_to_datetime)
+##df.set_index('Hora', inplace=True)
+##df = df[df.index < '17:40:00']
+##analysis_(df.reset_index())
 ## Testing 
 ##df = pd.read_pickle(PICKLE_FILE)
 ##

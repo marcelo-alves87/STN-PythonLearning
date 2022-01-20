@@ -10,7 +10,7 @@ import os
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 18-01-2022-Up0.pdf'
+BTC_FILE = 'BTC Rico 19-01-2022-5S0.pdf'
 FREE_FLOAT_FILE = 'Free-Float_9-2021.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
@@ -66,8 +66,10 @@ def get_free_float():
     return df
 
 
-def convert_to_datetime(x):
+def convert_to_datetime_str(x):
     if x != x: #is nan
+        return ''
+    elif x == '':
         return ''
     else:
         mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
@@ -130,13 +132,17 @@ def scrap_rico():
         df = df[['Papel', 'Lev.', 'Último', 'Data/Hora', 'Financeiro']]
         df = df.dropna()
         df.rename(columns={'Data/Hora': 'Hora', 'Financeiro': 'Volume'}, inplace=True)
+
         now = df['Hora'].iloc[-1]
+        
+        df['Hora'] = df['Hora'].apply(convert_to_datetime_str)
+
         df = pd.concat([main_df, df]).reset_index(drop=True)
 
         df.to_pickle(PICKLE_FILE) # where to save it usually as a .plk
 
         print('Read {}, sleeping ...'.format(now))
-        time.sleep(1)
+        time.sleep(5)
 
 print(get_leverage_btc())
 scrap_rico()
