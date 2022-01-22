@@ -7,7 +7,7 @@ from Datum import Datum
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['7min', '5min','3min','1min'] # deve ser em ordem decrescente
+periods = ['10min','7min', '5min','3min','1min'] # deve ser em ordem decrescente
 
 def RSI(column):
     #Get just the adjusted close
@@ -111,7 +111,7 @@ def analysis(df):
             for period in periods:
                 
                 df_resampled = df1.resample(period).last()
-                df_resampled = df_resampled.interpolate(method='zero')
+                df_resampled = df_resampled.dropna()
                 df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
                 ema_qt = len(df_resampled['EMA'])
                 df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()
@@ -205,6 +205,6 @@ df = pd.read_pickle(PICKLE_FILE)
 df['Hora'] = df['Hora'].apply(convert_to_datetime)
 df.set_index('Hora', inplace=True)
 
-df = df[(df.index > '2022-01-20 10:55:00') & (df.index < '2022-01-21 10:15:00')]
+df = df[df.index < '2022-01-21 10:45:00']
 
 analysis(df.reset_index())
