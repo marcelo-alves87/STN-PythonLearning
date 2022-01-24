@@ -4,10 +4,15 @@ import time
 import pdb
 import datetime as dt
 from Datum import Datum
+import beepy
+import threading
+import os
+from gtts import gTTS
+from pygame import mixer
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['10min','7min', '5min','3min','1min'] # deve ser em ordem decrescente
+periods = ['15min','5min','4min','3min','1min'] # deve ser em ordem decrescente
 
 def RSI(column):
     #Get just the adjusted close
@@ -26,8 +31,31 @@ def RSI(column):
     rsi_rma = 100.0 - (100.0 / (1.0 + rs))
     
     return rsi_rma[-1]
-    
 
+def notificate(ticket):
+    
+    beepy.beep(5)
+    path = 'Utils/' + ticket + '.mp3'
+    language = 'pt-br'        
+    myobj = gTTS(text=ticket, lang=language, slow=False)
+
+    try:
+        myobj.save(path)
+    except:
+        pass
+    
+    mixer.init()
+    mixer.music.load(path)
+    mixer.music.play()
+    
+    
+def convert_to_date_str(x):    
+    x = str(x)
+    if len(x) == 1:
+        return '0' + x
+    else:
+        return x
+    
 def join_cells(x):    
     return ';'.join(x[x.notnull()].astype(str))
 
@@ -89,7 +117,24 @@ def convert_to_float(x):
     else:
         return float(x)
     
+def print_stars():
+    color.write('*',"STRING")
+    color.write('*',"COMMENT")
+    color.write('*',"TODO")
+    color.write('*',"STRING")
+    color.write('*',"COMMENT")
+    color.write('*',"TODO")
+    
 data_ = []        
+
+def is_all_same_bool_except_first(data):
+    
+    data1 = data[1:]
+    if (sum(data1) == 0 and data[0] == True) or (sum(data1) == len(data) - 1 and data[0] == False) :
+       pdb.set_trace()
+       return True
+    else:
+       return False
 
 def analysis(df):
     data = []
@@ -149,7 +194,8 @@ def analysis(df):
     #data.sort(key=sort)
     
     for group in data:
-        
+        check_all_bools = False
+        bools = []
         color.write(group[0][0] + '(' + group[0][1] + ')' + ':' ,"TODO")        
         for i,period in enumerate(periods):
             datum = Datum(group[0][0],period,group[i + 1][1])
@@ -170,16 +216,14 @@ def analysis(df):
             value_str =str(round(abs(value),3))
 
             
-            if emph:            
-                color.write('*',"STRING")
-                color.write('*',"COMMENT")
-                color.write('*',"TODO")
-                color.write('*',"STRING")
-                color.write('*',"COMMENT")
-                color.write('*',"TODO")                
+            if emph:
+                check_all_bools = True
+                print_stars()               
             elif value > 0:
+                bools.append(True)
                 color.write(value_str,"STRING")    
             elif value < 0:
+                bools.append(False)
                 color.write(value_str,"COMMENT")
             
             if len(group[i + 1]) > 3:
@@ -188,23 +232,45 @@ def analysis(df):
                     color.write(' *',"STRING")    
                 elif value == 'R':
                     color.write(' *',"KEYWORD")
-                
+
+
+        if check_all_bools and is_all_same_bool_except_first(bools):
+            beep = threading.Thread(target=notificate, args=(group[0][0],))
+            beep.start()
+            beep.join()
+           
         color.write('\n',"TODO") 
 
-##while True:
-##    df = None
-##    while df is None:
-##        df = try_to_get_df()
-##        time.sleep(1)
-##    analysis(df)
-##    time.sleep(10)
-       
+def run():
+    while True:
+        df = None
+        while df is None:
+            df = try_to_get_df()
+            time.sleep(1)
+        analysis(df)
+        time.sleep(10)
+
+def test():
+    df = pd.read_pickle(PICKLE_FILE)
+
+    df['Hora'] = df['Hora'].apply(convert_to_datetime)
+    df.set_index('Hora', inplace=True)
+
+    date = dt.datetime.strptime('2022-01-24 12:30:00','%Y-%m-%d %H:%M:%S')    
+    ##start =  date + dt.timedelta(days=interval)    
+    ##tomorrow = now + dt.timedelta(days=1)
+    ##date.strftime("%Y-%m-%d %H:%M:%S")
+    for i in range(90):
+        new_date =  date + dt.timedelta(minutes=i)    
+        analysis(df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index())
+        time.sleep(1)
+        
     
-df = pd.read_pickle(PICKLE_FILE)
+global main
+main = threading.Thread(target=run)
+main.start()
+main.join()
 
-df['Hora'] = df['Hora'].apply(convert_to_datetime)
-df.set_index('Hora', inplace=True)
+ 
 
-df = df[df.index < '2022-01-21 10:45:00']
 
-analysis(df.reset_index())

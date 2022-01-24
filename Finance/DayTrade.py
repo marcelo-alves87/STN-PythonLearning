@@ -10,8 +10,8 @@ import os
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 21-01-2022-feA.pdf'
-FREE_FLOAT_FILE = 'Free-Float_9-2021.csv'
+BTC_FILE = 'BTC Rico 24-01-2022-RLs.pdf'
+FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
 def get_leverage_tickers():
