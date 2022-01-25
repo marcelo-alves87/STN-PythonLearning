@@ -12,7 +12,7 @@ from pygame import mixer
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['15min','5min','4min','3min','1min'] # deve ser em ordem decrescente
+periods = ['30min','15min','5min','4min','1min'] # deve ser em ordem decrescente
 
 def RSI(column):
     #Get just the adjusted close
@@ -125,13 +125,14 @@ def print_stars():
     color.write('*',"COMMENT")
     color.write('*',"TODO")
     
-data_ = []        
+data_ = []
 
-def is_all_same_bool_except_first(data):
-    
-    data1 = data[1:]
-    if (sum(data1) == 0 and data[0] == True) or (sum(data1) == len(data) - 1 and data[0] == False) :
-       pdb.set_trace()
+def strategy(data):
+    pdb.set_trace()
+    first = data[0]
+    latter = data[-1]
+    data1 = data[1:-1]
+    if (sum(data1) == 0 and latter == True and first == True) or (sum(data1) == len(data) - 2 and latter == True and first == True) :       
        return True
     else:
        return False
@@ -234,11 +235,11 @@ def analysis(df):
                     color.write(' *',"KEYWORD")
 
 
-        if check_all_bools and is_all_same_bool_except_first(bools):
+        if check_all_bools and strategy(bools):
             beep = threading.Thread(target=notificate, args=(group[0][0],))
             beep.start()
             beep.join()
-           
+            color.write('$$$',"STRING")
         color.write('\n',"TODO") 
 
 def run():

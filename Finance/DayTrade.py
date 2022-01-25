@@ -10,7 +10,7 @@ import os
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 24-01-2022-RLs.pdf'
+BTC_FILE = 'BTC Rico 25-01-2022-3UU.pdf'
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
