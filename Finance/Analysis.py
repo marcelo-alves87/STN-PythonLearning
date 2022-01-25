@@ -127,12 +127,11 @@ def print_stars():
     
 data_ = []
 
-def strategy(data):
-    pdb.set_trace()
+def strategy(data):    
     first = data[0]
     latter = data[-1]
     data1 = data[1:-1]
-    if (sum(data1) == 0 and latter == True and first == True) or (sum(data1) == len(data) - 2 and latter == True and first == True) :       
+    if (sum(data1) == 0 and latter == True and first == True) or (sum(data1) == len(data) - 2 and latter == False and first == False) :       
        return True
     else:
        return False
