@@ -12,7 +12,7 @@ from pygame import mixer
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['30min','15min','5min','4min','1min'] # deve ser em ordem decrescente
+periods = ['30min','15min','5min','3min','1min'] # deve ser em ordem decrescente
 
 def RSI(column):
     #Get just the adjusted close
@@ -127,15 +127,19 @@ def print_stars():
     
 data_ = []
 
-def strategy(data):    
-    first = data[0]
-    latter = data[-1]
-    data1 = data[1:-1]
-    if (sum(data1) == 0 and latter == True and first == True) or (sum(data1) == len(data) - 2 and latter == False and first == False) :       
-       return True
-    else:
-       return False
+def strategy(data):
+    
+    data1 = data[-2:]
+    data1.append(data[0])
+    data2 = data[1:-2]
 
+    sum1 = sum(data1)
+    sum2 = sum(data2)
+
+    ret = (sum2 == len(data) - 3 and sum1 == 0) or (sum1 == len(data) - 2 and sum2 == 0)
+    if ret:
+        pdb.set_trace()
+    return ret
 def analysis(df):
     data = []
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
@@ -216,16 +220,21 @@ def analysis(df):
             value_str =str(round(abs(value),3))
 
             
-            if emph:
+            if emph:                
                 check_all_bools = True
-                print_stars()               
-            elif value > 0:
-                bools.append(True)
-                color.write(value_str,"STRING")    
-            elif value < 0:
-                bools.append(False)
-                color.write(value_str,"COMMENT")
-            
+                print_stars()
+                if value > 0:
+                    bools.append(True)                
+                elif value < 0:
+                    bools.append(False)                
+            else:
+                if value > 0:
+                        bools.append(True)
+                        color.write(value_str,"STRING")
+                elif value < 0:
+                        bools.append(False)
+                        color.write(value_str,"COMMENT")
+                
             if len(group[i + 1]) > 3:
                 value = group[i + 1][3]
                 if value == 'G':
@@ -233,8 +242,8 @@ def analysis(df):
                 elif value == 'R':
                     color.write(' *',"KEYWORD")
 
-
-        if check_all_bools and strategy(bools):
+        
+        if check_all_bools and strategy(bools):            
             beep = threading.Thread(target=notificate, args=(group[0][0],))
             beep.start()
             beep.join()
@@ -248,7 +257,7 @@ def run():
             df = try_to_get_df()
             time.sleep(1)
         analysis(df)
-        time.sleep(10)
+        time.sleep(3)
 
 def test():
     df = pd.read_pickle(PICKLE_FILE)
@@ -256,14 +265,14 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-01-24 12:30:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-01-25 16:10:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
-    for i in range(90):
+    for i in range(120):
         new_date =  date + dt.timedelta(minutes=i)    
         analysis(df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index())
-        time.sleep(1)
+        time.sleep(0)
         
     
 global main
