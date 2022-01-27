@@ -12,7 +12,7 @@ from pygame import mixer
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['30min','15min','5min','3min','1min'] # deve ser em ordem decrescente
+periods = ['30min','20min','15min','10min','5min','3min','1min'] # deve ser em ordem decrescente
 
 def RSI(column):
     #Get just the adjusted close
@@ -31,13 +31,16 @@ def RSI(column):
     rsi_rma = 100.0 - (100.0 / (1.0 + rs))
     
     return rsi_rma[-1]
-
-def notificate(ticket):
     
-    beepy.beep(5)
-    path = 'Utils/' + ticket + '.mp3'
+
+def notificate(ticket, beep1, color1):
+    
+    beepy.beep(beep1)
+    color.write('$$$',color1)
+        
+    path = 'Utils/' +  ticket + '.mp3'
     language = 'pt-br'        
-    myobj = gTTS(text=ticket, lang=language, slow=False)
+    myobj = gTTS(text=ticket, lang=language)
 
     try:
         myobj.save(path)
@@ -131,15 +134,25 @@ def strategy(data):
     
     data1 = data[-2:]
     data1.append(data[0])
-    data2 = data[1:-2]
+    data2 = [data[2],data[4]]
 
     sum1 = sum(data1)
     sum2 = sum(data2)
 
-    ret = (sum2 == len(data) - 3 and sum1 == 0) or (sum1 == len(data) - 2 and sum2 == 0)
-    if ret:
-        pdb.set_trace()
-    return ret
+    return (sum2 == len(data) - 5 and sum1 == 0) or (sum1 == len(data) - 4 and sum2 == 0)
+
+def strategy2(data):
+    
+    data1 = data[-2:]
+    
+    data2 = data[:5]
+
+    sum1 = sum(data1)
+    sum2 = sum(data2)
+
+    return (sum2 == len(data) - 2 and sum1 == 0) or (sum1 == len(data) - 5 and sum2 == 0)    
+    
+
 def analysis(df):
     data = []
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
@@ -172,7 +185,7 @@ def analysis(df):
                 else:
                     rsi = RSI(df_resampled['Último'])
                     value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]
-                    data1.append([df_resampled.index[-1],value,rsi])     
+                    data1.append([df_resampled.index[-1],value])     
                 
             data.append(data1)
                 
@@ -215,7 +228,7 @@ def analysis(df):
                 data_.remove(datum2)
                 data_.append(datum)
                 
-            color.write(' ' + period + '(' + timestamp_to_str(group[i + 1][0]) + ' ' + str(round(group[i + 1][2],2)) + ') ',"TODO")
+            color.write(' ' + period + '(' + timestamp_to_str(group[i + 1][0]) + ') ',"TODO")
             value = group[i + 1][1]
             value_str =str(round(abs(value),3))
 
@@ -243,11 +256,12 @@ def analysis(df):
                     color.write(' *',"KEYWORD")
 
         
-        if check_all_bools and strategy(bools):            
-            beep = threading.Thread(target=notificate, args=(group[0][0],))
-            beep.start()
-            beep.join()
-            color.write('$$$',"STRING")
+        if check_all_bools:
+            if strategy(bools):            
+                notificate(group[0][0], 5, "STRING")                
+            if strategy2(bools):            
+                notificate(group[0][0], 6, "KEYWORD")
+                
         color.write('\n',"TODO") 
 
 def run():
@@ -265,21 +279,16 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-01-25 16:10:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-01-26 17:00:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
-    for i in range(120):
+    for i in range(20):
         new_date =  date + dt.timedelta(minutes=i)    
         analysis(df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index())
         time.sleep(0)
         
     
-global main
-main = threading.Thread(target=run)
-main.start()
-main.join()
-
- 
+test() 
 
 
