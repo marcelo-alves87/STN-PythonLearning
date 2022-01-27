@@ -13,7 +13,7 @@ from pygame import mixer
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
 periods = ['30min','20min','15min','10min','5min','3min','1min'] # deve ser em ordem decrescente
-
+previous_value = None
 def RSI(column):
     #Get just the adjusted close
     # Get the difference in price from previous step
@@ -151,7 +151,40 @@ def strategy2(data):
     sum2 = sum(data2)
 
     return (sum2 == len(data) - 2 and sum1 == 0) or (sum1 == len(data) - 5 and sum2 == 0)    
+
+def analysis_period(df, ticket, period):
+    global previous_value
     
+    grouped_df = df.groupby(["Papel"]).agg(join_cells)
+    for group in grouped_df.iterrows():
+        if ticket == group[0]:
+            list1 = group[1]['Hora'].split(';')
+            list2 = group[1]['Último'].split(';')
+            df1 = {'Hora' : list1, 'Último' : list2}
+            df1 = pd.DataFrame(df1)
+            df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
+            df1['Último'] = df1['Último'].apply(convert_to_float)
+            df1.set_index('Hora', inplace=True)
+            df_resampled = df1.resample(period).last()
+            df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
+            df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()
+            value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]
+            color.write('\nChecking each ' + period + ' of ' + ticket  + ': (' + timestamp_to_str(df_resampled.index[-1]) + ') ',"TODO")
+            value_str = str(round(value, 3))
+            if value > 0:
+                color.write(value_str,'STRING')
+            else:
+                color.write(value_str,'COMMENT')
+            
+            if previous_value is not None:
+                if (previous_value < 0 and value > 0):
+                    beepy.beep(1)
+                    color.write(' $$$','STRING')    
+                elif(previous_value > 0 and value < 0):                
+                    beepy.beep(1)
+                    color.write(' $$$','KEYWORD')    
+            previous_value = value               
+            
 
 def analysis(df):
     data = []
@@ -279,13 +312,15 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-01-26 17:00:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-01-26 13:20:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
+    
     for i in range(20):
-        new_date =  date + dt.timedelta(minutes=i)    
-        analysis(df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index())
+        new_date =  date + dt.timedelta(minutes=i)
+        df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
+        analysis_period(df1,'MGLU3','5min')
         time.sleep(0)
         
     
