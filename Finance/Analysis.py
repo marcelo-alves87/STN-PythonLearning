@@ -14,6 +14,7 @@ PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
 periods = ['30min','20min','15min','10min','5min','3min','1min'] # deve ser em ordem decrescente
 previous_value = None
+main_period = None
 def RSI(column):
     #Get just the adjusted close
     # Get the difference in price from previous step
@@ -130,27 +131,30 @@ def print_stars():
     
 data_ = []
 
-def strategy(data):
+def validate_strategy(data1,data2,period):
     
-    data1 = data[-2:]
+    ret = (any(data2) is False and  all(data1) is True) or (any(data1) is False and  all(data2) is True)
+    ret = ret and periods.index(period) > 3
+    
+    return ret
+
+def strategy(data, period):
+    
+    data1 = data[-3:]
     data1.append(data[0])
-    data2 = [data[2],data[4]]
-
-    sum1 = sum(data1)
-    sum2 = sum(data2)
-
-    return (sum2 == len(data) - 5 and sum1 == 0) or (sum1 == len(data) - 4 and sum2 == 0)
-
-def strategy2(data):
+    data2 = [data[2]]
     
-    data1 = data[-2:]
+    return validate_strategy(data1,data2, period)
     
-    data2 = data[:5]
 
-    sum1 = sum(data1)
-    sum2 = sum(data2)
+def strategy2(data, period):
+    
+    data1 = data[-3:]
+    
+    data2 = data[:4]
 
-    return (sum2 == len(data) - 2 and sum1 == 0) or (sum1 == len(data) - 5 and sum2 == 0)    
+
+    return validate_strategy(data1,data2, period)
 
 def analysis_period(df, ticket, period):
     global previous_value
@@ -188,6 +192,7 @@ def analysis_period(df, ticket, period):
 
 def analysis(df):
     data = []
+    global main_period
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
     for group in grouped_df.iterrows():
         
@@ -268,6 +273,7 @@ def analysis(df):
             
             if emph:                
                 check_all_bools = True
+                main_period = period
                 print_stars()
                 if value > 0:
                     bools.append(True)                
@@ -279,7 +285,7 @@ def analysis(df):
                         color.write(value_str,"STRING")
                 elif value < 0:
                         bools.append(False)
-                        color.write(value_str,"COMMENT")
+                        color.write('-' + value_str,"COMMENT")
                 
             if len(group[i + 1]) > 3:
                 value = group[i + 1][3]
@@ -290,9 +296,9 @@ def analysis(df):
 
         
         if check_all_bools:
-            if strategy(bools):            
+            if strategy(bools, main_period):            
                 notificate(group[0][0], 5, "STRING")                
-            if strategy2(bools):            
+            if strategy2(bools, main_period):            
                 notificate(group[0][0], 6, "KEYWORD")
                 
         color.write('\n',"TODO") 
@@ -307,23 +313,28 @@ def run():
         time.sleep(3)
 
 def test():
-    df = pd.read_pickle(PICKLE_FILE)
+    df = None
+    while df is None:
+        df = try_to_get_df()
+        time.sleep(1)
+        
 
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-01-26 13:20:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-01-26 12:30:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
     
-    for i in range(20):
+    for i in range(120):
         new_date =  date + dt.timedelta(minutes=i)
         df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
-        analysis_period(df1,'MGLU3','5min')
+        analysis(df1)
+        #analysis_period(df1,'MGLU3','5min')
         time.sleep(0)
         
     
-test() 
+run() 
 
 
