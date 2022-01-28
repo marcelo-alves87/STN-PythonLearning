@@ -134,8 +134,10 @@ data_ = []
 def validate_strategy(data1,data2,period):
     
     ret = (any(data2) is False and  all(data1) is True) or (any(data1) is False and  all(data2) is True)
-    ret = ret and periods.index(period) > 3
-    
+    ret = ret and periods.index(period) == 4
+    if ret:
+        beepy.beep(5)
+        pdb.set_trace()
     return ret
 
 def strategy(data, period):
@@ -151,7 +153,7 @@ def strategy2(data, period):
     
     data1 = data[-3:]
     
-    data2 = data[:4]
+    data2 = data[:3]
 
 
     return validate_strategy(data1,data2, period)
@@ -195,7 +197,6 @@ def analysis(df):
     global main_period
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
     for group in grouped_df.iterrows():
-        
         lev = group[1]['Lev.'].split(';')[0]
         list1 = group[1]['Hora'].split(';')
         list2 = group[1]['Último'].split(';')
@@ -322,12 +323,12 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-01-26 12:30:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-01-28 12:55:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
     
-    for i in range(120):
+    for i in range(240):
         new_date =  date + dt.timedelta(minutes=i)
         df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
         analysis(df1)
