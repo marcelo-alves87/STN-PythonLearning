@@ -7,10 +7,12 @@ import pdb
 import time
 import datetime as dt
 import os
+import pickle
+import numpy as np
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 28-01-2022-g0M.pdf'
+BTC_FILE = 'BTC Rico 31-01-2022-ulI.pdf'
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
@@ -33,7 +35,7 @@ def get_btc_df():
       df = df.append(df1)
     return df
 
-def get_leverage_btc():
+def get_leverage_btc(verbose=True):
     #Tickers that allow leverage
     lev_tickers = get_leverage_tickers()
     #Tickers that allow BTC
@@ -43,6 +45,9 @@ def get_leverage_btc():
     df = df[df['Disponibilidade'] == 'OK']
     df = df[df['Lev.'].notna()]
     df.drop(['Disponibilidade', 'Taxa (% a.a)'], 1, inplace=True)
+
+    if verbose:
+        print(df)
     return df
 
 def get_free_float():
@@ -67,14 +72,12 @@ def get_free_float():
 
 
 def convert_to_datetime_str(x):
-    if x != x: #is nan
-        return ''
-    elif x == '':
-        return ''
-    else:
-        mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
-        date = dt.datetime.combine(dt.date.today(), mytime)
-        return date.strftime("%Y-%m-%d %H:%M:%S")
+   try:
+       mytime = dt.datetime.strptime(x,'%H:%M:%S').time()
+       date = dt.datetime.combine(dt.date.today(), mytime)
+       return date.strftime("%Y-%m-%d %H:%M:%S")
+   except:
+       return np.NaN
         
 def merge_free_float_with_btc():
     #Tickers that allow leverage and BTC
@@ -88,7 +91,7 @@ def merge_free_float_with_btc():
 def update_main_df():
     
     df_btc = merge_free_float_with_btc()
-    if os.path.isfile(PICKLE_FILE): 
+    if os.path.isfile(PICKLE_FILE):
         main_df = pd.read_pickle(PICKLE_FILE)
         main_df = pd.merge(main_df, df_btc, on='Papel', how='outer')
         main_df.drop(['Lev._x', 'Nome'], 1, inplace=True)
@@ -110,7 +113,7 @@ def scrap_rico():
     
     while(True):
         
-        print('Reading ...')
+        print('Reading, do not close ...')
 
         if os.path.isfile(PICKLE_FILE): 
             main_df = pd.read_pickle(PICKLE_FILE)
@@ -132,21 +135,21 @@ def scrap_rico():
         df = df[['Papel', 'Lev.', 'Último', 'Data/Hora', 'Financeiro']]
         df = df.dropna()
         df.rename(columns={'Data/Hora': 'Hora', 'Financeiro': 'Volume'}, inplace=True)
-
+           
         now = df['Hora'].iloc[-1]
         
         df['Hora'] = df['Hora'].apply(convert_to_datetime_str)
-
-        df = pd.concat([main_df, df]).reset_index(drop=True)
-
-        df.to_pickle(PICKLE_FILE) # where to save it usually as a .plk
-
-        print('Read {}, sleeping ...'.format(now))
+        df = df.dropna()
+        if len(df) > 0:
+            df = pd.concat([main_df, df]).reset_index(drop=True)
+            df.to_pickle(PICKLE_FILE) # where to save it usually as a .plk
+            
+        print('Read {}, sleeping now, CTRL + C to quit...'.format(now))
         time.sleep(5)
 
-print(get_leverage_btc())
+
 scrap_rico()
-#print(get_leverage_btc())
+
 
 
 

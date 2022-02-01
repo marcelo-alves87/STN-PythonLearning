@@ -12,7 +12,7 @@ from pygame import mixer
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['30min','20min','15min','10min','5min','3min','1min'] # deve ser em ordem decrescente
+periods = ['4min','1min'] # deve ser em ordem decrescente
 previous_value = None
 main_period = None
 def RSI(column):
@@ -135,28 +135,25 @@ def validate_strategy(data1,data2,period):
     
     ret = (any(data2) is False and  all(data1) is True) or (any(data1) is False and  all(data2) is True)
     ret = ret and periods.index(period) == 4
-    if ret:
-        beepy.beep(5)
-        pdb.set_trace()
     return ret
 
 def strategy(data, period):
-    
-    data1 = data[-3:]
-    data1.append(data[0])
-    data2 = [data[2]]
-    
-    return validate_strategy(data1,data2, period)
+    return periods.index(period) == 0
+##    data1 = data[-3:]
+##    data1.append(data[0])
+##    data2 = [data[2]]
+##    
+##    return validate_strategy(data1,data2, period)
     
 
 def strategy2(data, period):
-    
-    data1 = data[-3:]
-    
-    data2 = data[:3]
-
-
-    return validate_strategy(data1,data2, period)
+    return False
+##    data1 = data[-3:]
+##    
+##    data2 = data[:3]
+##
+##
+##    return validate_strategy(data1,data2, period)
 
 def analysis_period(df, ticket, period):
     global previous_value
@@ -217,7 +214,7 @@ def analysis(df):
                 ema_qt = len(df_resampled['EMA'])
                 df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()
                 sma_qt = len(df_resampled['SMA'])
-
+                
                 if sma_qt < 40:
                     value = sma_qt
                     data1.append([df_resampled.index[-1],value,0])     
@@ -323,12 +320,12 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-01-28 12:55:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-01-31 19:15:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
     
-    for i in range(240):
+    for i in range(1):
         new_date =  date + dt.timedelta(minutes=i)
         df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
         analysis(df1)
