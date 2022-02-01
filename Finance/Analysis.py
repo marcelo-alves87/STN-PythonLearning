@@ -12,7 +12,7 @@ from pygame import mixer
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['4min','1min'] # deve ser em ordem decrescente
+periods = ['15min','5min','3min','2min','1min'] # deve ser em ordem decrescente
 previous_value = None
 main_period = None
 def RSI(column):
@@ -138,7 +138,8 @@ def validate_strategy(data1,data2,period):
     return ret
 
 def strategy(data, period):
-    return periods.index(period) == 0
+    data1 = data[1:]
+    return periods.index(period) == 1 and ((any(data1) is False and data[0] is True)  or (all(data1) is True and data[0] is False))
 ##    data1 = data[-3:]
 ##    data1.append(data[0])
 ##    data2 = [data[2]]
@@ -182,7 +183,7 @@ def analysis_period(df, ticket, period):
             if previous_value is not None:
                 if (previous_value < 0 and value > 0):
                     beepy.beep(1)
-                    color.write(' $$$','STRING')    
+                    color.write(' @@@','STRING')    
                 elif(previous_value > 0 and value < 0):                
                     beepy.beep(1)
                     color.write(' $$$','KEYWORD')    
