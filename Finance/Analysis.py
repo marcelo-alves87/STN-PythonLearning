@@ -12,9 +12,10 @@ from pygame import mixer
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['15min','5min','3min','2min','1min'] # deve ser em ordem decrescente
+periods = ['30min','15min','5min','1min'] # deve ser em ordem decrescente
 previous_value = None
 main_period = None
+
 def RSI(column):
     #Get just the adjusted close
     # Get the difference in price from previous step
@@ -34,11 +35,11 @@ def RSI(column):
     return rsi_rma[-1]
     
 
-def notificate(ticket, beep1, color1):
+def notificate(ticket, beep1):
     
     beepy.beep(beep1)
-    color.write('$$$',color1)
-        
+    
+    print_stars(text='WIN')    
     path = 'Utils/' +  ticket + '.mp3'
     language = 'pt-br'        
     myobj = gTTS(text=ticket, lang=language)
@@ -121,40 +122,29 @@ def convert_to_float(x):
     else:
         return float(x)
     
-def print_stars():
+def print_stars(text=''):
     color.write('*',"STRING")
     color.write('*',"COMMENT")
-    color.write('*',"TODO")
+    color.write(text,"TODO")
     color.write('*',"STRING")
     color.write('*',"COMMENT")
     color.write('*',"TODO")
     
 data_ = []
 
-def validate_strategy(data1,data2,period):
-    
-    ret = (any(data2) is False and  all(data1) is True) or (any(data1) is False and  all(data2) is True)
-    ret = ret and periods.index(period) == 4
-    return ret
 
-def strategy(data, period):
-    data1 = data[1:]
-    return periods.index(period) == 1 and ((any(data1) is False and data[0] is True)  or (all(data1) is True and data[0] is False))
-##    data1 = data[-3:]
-##    data1.append(data[0])
-##    data2 = [data[2]]
-##    
-##    return validate_strategy(data1,data2, period)
+def strategy(ticket, data, period):
     
+    if period == '5min' and ticket in ['MGLU3','PETR4']:
+        data1 = data[periods.index(period):]
+        if any(data1) is False or all(data1) is True:
+             notificate(ticket, 5)             
+    elif period == '15min':
+        data1 = data[periods.index(period):]
+        if any(data1) is False or all(data1) is True:
+            notificate(ticket, 6)            
+    # fazer else da Estratégia 1 quando 30 min está disponivel         
 
-def strategy2(data, period):
-    return False
-##    data1 = data[-3:]
-##    
-##    data2 = data[:3]
-##
-##
-##    return validate_strategy(data1,data2, period)
 
 def analysis_period(df, ticket, period):
     global previous_value
@@ -295,11 +285,8 @@ def analysis(df):
 
         
         if check_all_bools:
-            if strategy(bools, main_period):            
-                notificate(group[0][0], 5, "STRING")                
-            if strategy2(bools, main_period):            
-                notificate(group[0][0], 6, "KEYWORD")
-                
+            strategy(group[0][0], bools, main_period)
+                                
         color.write('\n',"TODO") 
 
 def run():
@@ -321,12 +308,12 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-01-31 19:15:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-02-02 14:30:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
     
-    for i in range(1):
+    for i in range(120):
         new_date =  date + dt.timedelta(minutes=i)
         df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
         analysis(df1)
@@ -334,6 +321,6 @@ def test():
         time.sleep(0)
         
     
-run() 
+test() 
 
 

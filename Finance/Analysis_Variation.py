@@ -70,19 +70,20 @@ def create_df_from_free_float(interval):
     
 
     for ticker in tickers:
-    
+       
         df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
+        
         df['Date'] = df['Date'].apply(lambda x: dt.datetime.strptime(x,'%Y-%m-%d'))
         df.set_index('Date',inplace=True)
         now = dt.datetime.now()
-        start =  now - dt.timedelta(days=interval)    
+        start =  now - dt.timedelta(days=interval)
+        df = df[(df.index >= start)]
         
-        df = df[df.index >= start]
-        
-        df['Var.'] = (1 - (df['Open']/df['High']))*100
-        df['Ticket'] = ticker
-        df.reset_index(inplace=True)
-        df_tickers = pd.concat([df_tickers, df])
+        if len(df) > 0:
+            df['Var.'] = (1 - (df['Open']/df['High']))*100
+            df['Ticket'] = ticker
+            df.reset_index(inplace=True)
+            df_tickers = pd.concat([df_tickers, df])
 
     #df_tickers['Date'] = df_tickers['Date'].apply(lambda x: dt.datetime.strptime(x,'%Y-%m-%d'))
 
@@ -96,15 +97,15 @@ def ranking_tickets_by_var(interval=30):
     #grouping by index
     df_tickers['Score'] = df_tickers.groupby(level=0)['Var.'].rank(ascending=True)
    
-    group = df_tickers.groupby('Ticket').agg({'Score': 'sum', 'Volume' : 'sum'})
+    group = df_tickers.groupby('Ticket').agg({'Score': 'sum', 'Volume' : 'first'})
     
-    group = group.sort_values(['Volume','Score'],ascending=False)
+    group = group.sort_values(['Volume', 'Score'],ascending=False)
     group['Volume'] = group['Volume'] / 10 ** 6 
     print('Rank of elements from {} to {}:'.format(date_to_str(df_tickers.iloc[0].name), date_to_str(df_tickers.iloc[-1].name)))
     group.reset_index(inplace=True)
     for i,row in group.iterrows():
         
-        print('{} {} : Score({}) Volume({}) mil'.format(i+1,row['Ticket'],int(row['Score']),round(row['Volume'],3)))
+        print('{} {} : Score({}) Volume({}) M'.format(i+1,row['Ticket'],int(row['Score']),round(row['Volume'],3)))
         
 #if interval is lower than 30, update will not be executed
 ranking_tickets_by_var(interval=5)

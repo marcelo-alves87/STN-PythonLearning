@@ -12,7 +12,7 @@ import numpy as np
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 31-01-2022-ulI.pdf'
+BTC_FILE = 'BTC Rico 02-02-2022-Eh4.pdf'
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
