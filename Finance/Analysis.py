@@ -10,11 +10,13 @@ import os
 from gtts import gTTS
 from pygame import mixer
 import numpy as np
+import pickle
 
 PICKLE_FILE = 'btc_tickers.plk'
+DATA__FILE = 'btc_data_.plk'
 color = sys.stdout.shell
 periods = ['60min','30min','15min','5min','1min'] # deve ser em ordem decrescente
-data_ = []
+
 
 def RSI(column):
     #Get just the adjusted close
@@ -89,8 +91,13 @@ def notificate(ticket, period):
 
             print_stars(text='FATALITY')     
 
-
-        
+    else:
+         x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
+         x.start()
+         x.join()
+         y = threading.Thread(target=play, args=('Reset',path2,'en-us'))
+         y.start()
+         print_stars(text='RESET') 
         
         
 
@@ -195,6 +202,15 @@ def find_in_data(ticket,period):
             return datum
     return datum
 
+def get_next_datum(ticket,period):
+    
+    index = periods.index(period)
+
+    if index == 0:
+        return None
+    else:
+        return find_in_data(ticket,periods[index - 1])
+
 def get_previous_datum(ticket,period):
     
     index = periods.index(period)
@@ -219,10 +235,18 @@ def reset_foward_periods_flag(ticket, period):
 def print_data():
     for datum in data_:
         print(datum.ticket,datum.period,datum.value,datum.flag)
-        
+
+
+def get_last_data_():
+    if os.path.exists(DATA__FILE):
+         with open(DATA__FILE,"rb") as f:
+            return pickle.load(f)
+    else:
+        return []
 
 def analysis(df):
-
+    global data_
+    data_ = get_last_data_()
     data = []
     len_periods = len(periods) - 1
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
@@ -300,7 +324,7 @@ def analysis(df):
                 if (datum.value > 0 and datum2.value < 0) or (datum.value < 0 and datum2.value > 0):
                     
                     datum.flag = np.sign(value)    
-                    reset_foward_periods_flag(ticket, period)
+                    
                     
                     prev_datum = get_previous_datum(ticket,period)
 
@@ -311,7 +335,13 @@ def analysis(df):
                         
                         if prev_datum.flag == datum.flag:                                                        
                             notificate(ticket,period)
+                    else:
+                        datum3 = get_next_datum(ticket,period)
                         
+                        if datum3.flag != 0 and datum3.flag != datum.flag:    
+                            notificate(ticket,period)
+
+                    reset_foward_periods_flag(ticket, period)    
                     
                 else:
                     print_period(period, time1, value, datum.flag)
@@ -322,7 +352,9 @@ def analysis(df):
             
       
         
-        color.write('\n',"TODO") 
+        color.write('\n',"TODO")
+        with open(DATA__FILE,"wb") as f:
+            pickle.dump(data_,f)
 
 def run():
     while True:
@@ -343,7 +375,7 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-02-02 13:35:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-02-04 10:15:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
