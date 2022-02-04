@@ -9,12 +9,12 @@ import threading
 import os
 from gtts import gTTS
 from pygame import mixer
+import numpy as np
 
 PICKLE_FILE = 'btc_tickers.plk'
 color = sys.stdout.shell
-periods = ['30min','15min','5min','1min'] # deve ser em ordem decrescente
-previous_value = None
-main_period = None
+periods = ['60min','30min','15min','5min','1min'] # deve ser em ordem decrescente
+data_ = []
 
 def RSI(column):
     #Get just the adjusted close
@@ -33,27 +33,69 @@ def RSI(column):
     rsi_rma = 100.0 - (100.0 / (1.0 + rs))
     
     return rsi_rma[-1]
-    
 
-def notificate(ticket, beep1):
-    
-    beepy.beep(beep1)
-    
-    print_stars(text='WIN')    
-    path = 'Utils/' +  ticket + '.mp3'
-    language = 'pt-br'        
-    myobj = gTTS(text=ticket, lang=language)
 
+def play(text, path, language):
+    myobj = gTTS(text=text, lang=language)
     try:
         myobj.save(path)
     except:
         pass
-    
+
     mixer.init()
     mixer.music.load(path)
     mixer.music.play()
+    time.sleep(3)
+
+def notificate(ticket, period):
     
+
+    index = periods.index(period)
+    path1 = 'Utils/' +  ticket + '.mp3'
+    path2 = 'Utils/' +  period + '.mp3'
+
     
+    if index < len(periods) - 1:
+
+        beepy.beep(5)
+        
+        
+
+        x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
+        x.start()
+        x.join()
+        
+        if index == 3:
+            y = threading.Thread(target=play, args=('Hit',path2,'en-us'))
+            y.start()
+            
+            print_stars(text='HIT')     
+        elif index == 2:                        
+            
+            y = threading.Thread(target=play, args=('Special',path2,'en-us'))
+            y.start()
+
+            print_stars(text='SPECIAL')
+        elif index == 1:
+
+            y = threading.Thread(target=play, args=('Brutality',path2,'en-us'))
+            y.start()
+
+            print_stars(text='BRUTALITY')         
+        elif index == 0:
+
+            y = threading.Thread(target=play, args=('Fatality',path2,'en-us'))
+            y.start()
+
+            print_stars(text='FATALITY')     
+
+
+        
+        
+        
+
+        
+   
 def convert_to_date_str(x):    
     x = str(x)
     if len(x) == 1:
@@ -79,9 +121,24 @@ def convert_to_datetime(x):
         
         return date
 
-def print_group(period, group, index):
-    color.write(' ' + period + '->' ,"TODO")
-    calc_pct_last_diff(group[index][1],group[index][2])
+def print_period(period, timestamp, value = np.Inf, flag = 0):
+
+    my_color = 'TODO'
+    
+    
+    if flag > 0:
+        my_color = 'STRING'
+    elif flag < 0:
+        my_color = 'COMMENT'
+
+    color.write(' ' + period + '(' + timestamp + ') ', my_color)
+    
+    if not np.isinf(value):
+        value_str = str(round(abs(value),3))
+        if value < 0:                    
+            color.write('-' + value_str, 'COMMENT')
+        else:    
+            color.write(value_str,'STRING')
         
 def calc_pct_last_diff(sma,ema):
     value = abs(ema[-1] - sma[-1])
@@ -123,66 +180,51 @@ def convert_to_float(x):
         return float(x)
     
 def print_stars(text=''):
+    color.write(' *',"TODO")
     color.write('*',"STRING")
     color.write('*',"COMMENT")
     color.write(text,"TODO")
     color.write('*',"STRING")
     color.write('*',"COMMENT")
-    color.write('*',"TODO")
+    color.write('* ',"TODO")
+
+def find_in_data(ticket,period):
+    datum = None
+    for datum in data_:
+        if datum.ticket == ticket and datum.period == period:
+            return datum
+    return datum
+
+def get_previous_datum(ticket,period):
     
-data_ = []
+    index = periods.index(period)
 
-
-def strategy(ticket, data, period):
+    if index == len(periods) - 1:
+        return None
+    else:
+        return find_in_data(ticket,periods[index + 1])
     
-    if period == '5min' and ticket in ['MGLU3','PETR4']:
-        data1 = data[periods.index(period):]
-        if any(data1) is False or all(data1) is True:
-             notificate(ticket, 5)             
-    elif period == '15min':
-        data1 = data[periods.index(period):]
-        if any(data1) is False or all(data1) is True:
-            notificate(ticket, 6)            
-    # fazer else da Estratégia 1 quando 30 min está disponivel         
+def reset_foward_periods_flag(ticket, period):
+
+    index = periods.index(period)
+
+    my_periods = periods[:index]
+
+    for period1 in my_periods:
+        datum = find_in_data(ticket,period1)
+        if datum is not None:
+            datum.flag = 0
 
 
-def analysis_period(df, ticket, period):
-    global previous_value
-    
-    grouped_df = df.groupby(["Papel"]).agg(join_cells)
-    for group in grouped_df.iterrows():
-        if ticket == group[0]:
-            list1 = group[1]['Hora'].split(';')
-            list2 = group[1]['Último'].split(';')
-            df1 = {'Hora' : list1, 'Último' : list2}
-            df1 = pd.DataFrame(df1)
-            df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
-            df1['Último'] = df1['Último'].apply(convert_to_float)
-            df1.set_index('Hora', inplace=True)
-            df_resampled = df1.resample(period).last()
-            df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
-            df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()
-            value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]
-            color.write('\nChecking each ' + period + ' of ' + ticket  + ': (' + timestamp_to_str(df_resampled.index[-1]) + ') ',"TODO")
-            value_str = str(round(value, 3))
-            if value > 0:
-                color.write(value_str,'STRING')
-            else:
-                color.write(value_str,'COMMENT')
-            
-            if previous_value is not None:
-                if (previous_value < 0 and value > 0):
-                    beepy.beep(1)
-                    color.write(' @@@','STRING')    
-                elif(previous_value > 0 and value < 0):                
-                    beepy.beep(1)
-                    color.write(' $$$','KEYWORD')    
-            previous_value = value               
-            
+def print_data():
+    for datum in data_:
+        print(datum.ticket,datum.period,datum.value,datum.flag)
+        
 
 def analysis(df):
+
     data = []
-    global main_period
+    len_periods = len(periods) - 1
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
     for group in grouped_df.iterrows():
         lev = group[1]['Lev.'].split(';')[0]
@@ -221,72 +263,65 @@ def analysis(df):
     
     for group in data:
         
-        score = 0
-        len_periods = len(periods) - 1
+        
+        
 
         for i in range(len_periods):
             if isinstance(group[i + 1][1], int):
                 group[i + 1].append('R')
             elif not isinstance(group[i + 2][1], int):
-                if (group[i + 1][1] > 0 and group[i + 2][1] > 0) or (group[i + 1][1] < 0 and group[i + 2][1] < 0):
-                    score += 1
+                if (group[i + 1][1] > 0 and group[i + 2][1] > 0) or (group[i + 1][1] < 0 and group[i + 2][1] < 0):                    
                     group[i + 1].append('G')
                 elif (group[i + 1][1] > 0 and group[i + 2][1] < 0) or (group[i + 1][1] < 0 and group[i + 2][1] > 0):
                     group[i + 1].append('R')
-        group.append(score)            
+        
 
     #data.sort(key=sort)
     
-    for group in data:
-        check_all_bools = False
-        bools = []
-        color.write(group[0][0] + '(' + group[0][1] + ')' + ':' ,"TODO")        
-        for i,period in enumerate(periods):
-            datum = Datum(group[0][0],period,group[i + 1][1])
-            if not datum in data_:
-                data_.append(datum)
-                emph = False
-            else:
-                datum2 = data_[Datum == datum]
-                if (datum.value > 0 and datum2.value < 0) or (datum.value < 0 and datum2.value > 0):
-                    emph = True
-                else:    
-                    emph = False
-                data_.remove(datum2)
-                data_.append(datum)
-                
-            color.write(' ' + period + '(' + timestamp_to_str(group[i + 1][0]) + ') ',"TODO")
-            value = group[i + 1][1]
-            value_str =str(round(abs(value),3))
-
-            
-            if emph:                
-                check_all_bools = True
-                main_period = period
-                print_stars()
-                if value > 0:
-                    bools.append(True)                
-                elif value < 0:
-                    bools.append(False)                
-            else:
-                if value > 0:
-                        bools.append(True)
-                        color.write(value_str,"STRING")
-                elif value < 0:
-                        bools.append(False)
-                        color.write('-' + value_str,"COMMENT")
-                
-            if len(group[i + 1]) > 3:
-                value = group[i + 1][3]
-                if value == 'G':
-                    color.write(' *',"STRING")    
-                elif value == 'R':
-                    color.write(' *',"KEYWORD")
-
+    for group in data:        
         
-        if check_all_bools:
-            strategy(group[0][0], bools, main_period)
-                                
+        ticket = group[0][0]
+        color.write(ticket + '(' + group[0][1] + ')' + ':' ,"TODO")        
+        for i in range(len_periods,-1,-1):
+            period = periods[i]
+            value = group[i + 1][1]            
+            datum = Datum(ticket,period,value)
+            time1 = timestamp_to_str(group[i + 1][0])
+            if not datum in data_:
+                if i == len_periods:                    
+                    datum.flag = np.sign(value)
+                data_.append(datum)
+                print_period(period, time1, value)
+            else:
+                
+                datum2 = find_in_data(ticket,period)
+                datum.flag = datum2.flag
+                
+                if (datum.value > 0 and datum2.value < 0) or (datum.value < 0 and datum2.value > 0):
+                    
+                    datum.flag = np.sign(value)    
+                    reset_foward_periods_flag(ticket, period)
+                    
+                    prev_datum = get_previous_datum(ticket,period)
+
+                    print_period(period, time1,value,datum.flag)
+
+                    if prev_datum is not None:
+
+                        
+                        if prev_datum.flag == datum.flag:                                                        
+                            notificate(ticket,period)
+                        
+                    
+                else:
+                    print_period(period, time1, value, datum.flag)
+                    
+                data_.remove(datum2)
+                data_.append(datum)                 
+                
+            
+      
+        
         color.write('\n',"TODO") 
 
 def run():
@@ -308,7 +343,7 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-02-02 14:30:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-02-02 13:35:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
@@ -321,6 +356,6 @@ def test():
         time.sleep(0)
         
     
-test() 
+run() 
 
 
