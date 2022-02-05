@@ -49,7 +49,18 @@ def play(text, path, language):
     mixer.music.play()
     time.sleep(3)
 
-def notificate(ticket, period):
+def play_cima_baixo(value):
+    if value > 0: 
+        str1 = 'Cima!'                
+    else:
+        str1 = 'Baixo!'
+
+    path1 = 'Utils/' +  str1 + '.mp3'
+    y = threading.Thread(target=play, args=(str1,path1,'pt-br'))
+    y.start()
+    y.join()
+
+def notificate(ticket, period,value):
     
 
     index = periods.index(period)
@@ -57,47 +68,30 @@ def notificate(ticket, period):
     path2 = 'Utils/' +  period + '.mp3'
 
     
-    if index < len(periods) - 1:
+    x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
+    x.start()
+    x.join()
 
-        beepy.beep(5)
+    if index == 4:
+        str1 = 'Reset'
+    elif index == 3:
+        str1 = 'Hit'
+    elif index == 2:                        
+        str1 = 'Special'                      
+    elif index == 1:
+        str1 = 'Brutality'
+    elif index == 0:
+        str1 = 'Fatality'
+
+    print_stars(text=str1.upper())             
+    y = threading.Thread(target=play, args=(str1,path2,'en-us'))
+    y.start()
+    y.join()    
         
-        
-
-        x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
-        x.start()
-        x.join()
-        
-        if index == 3:
-            y = threading.Thread(target=play, args=('Hit',path2,'en-us'))
-            y.start()
-            
-            print_stars(text='HIT')     
-        elif index == 2:                        
-            
-            y = threading.Thread(target=play, args=('Special',path2,'en-us'))
-            y.start()
-
-            print_stars(text='SPECIAL')
-        elif index == 1:
-
-            y = threading.Thread(target=play, args=('Brutality',path2,'en-us'))
-            y.start()
-
-            print_stars(text='BRUTALITY')         
-        elif index == 0:
-
-            y = threading.Thread(target=play, args=('Fatality',path2,'en-us'))
-            y.start()
-
-            print_stars(text='FATALITY')     
-
-    else:
-         x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
-         x.start()
-         x.join()
-         y = threading.Thread(target=play, args=('Reset',path2,'en-us'))
-         y.start()
-         print_stars(text='RESET') 
+    
+    play_cima_baixo(value)    
+         
+         
         
         
 
@@ -128,17 +122,17 @@ def convert_to_datetime(x):
         
         return date
 
-def print_period(period, timestamp, value = np.Inf, flag = 0):
+def print_period(period, timestamp, value = np.Inf, flag = 0, rsi=0):
 
     my_color = 'TODO'
-    
+    rsi = round(rsi,2)
     
     if flag > 0:
         my_color = 'STRING'
     elif flag < 0:
         my_color = 'COMMENT'
 
-    color.write(' ' + period + '(' + timestamp + ') ', my_color)
+    color.write(' ' + period + '(' + timestamp + ';' + str(rsi) +  ') ', my_color)
     
     if not np.isinf(value):
         value_str = str(round(abs(value),3))
@@ -245,13 +239,13 @@ def get_last_data_():
         return []
 
 def analysis(df):
+    
     global data_
     data_ = get_last_data_()
     data = []
     len_periods = len(periods) - 1
     grouped_df = df.groupby(["Papel"]).agg(join_cells)
-    for group in grouped_df.iterrows():
-        lev = group[1]['Lev.'].split(';')[0]
+    for group in grouped_df.iterrows():        
         list1 = group[1]['Hora'].split(';')
         list2 = group[1]['Último'].split(';')
         df1 = {'Hora' : list1, 'Último' : list2}
@@ -262,7 +256,7 @@ def analysis(df):
         
         if len(df1) > 1:
             data1 = []
-            data1.append([group[0],lev])
+            data1.append([group[0],list2[-1]])
             for period in periods:
                 
                 df_resampled = df1.resample(period).last()
@@ -278,7 +272,7 @@ def analysis(df):
                 else:
                     rsi = RSI(df_resampled['Último'])
                     value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]
-                    data1.append([df_resampled.index[-1],value])     
+                    data1.append([df_resampled.index[-1],value,rsi])     
                 
             data.append(data1)
                 
@@ -308,7 +302,8 @@ def analysis(df):
         color.write(ticket + '(' + group[0][1] + ')' + ':' ,"TODO")        
         for i in range(len_periods,-1,-1):
             period = periods[i]
-            value = group[i + 1][1]            
+            value = group[i + 1][1]
+            rsi = group[i + 1][2]
             datum = Datum(ticket,period,value)
             time1 = timestamp_to_str(group[i + 1][0])
             if not datum in data_:
@@ -324,27 +319,21 @@ def analysis(df):
                 if (datum.value > 0 and datum2.value < 0) or (datum.value < 0 and datum2.value > 0):
                     
                     datum.flag = np.sign(value)    
-                    
-                    
+
                     prev_datum = get_previous_datum(ticket,period)
 
-                    print_period(period, time1,value,datum.flag)
+                    print_period(period, time1,value,datum.flag, rsi)
 
-                    if prev_datum is not None:
-
-                        
+                    if prev_datum is not None:                              
                         if prev_datum.flag == datum.flag:                                                        
-                            notificate(ticket,period)
+                            notificate(ticket,period,value)
                     else:
-                        datum3 = get_next_datum(ticket,period)
-                        
-                        if datum3.flag != 0 and datum3.flag != datum.flag:    
-                            notificate(ticket,period)
+                         notificate(ticket,period,value)
 
                     reset_foward_periods_flag(ticket, period)    
                     
                 else:
-                    print_period(period, time1, value, datum.flag)
+                    print_period(period, time1, value, datum.flag, rsi)
                     
                 data_.remove(datum2)
                 data_.append(datum)                 
@@ -375,11 +364,11 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-02-04 10:15:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-02-04 10:00:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
-    
+    os.remove(DATA__FILE)
     for i in range(120):
         new_date =  date + dt.timedelta(minutes=i)
         df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
@@ -388,6 +377,4 @@ def test():
         time.sleep(0)
         
     
-run() 
-
-
+test()
