@@ -12,7 +12,7 @@ import numpy as np
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 03-02-2022-6lE.pdf'
+BTC_FILE = 'BTC Rico 04-02-2022-UxU.pdf'
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
@@ -127,12 +127,14 @@ def scrap_rico():
 
         df = pd.read_html(str(tables[0]))[0]
         
-        df = df[['Ativo','Último', 'Data/Hora', 'Financeiro']]
+        df = df[['Ativo','Último', 'Data/Hora', 'Financeiro', 'Mínimo', 'Máximo']]
 
         df['Último'] = df['Último']/100
+        df['Máximo'] = df['Máximo']/100
+        df['Mínimo'] = df['Mínimo']/100
         
         df = pd.merge(df_btc, df, left_on=df_btc["Papel"], right_on=df["Ativo"], how='left')
-        df = df[['Papel', 'Lev.', 'Último', 'Data/Hora', 'Financeiro']]
+        df = df[['Papel', 'Lev.', 'Último', 'Data/Hora', 'Financeiro', 'Mínimo', 'Máximo']]
         df = df.dropna()
         df.rename(columns={'Data/Hora': 'Hora', 'Financeiro': 'Volume'}, inplace=True)
            

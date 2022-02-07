@@ -17,7 +17,6 @@ DATA__FILE = 'btc_data_.plk'
 color = sys.stdout.shell
 periods = ['60min','30min','15min','5min','1min'] # deve ser em ordem decrescente
 
-
 def RSI(column):
     #Get just the adjusted close
     # Get the difference in price from previous step
@@ -73,7 +72,7 @@ def notificate(ticket, period,value):
     x.join()
 
     if index == 4:
-        str1 = 'Reset'
+        str1 = 'Reset'        
     elif index == 3:
         str1 = 'Hit'
     elif index == 2:                        
@@ -122,24 +121,21 @@ def convert_to_datetime(x):
         
         return date
 
-def print_period(period, timestamp, value = np.Inf, flag = 0, rsi=0):
+def print_period(period, timestamp, value):
 
     my_color = 'TODO'
-    rsi = round(rsi,2)
     
-    if flag > 0:
-        my_color = 'STRING'
-    elif flag < 0:
+    value_str = str(round(abs(value),3))
+    if value < 0:
         my_color = 'COMMENT'
-
-    color.write(' ' + period + '(' + timestamp + ';' + str(rsi) +  ') ', my_color)
+        value_str = '-' + value_str
+    else:
+        my_color = 'STRING'
+        
     
-    if not np.isinf(value):
-        value_str = str(round(abs(value),3))
-        if value < 0:                    
-            color.write('-' + value_str, 'COMMENT')
-        else:    
-            color.write(value_str,'STRING')
+    
+    color.write(' ' + period + '(' + timestamp  + ') ', my_color)
+    color.write(value_str, my_color)
         
 def calc_pct_last_diff(sma,ema):
     value = abs(ema[-1] - sma[-1])
@@ -196,6 +192,7 @@ def find_in_data(ticket,period):
             return datum
     return datum
 
+
 def get_next_datum(ticket,period):
     
     index = periods.index(period)
@@ -214,17 +211,6 @@ def get_previous_datum(ticket,period):
     else:
         return find_in_data(ticket,periods[index + 1])
     
-def reset_foward_periods_flag(ticket, period):
-
-    index = periods.index(period)
-
-    my_periods = periods[:index]
-
-    for period1 in my_periods:
-        datum = find_in_data(ticket,period1)
-        if datum is not None:
-            datum.flag = 0
-
 
 def print_data():
     for datum in data_:
@@ -237,6 +223,10 @@ def get_last_data_():
             return pickle.load(f)
     else:
         return []
+
+def reset_data(reset):
+    if reset and os.path.exists(DATA__FILE):
+        os.remove(DATA__FILE)    
 
 def analysis(df):
     
@@ -271,7 +261,7 @@ def analysis(df):
                     data1.append([df_resampled.index[-1],value,0])     
                 else:
                     rsi = RSI(df_resampled['Último'])
-                    value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]
+                    value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]                    
                     data1.append([df_resampled.index[-1],value,rsi])     
                 
             data.append(data1)
@@ -303,12 +293,10 @@ def analysis(df):
         for i in range(len_periods,-1,-1):
             period = periods[i]
             value = group[i + 1][1]
-            rsi = group[i + 1][2]
+            rsi = group[i + 1][2]            
             datum = Datum(ticket,period,value)
             time1 = timestamp_to_str(group[i + 1][0])
             if not datum in data_:
-                if i == len_periods:                    
-                    datum.flag = np.sign(value)
                 data_.append(datum)
                 print_period(period, time1, value)
             else:
@@ -318,22 +306,18 @@ def analysis(df):
                 
                 if (datum.value > 0 and datum2.value < 0) or (datum.value < 0 and datum2.value > 0):
                     
-                    datum.flag = np.sign(value)    
-
                     prev_datum = get_previous_datum(ticket,period)
 
-                    print_period(period, time1,value,datum.flag, rsi)
+                    
 
-                    if prev_datum is not None:                              
-                        if prev_datum.flag == datum.flag:                                                        
-                            notificate(ticket,period,value)
-                    else:
-                         notificate(ticket,period,value)
+                    print_period(period, time1,value)
 
-                    reset_foward_periods_flag(ticket, period)    
+                    
+                    notificate(ticket,period,value)                   
+                             
                     
                 else:
-                    print_period(period, time1, value, datum.flag, rsi)
+                    print_period(period, time1, value)
                     
                 data_.remove(datum2)
                 data_.append(datum)                 
@@ -345,7 +329,9 @@ def analysis(df):
         with open(DATA__FILE,"wb") as f:
             pickle.dump(data_,f)
 
-def run():
+def run(reset=True):
+    
+    reset_data(reset)    
     while True:
         df = None
         while df is None:
@@ -364,17 +350,19 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-02-04 10:00:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-02-07 11:30:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
-    os.remove(DATA__FILE)
+    reset_data(True)
     for i in range(120):
+        
         new_date =  date + dt.timedelta(minutes=i)
         df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
+        df1.fillna(0)
         analysis(df1)
         #analysis_period(df1,'MGLU3','5min')
         time.sleep(0)
         
     
-test()
+run()
