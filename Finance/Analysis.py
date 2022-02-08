@@ -228,27 +228,6 @@ def reset_data(reset):
     if reset and os.path.exists(DATA__FILE):
         os.remove(DATA__FILE)    
 
-def notify_price_fibonacci(group,datum):
-    
-    ticket = group[0]
-    price = float(group[1])
-    maximum = float(group[2])
-    minimum = float(group[3])
-
-    level1 = maximum - ((maximum - minimum) * 0.236)
-    level2 = maximum - ((maximum - minimum) * 0.786)
-
-    if price > level1 or price < level2:
-        if not datum.flag:
-            datum.flag = 1
-            beepy.beep(5)
-            path1 = 'Utils/' +  ticket + '.mp3'       
-            x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
-            x.start()
-            x.join()
-    else:
-        datum.flag = 0
-
 def analysis(df):
     
     global data_
@@ -259,17 +238,15 @@ def analysis(df):
     for group in grouped_df.iterrows():        
         list1 = group[1]['Hora'].split(';')
         list2 = group[1]['Último'].split(';')
-        maximum = group[1]['Máximo'].split(';')[-1]
-        minimum = group[1]['Mínimo'].split(';')[-1]
         df1 = {'Hora' : list1, 'Último' : list2}
-        df1 = pd.DataFrame(df1)        
+        df1 = pd.DataFrame(df1)
         df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
         df1['Último'] = df1['Último'].apply(convert_to_float)
         df1.set_index('Hora', inplace=True)
         
         if len(df1) > 1:
             data1 = []
-            data1.append([group[0],list2[-1],maximum,minimum])
+            data1.append([group[0],list2[-1]])
             for period in periods:
                 
                 df_resampled = df1.resample(period).last()
@@ -309,7 +286,8 @@ def analysis(df):
 
     #data.sort(key=sort)
     
-    for group in data:                
+    for group in data:        
+        
         ticket = group[0][0]
         color.write(ticket + '(' + group[0][1] + ')' + ':' ,"TODO")        
         for i in range(len_periods,-1,-1):
@@ -325,15 +303,9 @@ def analysis(df):
                 
                 datum2 = find_in_data(ticket,period)
                 datum.flag = datum2.flag
-                prev_datum = get_previous_datum(ticket,period)
-
-                if prev_datum is None:
-                    notify_price_fibonacci(group[0],datum)
                 
                 if (datum.value > 0 and datum2.value < 0) or (datum.value < 0 and datum2.value > 0):
                     
-                    
-
                     print_period(period, time1,value)
 
                     
@@ -374,7 +346,7 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-02-08 11:30:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-02-07 11:30:00','%Y-%m-%d %H:%M:%S')    
     ##start =  date + dt.timedelta(days=interval)    
     ##tomorrow = now + dt.timedelta(days=1)
     ##date.strftime("%Y-%m-%d %H:%M:%S")
