@@ -1,113 +1,22 @@
 import pandas as pd
+import os
+import pdb
 import sys
 import time
-import pdb
 import datetime as dt
-from Datum import Datum
-import beepy
-import threading
-import os
-from gtts import gTTS
-from pygame import mixer
-import numpy as np
-import pickle
 
 PICKLE_FILE = 'btc_tickers.plk'
-DATA__FILE = 'btc_data_.plk'
+DATA_FILE = 'btc_data.plk'
 color = sys.stdout.shell
-periods = ['60min','30min','15min','5min','1min'] # deve ser em ordem decrescente
+windows = [5,8,13]
+windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
+period = '5min'
 
-def RSI(column):
-    #Get just the adjusted close
-    # Get the difference in price from previous step
-    delta = column.diff()
-    # Get rid of the first row, which is NaN since it did not have a previous 
-    # row to calculate the differences
-    delta = delta[1:]
-    # Make the positive gains (up) and negative gains (down) Series
-    up, down = delta.clip(lower=0), delta.clip(upper=0).abs()
-    window_length = 14
-    alpha = 1 / window_length
-    roll_up = up.ewm(alpha=alpha).mean()
-    roll_down = down.ewm(alpha=alpha).mean()
-    rs = roll_up / roll_down
-    rsi_rma = 100.0 - (100.0 / (1.0 + rs))
-    
-    return rsi_rma[-1]
-
-
-def play(text, path, language):
-    myobj = gTTS(text=text, lang=language)
-    try:
-        myobj.save(path)
-    except:
-        pass
-
-    mixer.init()
-    mixer.music.load(path)
-    mixer.music.play()
-    time.sleep(3)
-
-def play_cima_baixo(value):
-    if value > 0: 
-        str1 = 'Cima!'                
+def convert_to_float(x):
+    if x is None or x == '':
+        return 0
     else:
-        str1 = 'Baixo!'
-
-    path1 = 'Utils/' +  str1 + '.mp3'
-    y = threading.Thread(target=play, args=(str1,path1,'pt-br'))
-    y.start()
-    y.join()
-
-def notificate(ticket, period,value):
-    
-
-    index = periods.index(period)
-    path1 = 'Utils/' +  ticket + '.mp3'
-    path2 = 'Utils/' +  period + '.mp3'
-
-    
-    x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
-    x.start()
-    x.join()
-
-    if index == 4:
-        str1 = 'Reset'        
-    elif index == 3:
-        str1 = 'Hit'
-    elif index == 2:                        
-        str1 = 'Special'                      
-    elif index == 1:
-        str1 = 'Brutality'
-    elif index == 0:
-        str1 = 'Fatality'
-
-    print_stars(text=str1.upper())             
-    y = threading.Thread(target=play, args=(str1,path2,'en-us'))
-    y.start()
-    y.join()    
-        
-    
-    play_cima_baixo(value)    
-         
-         
-        
-        
-
-        
-   
-def convert_to_date_str(x):    
-    x = str(x)
-    if len(x) == 1:
-        return '0' + x
-    else:
-        return x
-    
-def join_cells(x):    
-    return ';'.join(x[x.notnull()].astype(str))
-
-def timestamp_to_str(x):
-    return x.strftime("%H:%M")
+        return float(x)
 
 def convert_to_datetime(x):
     
@@ -121,44 +30,16 @@ def convert_to_datetime(x):
         
         return date
 
-def print_period(period, timestamp, value):
-
-    my_color = 'TODO'
-    
-    value_str = str(round(abs(value),3))
-    if value < 0:
-        my_color = 'COMMENT'
-        value_str = '-' + value_str
+def get_last_data():
+    if os.path.exists(DATA_FILE):
+         with open(DATA_FILE,"rb") as f:
+            return pickle.load(f)
     else:
-        my_color = 'STRING'
-        
+        return []
     
-    
-    color.write(' ' + period + '(' + timestamp  + ') ', my_color)
-    color.write(value_str, my_color)
-        
-def calc_pct_last_diff(sma,ema):
-    value = abs(ema[-1] - sma[-1])
-    value = str(ema[-1]) + ' ' + str(sma[-1])
-    if ema[-1] > sma[-1]:
-        return color.write(value,"STRING")
-    elif ema[-1] == sma[-1]:
-        return color.write(value,"KEYWORD")
-    else:
-        return color.write(value,"COMMENT")
-    
-def resample(df , period):
-    
-    if pd.isnull(df.index[-1]):
-        return None
-    else:
-        
-        df_resampled = df.resample(period).last()
-        
-        df_resampled['EMA'] = df_resampled['Preco'].ewm(span=9, adjust=False).mean()
-        df_resampled['SMA'] = df_resampled['Preco'].rolling(window=40, min_periods=0).mean()           
-
-        return df_resampled.index[-1],df_resampled['SMA'],df_resampled['EMA']
+def reset_data():
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
 
 def try_to_get_df():
     try:
@@ -167,167 +48,48 @@ def try_to_get_df():
     except:
         return None
 
-def sort(x):
-    return x[-1]
-
-def convert_to_float(x):
-    if x is None or x == '':
-        return 0
+def create_resampled_from_group(group):
+    list1 = group[1]['Hora'].split(';')
+    list2 = group[1]['Último'].split(';')
+    df = pd.DataFrame({'Hora' : list1, 'Último' : list2})
+    df['Hora'] = df['Hora'].apply(convert_to_datetime)
+    df['Último'] = df['Último'].apply(convert_to_float)
+    df.set_index('Hora', inplace=True)
+        
+    if not df.empty:        
+        df_resampled = df.resample(period).last()
+        df_resampled = df_resampled.dropna()
+        for window in windows:
+          df_resampled['SMA_' + str(window)] = df_resampled['Último'].rolling(window=window, min_periods=0).mean()
+        return df_resampled
     else:
-        return float(x)
+        return df
+
+def print_group(ticket,df):
     
-def print_stars(text=''):
-    color.write(' *',"TODO")
-    color.write('*',"STRING")
-    color.write('*',"COMMENT")
-    color.write(text,"TODO")
-    color.write('*',"STRING")
-    color.write('*',"COMMENT")
-    color.write('* ',"TODO")
-
-def find_in_data(ticket,period):
-    datum = None
-    for datum in data_:
-        if datum.ticket == ticket and datum.period == period:
-            return datum
-    return datum
-
-
-def get_next_datum(ticket,period):
-    
-    index = periods.index(period)
-
-    if index == 0:
-        return None
-    else:
-        return find_in_data(ticket,periods[index - 1])
-
-def get_previous_datum(ticket,period):
-    
-    index = periods.index(period)
-
-    if index == len(periods) - 1:
-        return None
-    else:
-        return find_in_data(ticket,periods[index + 1])
-    
-
-def print_data():
-    for datum in data_:
-        print(datum.ticket,datum.period,datum.value,datum.flag)
-
-
-def get_last_data_():
-    if os.path.exists(DATA__FILE):
-         with open(DATA__FILE,"rb") as f:
-            return pickle.load(f)
-    else:
-        return []
-
-def reset_data(reset):
-    if reset and os.path.exists(DATA__FILE):
-        os.remove(DATA__FILE)    
+    color.write('\n' + ticket + ' (' + df.index[-1].strftime("%H:%M") + '): ' ,"TODO")
+    for i,window in enumerate(windows):
+        color.write('(' + str(window) + ')',"TODO")
+        value = round(df['SMA_' + str(window)][-1],3)
+        color.write(' ' + str(value) + ' ',windows_color[i])
+        
 
 def analysis(df):
     
-    global data_
-    data_ = get_last_data_()
-    data = []
-    len_periods = len(periods) - 1
-    grouped_df = df.groupby(["Papel"]).agg(join_cells)
-    for group in grouped_df.iterrows():        
-        list1 = group[1]['Hora'].split(';')
-        list2 = group[1]['Último'].split(';')
-        df1 = {'Hora' : list1, 'Último' : list2}
-        df1 = pd.DataFrame(df1)
-        df1['Hora'] = df1['Hora'].apply(convert_to_datetime)
-        df1['Último'] = df1['Último'].apply(convert_to_float)
-        df1.set_index('Hora', inplace=True)
-        
-        if len(df1) > 1:
-            data1 = []
-            data1.append([group[0],list2[-1]])
-            for period in periods:
-                
-                df_resampled = df1.resample(period).last()
-                df_resampled = df_resampled.dropna()
-                df_resampled['EMA'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
-                ema_qt = len(df_resampled['EMA'])
-                df_resampled['SMA'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()
-                sma_qt = len(df_resampled['SMA'])
-                
-                if sma_qt < 40:
-                    value = sma_qt
-                    data1.append([df_resampled.index[-1],value,0])     
-                else:
-                    rsi = RSI(df_resampled['Último'])
-                    value = df_resampled['EMA'][-1] - df_resampled['SMA'][-1]                    
-                    data1.append([df_resampled.index[-1],value,rsi])     
-                
-            data.append(data1)
-                
+    global data
+    data = get_last_data()        
+
+    grouped_df = df.groupby(["Papel"]).agg(lambda x: ';'.join(x[x.notnull()].astype(str)))
     color.write('\n',"TODO")
+    for group in grouped_df.iterrows():        
+        ticket = group[0]
+        df = create_resampled_from_group(group)                                      
+        print_group(ticket,df)
+                                           
 
+def run():
     
-    for group in data:
-        
-        
-        
-
-        for i in range(len_periods):
-            if isinstance(group[i + 1][1], int):
-                group[i + 1].append('R')
-            elif not isinstance(group[i + 2][1], int):
-                if (group[i + 1][1] > 0 and group[i + 2][1] > 0) or (group[i + 1][1] < 0 and group[i + 2][1] < 0):                    
-                    group[i + 1].append('G')
-                elif (group[i + 1][1] > 0 and group[i + 2][1] < 0) or (group[i + 1][1] < 0 and group[i + 2][1] > 0):
-                    group[i + 1].append('R')
-        
-
-    #data.sort(key=sort)
-    
-    for group in data:        
-        
-        ticket = group[0][0]
-        color.write(ticket + '(' + group[0][1] + ')' + ':' ,"TODO")        
-        for i in range(len_periods,-1,-1):
-            period = periods[i]
-            value = group[i + 1][1]
-            rsi = group[i + 1][2]            
-            datum = Datum(ticket,period,value)
-            time1 = timestamp_to_str(group[i + 1][0])
-            if not datum in data_:
-                data_.append(datum)
-                print_period(period, time1, value)
-            else:
-                
-                datum2 = find_in_data(ticket,period)
-                datum.flag = datum2.flag
-                
-                if (datum.value > 0 and datum2.value < 0) or (datum.value < 0 and datum2.value > 0):
-                    
-                    print_period(period, time1,value)
-
-                    
-                    notificate(ticket,period,value)                   
-                             
-                    
-                else:
-                    print_period(period, time1, value)
-                    
-                data_.remove(datum2)
-                data_.append(datum)                 
-                
-            
-      
-        
-        color.write('\n',"TODO")
-        with open(DATA__FILE,"wb") as f:
-            pickle.dump(data_,f)
-
-def run(reset=True):
-    
-    reset_data(reset)    
+    reset_data()
     while True:
         df = None
         while df is None:
@@ -347,18 +109,15 @@ def test():
     df.set_index('Hora', inplace=True)
 
     date = dt.datetime.strptime('2022-02-07 11:30:00','%Y-%m-%d %H:%M:%S')    
-    ##start =  date + dt.timedelta(days=interval)    
-    ##tomorrow = now + dt.timedelta(days=1)
-    ##date.strftime("%Y-%m-%d %H:%M:%S")
-    reset_data(True)
+
+    reset_data()
     for i in range(120):
         
         new_date =  date + dt.timedelta(minutes=i)
         df1 = df[df.index < new_date.strftime("%Y-%m-%d %H:%M:%S")].reset_index()
         df1.fillna(0)
-        analysis(df1)
-        #analysis_period(df1,'MGLU3','5min')
+        analysis(df1)        
         time.sleep(0)
         
     
-run()
+test()
