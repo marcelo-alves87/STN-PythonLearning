@@ -5,10 +5,12 @@ import pandas as pd
 import mpl_finance
 from mpl_finance import candlestick_ohlc
 import matplotlib.dates as mdates
+import pdb
 
 style.use('ggplot')
 
 def ohlcVolume(x):
+    
     if len(x):
         ohlc={ "open":x["Open"][0],"high":max(x["High"]),"low":min(x["Low"]),"close":x["Adj Close"][-1],"volume":sum(x["Volume"])}
         return pd.Series(ohlc)
@@ -67,9 +69,10 @@ df['EMA'] = df['Adj Close'].ewm(span=9, adjust=False).mean()
 
 
 #df_ohlc = df['Adj Close'].resample('B').ohlc()
+
 df_ohlc=df.resample('B').apply(ohlcVolume)
 #df_volume = df['Volume'].resample('W-MON').sum()
-
+pdb.set_trace()
 df_ohlc.reset_index(inplace=True)
 df_ohlc['Date'] = df_ohlc['Date'].map(mdates.date2num)
 
