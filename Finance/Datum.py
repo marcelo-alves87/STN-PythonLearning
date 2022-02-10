@@ -2,8 +2,7 @@
 class Datum:
 
     def __init__(self, ticket):
-        self.ticket = ticket
-        #0 - None, 1 - Reset, 2 - Hit, 3 - Over
+        self.ticket = ticket        
         self.flag = 0 
         
 
