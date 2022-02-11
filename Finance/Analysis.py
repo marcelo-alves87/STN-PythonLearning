@@ -23,6 +23,7 @@ windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
 windows_color2 = ['blue', 'yellow', 'red']
 period = '5min'
 WINDOW_OFFSET = 0.01
+MONOTONIC_OFFSET = -3
 
 def play(text, path, language):
     myobj = gTTS(text=text, lang=language)
@@ -81,6 +82,7 @@ def try_to_get_df():
 
 def create_resampled_from_group(group):
     if len(group[1]['Hora']) > 0:
+        
         list1 = group[1]['Hora'].split(';')
         list2 = group[1]['Último'].split(';')
         df = pd.DataFrame({'Hora' : list1, 'Último' : list2})
@@ -105,68 +107,69 @@ def print_group(ticket,df):
         value = round(df['SMA_' + str(window)][-1],3)
         color.write(' ' + str(value) + ' ',windows_color[i])
 
-def strategy_flag(datum, flag):
-    path1 = 'Utils/' + datum.ticket + '.mp3'
+def notify(ticket,status):
+    path1 = 'Utils/' + ticket + '.mp3'    
+    x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
+    x.start()
+    x.join()
+
+    if status == 0:
+       color.write(' * ','TODO')
+       text = 'Reset'
+       path1 = 'Utils/Reset.mp3'    
+    elif status == 1:
+       color.write('++ * ++','STRING')
+       text = 'Increasing'
+       path1 = 'Utils/Increasing.mp3'    
+    elif status == 2:
+       color.write('-- * --','COMMENT')
+       text = 'Decreasing'
+       path1 = 'Utils/Decreasing.mp3'
+       
+    
+
+    y = threading.Thread(target=play, args=(text,path1,'en-us'))
+    y.start()
+    y.join()
+
+def to_ohlc(x):
+    if len(x) == 0:
+        return {'open': 0, 'high' : 0, 'low' : 0, 'close': 0, 'volume' : 0}
+    return {'open': x[0], 'high' : x.max(), 'low' : x.min(), 'close': x[-1], 'volume' : 0}
+
+def save_datum(datum,flag):
+    
     index = data.index(datum)
-    datum = data[index]
-    if datum.flag == flag:            
-        x = threading.Thread(target=play, args=(datum.ticket,path1,'pt-br'))
-        x.start()
-        x.join()
-        datum.flag = not flag
-        del data[index]
-        data.append(datum)
-        color.write(' * ','TODO')
-        
-def strategy(ticket,df_resampled):    
-    values = []    
-    for i in windows:
-        for j in windows:
-            if j > i:
-                values.append(abs(df_resampled['SMA_' + str(i)][-1] - df_resampled['SMA_' + str(j)][-1]))
+    data[index].flag = flag
+       
+def strategy(ticket,df):
+    values = []
+    for window in windows:
+        values.append(df['SMA_' + str(window)][-1])
     datum = Datum(ticket)
     if datum in data:
-        if all(i <= WINDOW_OFFSET for i in values):
-            strategy_flag(datum,1)
-            
-        elif all(i > WINDOW_OFFSET for i in values):
-            strategy_flag(datum,0)
-            
-    else:
-        data.append(datum)
+        datum = data[data.index(Datum(ticket))]    
 
+        if (values[0] < values[1] < values [2]) and (df['SMA_5'].iloc[MONOTONIC_OFFSET:].is_monotonic_decreasing and df['SMA_8'].iloc[MONOTONIC_OFFSET:].is_monotonic_decreasing):
+            
+            if datum.flag != 2:
+                notify(ticket, 2)
+                save_datum(datum,2)
+
+        elif (values[0] > values[1] > values[2]) and (df['SMA_5'].iloc[MONOTONIC_OFFSET:].is_monotonic_increasing and df['SMA_8'].iloc[MONOTONIC_OFFSET:].is_monotonic_increasing):
+
+             if datum.flag != 1:
+                notify(ticket,1)
+                save_datum(datum,1)
+             
+
+        elif datum.flag != 0:
+            notify(ticket,0)
+            save_datum(datum,0)
+               
+    else:                
+        data.append(datum)
         
-##    path1 = 'Utils/' +  ticket + '.mp3'
-##    values = []
-##    for window in windows:
-##        values.append(df_resampled['SMA_' + str(window)][-1])
-##    max_value = max(values)
-##    min_value = min(values)
-##    datum = Datum(ticket)
-##    diff = max_value - min_value
-##    color.write(' ' + str(round(diff,3)) + ' ','TODO')
-##    if datum in data:
-##        
-##        datum = data[data.index(datum)]
-##    
-##        if (diff) <= WINDOW_OFFSET:
-##            if datum.flag != 0:
-##                datum.flag = 0
-##                x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
-##                x.start()
-##                x.join()
-##        
-##        else:
-##            if datum.flag == 0:
-##                datum.flag = 1
-##                x = threading.Thread(target=play, args=(ticket,path1,'pt-br'))
-##                x.start()
-##                x.join()
-##
-##        
-##
-##    else:
-##        data.append(datum)
              
 def analysis(df):
     
@@ -180,20 +183,22 @@ def analysis(df):
         df,df_resampled = create_resampled_from_group(group)
         if df is not None:
             print_group(ticket,df_resampled)
-            strategy(ticket,df_resampled)
-            #plot(ticket,df,df_resampled)
+            strategy(ticket,df_resampled)            
+            plot(ticket,df,df_resampled)
+            input('Enter ...')
     with open(DATA_FILE,"wb") as f:
         pickle.dump(data,f)        
                                                
 def plot(ticket,df,df_resampled):
+
+    new_date =  df.index[-1] - dt.timedelta(hours=1)
     
-    
-    df = df[df.index > df.index[-1].strftime("%Y-%m-%d 10:00:00")]
+    df = df[df.index > new_date.strftime("%Y-%m-%d %H:%M:%S")]
     
     for window in windows:
         df['SMA_' + str(window)] = df['Último'].rolling(window=window, min_periods=0).mean()
 
-    df_ohlc=df.resample(period).apply(lambda x : {'open': x[0], 'high' : x.max(), 'low' : x.min(), 'close': x[-1], 'volume' : 0})
+    df_ohlc=df.resample(period).apply(lambda x : to_ohlc(x))
     df_ohlc['open'] = df_ohlc['Último'].apply(lambda x : x['open'])
     df_ohlc['high'] = df_ohlc['Último'].apply(lambda x : x['high'])
     df_ohlc['low'] = df_ohlc['Último'].apply(lambda x : x['low'])
@@ -207,10 +212,11 @@ def plot(ticket,df,df_resampled):
     
     ax1 = plt.subplot2grid((6,1), (0,0), rowspan=4, colspan=1)
     ax1.xaxis_date()
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax1.set_ylim(df['Último'].min(), df['Último'].max())
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     candlestick_ohlc(ax1, df_ohlc.values, colorup='g', width=0.001)
     for i,window in enumerate(windows):
-        ax1.plot(df.index, df['SMA_' + str(window)], color = windows_color2[i], linewidth=1)
+        ax1.plot(df.index, df['SMA_' + str(window)], color = windows_color2[i], linewidth=1, alpha=.8)
         
     
     plt.grid()
@@ -241,7 +247,7 @@ def test():
     df['Hora'] = df['Hora'].apply(convert_to_datetime)
     df.set_index('Hora', inplace=True)
 
-    date = dt.datetime.strptime('2022-02-08 14:45:00','%Y-%m-%d %H:%M:%S')    
+    date = dt.datetime.strptime('2022-02-10 15:20:00','%Y-%m-%d %H:%M:%S')    
 
     reset_data()
     for i in range(120):
@@ -254,4 +260,4 @@ def test():
         
         
     
-run()
+test()
