@@ -12,7 +12,7 @@ import numpy as np
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 10-02-2022--eY.pdf'
+BTC_FILE = 'BTC Rico 11-02-2022-CoA.pdf'
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 
@@ -104,9 +104,10 @@ def scrap_rico():
 
     df_btc = update_main_df()
         
-    
+    options = webdriver.ChromeOptions()
+    options.add_argument("--incognito")
     url = "https://rico.com.vc/arealogada/home-broker"
-    driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe")
+    driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
     driver.get(url)
 
     input('Ready?')

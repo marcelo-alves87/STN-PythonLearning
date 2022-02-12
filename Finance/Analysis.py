@@ -184,8 +184,9 @@ def analysis(df):
         if df is not None:
             print_group(ticket,df_resampled)
             strategy(ticket,df_resampled)            
-            plot(ticket,df,df_resampled)
-            input('Enter ...')
+            #plot(ticket,df,df_resampled)
+
+            
     with open(DATA_FILE,"wb") as f:
         pickle.dump(data,f)        
                                                
@@ -260,4 +261,4 @@ def test():
         
         
     
-test()
+run()
