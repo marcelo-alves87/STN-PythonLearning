@@ -10,11 +10,13 @@ import os
 import pickle
 import numpy as np
 
+
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
 BTC_FILE = 'BTC Rico 11-02-2022-CoA.pdf'
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
+URL = "https://rico.com.vc/arealogada/home-broker"
 
 def get_leverage_tickers():
     tickers = []
@@ -106,9 +108,9 @@ def scrap_rico():
         
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
-    url = "https://rico.com.vc/arealogada/home-broker"
+    
     driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
-    driver.get(url)
+    driver.get(URL)
 
     input('Ready?')
     
@@ -152,7 +154,4 @@ def scrap_rico():
 
 
 scrap_rico()
-
-
-
 
