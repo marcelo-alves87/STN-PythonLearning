@@ -4,7 +4,7 @@ import sys
 import os
 import pandas as pd
 import Utils as utils
-
+import time
 
 DATA_FILE = 'btc_data.plk'
 color = sys.stdout.shell
@@ -13,6 +13,10 @@ windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
 windows_color2 = ['blue', 'yellow', 'red']
 WINDOW_OFFSET = 0.01
 MONOTONIC_OFFSET = -5
+
+def print_(text,color,verbose=False):
+    if verbose:
+        color.write(text,color)
 
 def get_last_data():
     if os.path.exists(DATA_FILE):
@@ -59,15 +63,15 @@ def notify(ticket,status):
     utils.play(ticket,path1,'pt-br')
     
     if status == 0:
-       color.write(' * ','TODO')
+       #color.write(' * ','TODO')
        text = 'Reset'
        path1 = 'Utils/Reset.mp3'    
     elif status == 1:
-       color.write('++ * ++','STRING')
+       #color.write('++ * ++','STRING')
        text = 'Increasing'
        path1 = 'Utils/Increasing.mp3'    
     elif status == 2:
-       color.write('-- * --','COMMENT')
+       #color.write('-- * --','COMMENT')
        text = 'Decreasing'
        path1 = 'Utils/Decreasing.mp3'
        
@@ -111,18 +115,21 @@ def strategy(ticket,df):
 
       
              
-def analysis(df,period):
+def analysis(df,period,verbose=False):
     
     global data    
     data = get_last_data()
     
     grouped_df = df.groupby(["Papel"]).agg(lambda x: ';'.join(x[x.notnull()].astype(str)))
-    color.write('\n',"TODO")
+
+    print_('\n',"TODO")
+    
     for group in grouped_df.iterrows():
         ticket = group[0]
         df,df_resampled = create_resampled_from_group(group,period)
         if df is not None:
-            print_group(ticket,df_resampled)
+            if verbose:
+                print_group(ticket,df_resampled)
             strategy(ticket,df_resampled)            
      
 
@@ -130,7 +137,7 @@ def analysis(df,period):
     with open(DATA_FILE,"wb") as f:
         pickle.dump(data,f)        
                                                
-
+    
     
     
 

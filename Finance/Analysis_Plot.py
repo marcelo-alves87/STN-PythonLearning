@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 import mplfinance as mpf
 import pdb
+import Utils as utils
 
-style  = mpf.make_mpf_style(base_mpf_style='charles',mavcolors=['blue','orange','red'])
+STYLE  = mpf.make_mpf_style(base_mpf_style='charles',mavcolors=['blue','orange','red'])
 
 def RSI(df, window_length = 14):
 
@@ -62,8 +63,8 @@ def RSI(df, window_length = 14):
 ##p = mpf.make_addplot(df['RSI'],ax=ar)        
 ##mpf.plot(df,type='candle',ax=ax,mav=(5,8,13),axtitle='AAPL', addplot=p,volume=av,ylabel='', ylabel_lower='',xrotation=0)
 ##
-
-
+##
+##
 ##size = 3
 ##capacity = size ** 2
 ##for i in range(size):
@@ -76,10 +77,46 @@ def RSI(df, window_length = 14):
 ##            p = mpf.make_addplot(df['RSI'],ax=ar,ylabel='RSI')        
 ##            mpf.plot(df,type='candle',ax=ax,mav=(5,8,13),axtitle='AAPL', volume=av, addplot=p)
 ##        count += 1
+##
+##
+##
+##plt.axis([0, 10, 0, 1])
 
-def analysis(df):
-    pdb.set_trace()
+def get_tickets(df):
+    tickets = []
+    for value in df.index.values:
+        if not value[1] in tickets:
+            tickets.append(value[1])
+    return tickets
 
+def analysis(df, PERIOD):
+
+    df['Volume'] = df['Volume'].apply(utils.to_volume)
+    df['Hora'] = df['Hora'].apply(utils.convert_to_datetime)
+    df.set_index('Hora',inplace=True)
+        
+    df4 = df.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+    df5 = df.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Volume'].agg([('volume','sum')])
+    df = pd.concat([df4,df5],axis=1)
     
 
-##plt.show()
+    fig = mpf.figure(style=STYLE)
+    tickets = get_tickets(df)
+
+    for ticket in tickets:
+        if ticket == 'CSNA3':
+            df1 = df.loc[pd.IndexSlice[:,ticket], :]
+            df1.reset_index('Papel',inplace=True)            
+            ax = fig.add_subplot(26,7,(1,38))
+            av = fig.add_subplot(26,7,(43,45), sharex=ax)
+            ##ar = fig.add_subplot(26,7,(50,52), sharex=ax)
+            ##p = mpf.make_addplot(df['RSI'],ax=ar)
+            mpf.plot(df1,type='candle',ax=ax,mav=(5,8,13),axtitle=ticket,volume=av, ylabel='', ylabel_lower='',xrotation=0)
+            plt.pause(1)
+    
+    
+
+plt.show()
+    
+
+
