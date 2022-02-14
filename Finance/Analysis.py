@@ -1,8 +1,6 @@
 import pandas as pd
 import pdb
 import datetime as dt
-import Analysis_Voice as anal_v
-import Analysis_Plot as ap
 import Utils as utils
 import threading
 import mplfinance as mpf
@@ -12,16 +10,10 @@ import time
 import warnings
 
 warnings.filterwarnings('ignore')
-PICKLE_FILE = 'btc_tickers.plk'
 PERIOD = '5min'
 RESOLUTION = -30
 FIBONACCI = [23.6, 38.2, 61.8, 78.6]
-def try_to_get_df():
-    try:
-        df = pd.read_pickle(PICKLE_FILE)
-        return df
-    except:
-        return None
+
 
 def get_tickets(df):
     tickets = []
@@ -32,9 +24,7 @@ def get_tickets(df):
 
  
 
-df = None
-while df is None:
-    df = try_to_get_df()
+df = utils.try_to_get_df()
 
 df.dropna(inplace=True)
 
@@ -52,18 +42,14 @@ for pos in positions:
     axes.append([ax,av])
 
 
-anal_v.reset_data()
-date = dt.datetime.strptime('2022-02-10 17:45:00','%Y-%m-%d %H:%M:%S')
+
+date = dt.datetime.strptime('2022-02-10 16:45:00','%Y-%m-%d %H:%M:%S')
 
 
 def analysis(ival):
-    new_date =  date + dt.timedelta(minutes=ival)
-    df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
-    #df1 = df
-    
-    if ival > 10:
-        x = threading.Thread(target=anal_v.analysis, args=(df1,PERIOD,))
-        x.start()
+##    new_date =  date + dt.timedelta(minutes=ival)
+##    df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
+    df1 = df
     df1.reset_index(inplace=True)
     df1['Volume'] = df1['Volume'].apply(utils.to_volume)
     df1['Hora'] = df1['Hora'].apply(utils.convert_to_datetime)
@@ -100,7 +86,7 @@ def analysis(ival):
             hlines.append(diff*f/100 + minimum)
         
         mpf.plot(df0,hlines=dict(hlines=hlines,colors=['g','r','b','c','k'],linestyle='--'),type='candle',ax=ax,mav=(5,8,13),axtitle=ticket,volume=av, ylabel='', ylabel_lower='',xrotation=0, datetime_format='%H:%M')
-
+        
     
 
 

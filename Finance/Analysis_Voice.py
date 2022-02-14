@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import Utils as utils
 import time
+import datetime as dt
 
 DATA_FILE = 'btc_data.plk'
 color = sys.stdout.shell
@@ -14,9 +15,9 @@ windows_color2 = ['blue', 'yellow', 'red']
 WINDOW_OFFSET = 0.01
 MONOTONIC_OFFSET = -5
 
-def print_(text,color,verbose=False):
+def print_(text,color1,verbose=True):
     if verbose:
-        color.write(text,color)
+        color.write(text,color1)
 
 def get_last_data():
     if os.path.exists(DATA_FILE):
@@ -115,7 +116,7 @@ def strategy(ticket,df):
 
       
              
-def analysis(df,period,verbose=False):
+def analysis(df,period,verbose=True):
     
     global data    
     data = get_last_data()
@@ -137,13 +138,27 @@ def analysis(df,period,verbose=False):
     with open(DATA_FILE,"wb") as f:
         pickle.dump(data,f)        
                                                
-    
-    
-    
 
-        
-        
-        
-        
     
-
+##df = utils.try_to_get_df()
+##
+##df.dropna(inplace=True)
+##    
+##    
+##reset_data()
+##        
+##date = dt.datetime.strptime('2022-02-10 16:45:00','%Y-%m-%d %H:%M:%S')
+##
+##
+##for i in range(120):
+##    new_date =  date + dt.timedelta(minutes=i)
+##    df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
+##
+##    analysis(df1,'5min')
+    
+while True:
+    df1 = utils.try_to_get_df()  
+    df1.dropna(inplace=True)
+    reset_data()
+    analysis(df1,'5min')
+    time.sleep(3)

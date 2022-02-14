@@ -2,7 +2,10 @@ import datetime as dt
 import time
 from gtts import gTTS
 from pygame import mixer
+import pandas as pd
 import pdb
+
+PICKLE_FILE = 'btc_tickers.plk'
 
 def convert_to_float(x):
     if x is None or x == '':
@@ -50,4 +53,12 @@ def to_volume(x):
     else:       
         return float(x)
 
-
+def try_to_get_df():
+    df = None
+    while df is None:
+        try:
+            df = pd.read_pickle(PICKLE_FILE)
+        except:
+            pass
+    return df    
+    
