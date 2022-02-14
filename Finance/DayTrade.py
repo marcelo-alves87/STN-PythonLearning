@@ -13,7 +13,7 @@ import numpy as np
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
-BTC_FILE = 'BTC Rico 11-02-2022-CoA.pdf'
+BTC_FILE = 'BTC Rico 14-02-2022-R0E.pdf'
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
 PICKLE_FILE = 'btc_tickers.plk'
 URL = "https://rico.com.vc/arealogada/home-broker"
