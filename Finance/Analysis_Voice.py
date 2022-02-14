@@ -64,15 +64,15 @@ def notify(ticket,status):
     utils.play(ticket,path1,'pt-br')
     
     if status == 0:
-       #color.write(' * ','TODO')
+       color.write(' * ','TODO')
        text = 'Reset'
        path1 = 'Utils/Reset.mp3'    
     elif status == 1:
-       #color.write('++ * ++','STRING')
+       color.write('++ * ++','STRING')
        text = 'Increasing'
        path1 = 'Utils/Increasing.mp3'    
     elif status == 2:
-       #color.write('-- * --','COMMENT')
+       color.write('-- * --','COMMENT')
        text = 'Decreasing'
        path1 = 'Utils/Decreasing.mp3'
        
@@ -140,25 +140,25 @@ def analysis(df,period,verbose=True):
                                                
 
     
-##df = utils.try_to_get_df()
-##
-##df.dropna(inplace=True)
-##    
-##    
-##reset_data()
-##        
-##date = dt.datetime.strptime('2022-02-10 16:45:00','%Y-%m-%d %H:%M:%S')
-##
-##
+df = utils.try_to_get_df()
+
+df.dropna(inplace=True)
+    
+    
+reset_data()
+        
+date = dt.datetime.strptime('2022-02-14 10:15:00','%Y-%m-%d %H:%M:%S')
+
+
 ##for i in range(120):
 ##    new_date =  date + dt.timedelta(minutes=i)
 ##    df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
 ##
 ##    analysis(df1,'5min')
-    
+reset_data()
 while True:
     df1 = utils.try_to_get_df()  
     df1.dropna(inplace=True)
-    reset_data()
-    analysis(df1,'5min')
+    
+    analysis(df1,'1min')
     time.sleep(3)

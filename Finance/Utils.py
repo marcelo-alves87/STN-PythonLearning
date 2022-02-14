@@ -27,7 +27,7 @@ def convert_to_datetime(x):
             
 def play(text, path, language):
     
-    try:
+    try:        
         myobj = gTTS(text=text, lang=language)
         myobj.save(path)
         mixer.init()

@@ -49,14 +49,14 @@ date = dt.datetime.strptime('2022-02-10 16:45:00','%Y-%m-%d %H:%M:%S')
 def analysis(ival):
 ##    new_date =  date + dt.timedelta(minutes=ival)
 ##    df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
-    df1 = df
+    df1 = utils.try_to_get_df()
     df1.reset_index(inplace=True)
     df1['Volume'] = df1['Volume'].apply(utils.to_volume)
     df1['Hora'] = df1['Hora'].apply(utils.convert_to_datetime)
     df1.set_index('Hora',inplace=True)
         
     df4 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-    df5 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Volume'].agg([('volume','sum')])
+    df5 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Volume'].agg([('volume','last')])
     df6 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Máximo'].agg([('max','last')])
     df7 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Mínimo'].agg([('min', 'last')])
                                                                         
