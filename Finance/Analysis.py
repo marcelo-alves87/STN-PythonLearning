@@ -8,12 +8,47 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import time
 import warnings
+import numpy as np
 
 warnings.filterwarnings('ignore')
-PERIOD = '5min'
-RESOLUTION = -30
+PERIOD = '1min'
+RESOLUTION = -100
 FIBONACCI = [23.6, 38.2, 61.8, 78.6]
+PICKLE_FILE = 'btc_tickers.plk'
+STATUS_FILE = 'btc_status.plk'
 
+
+def williams_fractal_bullish(df):
+    
+    signal = []
+    df = df['low']
+    len_df = len(df)
+    for i in range(len_df):
+        if i > 2 and i < len_df - 2:
+            if df.iloc[i] <= df.iloc[i-2] and df.iloc[i] <= df.iloc[i-1] and df.iloc[i] < df.iloc[i+1] and df.iloc[i] < df.iloc[i+2]:
+                signal.append(df.iloc[i])
+            else:
+                signal.append(np.nan)
+        else:
+            signal.append(np.nan)
+        
+    return signal
+
+def williams_fractal_bearish(df):
+    
+    signal = []
+    df = df['high']
+    len_df = len(df)
+    for i in range(len_df):
+        if i > 2 and i < len_df - 2:
+            if df.iloc[i] >= df.iloc[i-2] and df.iloc[i] >= df.iloc[i-1] and df.iloc[i] > df.iloc[i+1] and df.iloc[i] > df.iloc[i+2]:
+                signal.append(df.iloc[i])
+            else:
+                signal.append(np.nan)
+        else:
+            signal.append(np.nan)
+        
+    return signal
 
 def get_tickets(df):
     tickets = []
@@ -24,11 +59,7 @@ def get_tickets(df):
 
  
 
-df = utils.try_to_get_df()
-
-df.dropna(inplace=True)
-
-style  = mpf.make_mpf_style(base_mpf_style='yahoo',mavcolors=['blue','orange','red'],y_on_right=False)
+style  = mpf.make_mpf_style(base_mpf_style='yahoo',y_on_right=False,facecolor='darkgray',gridstyle='')
 
 fig = mpf.figure(style=style)
 plt.subplots_adjust(0.05, 0.05, 0.95, 0.95, 0.95, 0.95)
@@ -47,10 +78,14 @@ date = dt.datetime.strptime('2022-02-10 16:45:00','%Y-%m-%d %H:%M:%S')
 
 
 def analysis(ival):
-    new_date =  date + dt.timedelta(minutes=ival)
-    
-    df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
-    #df1 = utils.try_to_get_df()
+    df = utils.try_to_get_df(PICKLE_FILE)
+
+    df.dropna(inplace=True)
+
+
+    #new_date =  date + dt.timedelta(minutes=ival)    
+    #df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
+    df1 = df
     df1.reset_index(inplace=True)
     df1['Volume'] = df1['Volume'].apply(utils.to_volume)
     
@@ -71,7 +106,13 @@ def analysis(ival):
         df0 = df1.loc[pd.IndexSlice[:,ticket], :]
         df0['volume'] = df0['volume'].diff()
         df0.fillna(0,inplace=True)
+        
         df0.reset_index('Papel',inplace=True)
+        df0['EMA_20'] = df0['close'].ewm(span=20, adjust=False).mean()
+        df0['EMA_50'] = df0['close'].ewm(span=50, adjust=False).mean()
+        df0['EMA_100'] = df0['close'].ewm(span=100, adjust=False).mean()
+
+        
         
         ax = axes[i][0]
         #av = axes[i][1]
@@ -80,17 +121,30 @@ def analysis(ival):
 
         df0 = df0.iloc[RESOLUTION:]
         
-        hlines=[]
-        maximum = df0['max'][-1]
-        minimum = df0['min'][-1]
-        diff = maximum - minimum
-        hlines.append(maximum)
-        hlines.append(minimum)
+##        hlines=[]
+##        maximum = df0['max'][-1]
+##        minimum = df0['min'][-1]
+##        diff = maximum - minimum
+##        hlines.append(maximum)
+##        hlines.append(minimum)
+##        
+##        for f in FIBONACCI:
+##            hlines.append(diff*f/100 + minimum)
         
-        for f in FIBONACCI:
-            hlines.append(diff*f/100 + minimum)
+        apds = [mpf.make_addplot(df0['EMA_20'],type='line',color='purple',ax=ax,width=0.5),
+                mpf.make_addplot(df0['EMA_50'],type='line',color='olive',ax=ax,width=0.5),
+                mpf.make_addplot(df0['EMA_100'],type='line',color='white',ax=ax,width=0.5),
+                mpf.make_addplot(williams_fractal_bullish(df0),type='scatter',ax=ax,color='green',markersize=10,marker='^'),
+                mpf.make_addplot(williams_fractal_bearish(df0),type='scatter',ax=ax,color='red',markersize=10,marker='v'),]
+
+##        statoos = utils.try_to_get_df(STATUS_FILE)
+##        status1 = ''
+##        if ticket in statoos:
+##            status1 = statoos[ticket]
+##        
         
-        mpf.plot(df0,hlines=dict(hlines=hlines,colors=['darkgreen','orangered','indianred','saddlebrown','greenyellow','lightgreen'],linestyle='--',linewidths=(1.3)),type='candle',ax=ax,mav=(5,8,13),axtitle=ticket,ylabel='', ylabel_lower='',xrotation=0, datetime_format='%H:%M')
+##        
+        mpf.plot(df0,type='candle',addplot=apds,ax=ax,axtitle=ticket,ylabel='', ylabel_lower='',xrotation=0, datetime_format='%H:%M')
         
     
 

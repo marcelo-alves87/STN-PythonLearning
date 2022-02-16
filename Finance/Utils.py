@@ -4,8 +4,8 @@ from gtts import gTTS
 from pygame import mixer
 import pandas as pd
 import pdb
-
-PICKLE_FILE = 'btc_tickers.plk'
+import pickle
+import os
 
 def convert_to_float(x):
     if x is None or x == '':
@@ -53,12 +53,22 @@ def to_volume(x):
     else:       
         return float(x)
 
-def try_to_get_df():
+def try_to_get_df(file_path):
     df = None
     while df is None:
         try:
-            df = pd.read_pickle(PICKLE_FILE)
+            df = pd.read_pickle(file_path)
         except:
             pass
     return df    
-    
+
+def get_pickle_file(file_path):    
+    if os.path.exists(file_path): 
+        with open(file_path,"rb") as f:
+            return pickle.load(f)
+    else:
+        return None
+
+def save_pickle_file(file_path,data):
+     with open(file_path,"wb") as f:
+        pickle.dump(data,f)    
