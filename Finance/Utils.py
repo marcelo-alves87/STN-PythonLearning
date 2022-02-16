@@ -71,4 +71,16 @@ def get_pickle_file(file_path):
 
 def save_pickle_file(file_path,data):
      with open(file_path,"wb") as f:
-        pickle.dump(data,f)    
+        pickle.dump(data,f)
+
+def RSI(df, window_length = 14):
+
+    delta = df.diff()
+    up, down = delta.clip(lower=0), delta.clip(upper=0).abs()
+    alpha = 1 / window_length
+    roll_up = up.ewm(alpha=alpha).mean()
+    roll_down = down.ewm(alpha=alpha).mean()
+    rs = roll_up / roll_down
+    rsi_rma = 100.0 - (100.0 / (1.0 + rs))
+    rsi_rma.fillna(0)
+    return rsi_rma

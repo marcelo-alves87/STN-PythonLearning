@@ -78,7 +78,7 @@ def notify(ticket,status):
     
 
 def save_datum(datum,flag,status):
-    pdb.set_trace()
+    
     index = data.index(datum)
     data[index].flag = flag
 
