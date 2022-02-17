@@ -11,9 +11,9 @@ import time
 import warnings
 import numpy as np
 
-
+PICKLE_FILE = 'btc_tickers.plk'
 warnings.filterwarnings('ignore')
-PERIOD = '1min'
+PERIOD = '5min'
 FIBONACCI = [23.6, 38.2, 61.8, 78.6]
 STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
@@ -139,10 +139,11 @@ def analysis(ival,fargs):
         
     
 
-def run(pickle_file):
+def run(pickle_file=PICKLE_FILE):
 
     ani = animation.FuncAnimation(fig, analysis, fargs=[pickle_file])
 
     mpf.show()    
     
 
+run()

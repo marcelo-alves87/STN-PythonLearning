@@ -16,7 +16,7 @@ windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
 
 WINDOW_OFFSET = 0.01
 
-PERIOD = '1min'
+PERIOD = '5min'
 
 def reset_data():
     if os.path.exists(DATA_FILE):
@@ -108,12 +108,12 @@ def strategy(ticket,df):
     if datum in data:
         datum = data[data.index(Datum(ticket))]    
 
-        if (values[0] < values[1]) and bearish_fractal(df):
+        if (values[0] < values[1] < values[2]) and bearish_fractal(df):
             if datum.flag != 2:
                 notify(ticket, 2)
                 save_datum(datum,2)
 
-        elif (values[0] > values[1]) and bullish_fractal(df):
+        elif (values[0] > values[1] > values[2]) and bullish_fractal(df):
             if datum.flag != 1:
                 notify(ticket,1)
                 save_datum(datum,1)
@@ -159,4 +159,4 @@ def run(pickle_file=PICKLE_FILE):
         analysis(df1)
         time.sleep(3)    
 
-
+run()

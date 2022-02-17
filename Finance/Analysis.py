@@ -34,8 +34,4 @@ def test():
     at.run(PICKLE_FILE_TEST)
 
 
-def run():
-    df = utils.try_to_get_df(PICKLE_FILE)
-    at.run(df)
-    
-test()
+
