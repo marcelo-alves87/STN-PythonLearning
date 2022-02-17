@@ -60,8 +60,11 @@ def try_to_get_df(file_path):
             df = pd.read_pickle(file_path)
         except:
             pass
-    return df    
+    return df
 
+def save_df(file_path,df):
+   df = df.to_pickle(file_path)
+    
 def get_pickle_file(file_path):    
     if os.path.exists(file_path): 
         with open(file_path,"rb") as f:

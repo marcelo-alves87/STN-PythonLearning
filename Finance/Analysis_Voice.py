@@ -9,26 +9,21 @@ import datetime as dt
 import pdb
 
 PICKLE_FILE = 'btc_tickers.plk'
-STATUS_FILE = 'btc_status.plk'
 DATA_FILE = 'btc_data.plk'
 color = sys.stdout.shell
-windows = [20,50,100]
+windows = [21,50,200]
 windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
-windows_color2 = ['purple', 'yellow', 'black']
-WINDOW_OFFSET = 0.01
-MONOTONIC_OFFSET = -5
-PERIOD = '1min'
 
-def print_(text,color1,verbose=True):
-    if verbose:
-        color.write(text,color1)
+WINDOW_OFFSET = 0.01
+
+PERIOD = '1min'
 
 def reset_data():
     if os.path.exists(DATA_FILE):
         os.remove(DATA_FILE)
 
 
-def create_resampled_from_group(group,period):
+def create_resampled_from_group(group):
     if len(group[1]['Hora']) > 0:            
         list1 = group[1]['Hora'].split(';')
         list2 = group[1]['Último'].split(';')
@@ -38,10 +33,10 @@ def create_resampled_from_group(group,period):
         df.set_index('Hora', inplace=True)
             
         
-        df_resampled = df.resample(period).last()
-        df_resampled = df_resampled.dropna()
+        df_resampled = df.resample(PERIOD)['Último'].agg([('High','max'),('Low', 'min'),('Último', 'last')])
+        df_resampled.dropna(inplace=True)
         for window in windows:
-            df_resampled['EMA_' + str(window)] = df_resampled['Último'].ewm(span=window, adjust=False).mean()
+            df_resampled['SMA_' + str(window)] = df_resampled['Último'].rolling(window=window, min_periods=0).mean()
         return df,df_resampled
     else:
         return None
@@ -51,7 +46,7 @@ def print_group(ticket,df):
     color.write('\n' + ticket + ' (' + df.index[-1].strftime("%H:%M") + '): ' ,"TODO")
     for i,window in enumerate(windows):
         color.write('(' + str(window) + ')',"TODO")
-        value = round(df['EMA_' + str(window)][-1],3)
+        value = round(df['SMA_' + str(window)][-1],3)
         color.write(' ' + str(value) + ' ',windows_color[i])
 
 
@@ -65,62 +60,74 @@ def notify(ticket,status):
        path1 = 'Utils/Reset.mp3'    
     elif status == 1:
        color.write('++ * ++','STRING')
-       text = 'Increasing'
-       path1 = 'Utils/Increasing.mp3'    
+       text = 'Bullish'
+       path1 = 'Utils/Bullish.mp3'    
     elif status == 2:
        color.write('-- * --','COMMENT')
-       text = 'Decreasing'
-       path1 = 'Utils/Decreasing.mp3'
+       text = 'Bearish'
+       path1 = 'Utils/Bearish.mp3'
        
     
 
     utils.play(text,path1,'en-us')
     
 
-def save_datum(datum,flag,status):
+def save_datum(datum,flag):
     
     index = data.index(datum)
     data[index].flag = flag
 
-    statoos = utils.get_pickle_file(STATUS_FILE)
-    if statoos is None:
-        statoos = {}
-    statoos[datum.ticket] = status
-    utils.save_pickle_file(STATUS_FILE,statoos)
     
-       
+def bearish_fractal(df):
+    if len(df) > 4:
+        df = df['High']
+        if df.iloc[-3] >= df.iloc[-4] and df.iloc[-3] >= df.iloc[-5] and df.iloc[-3] > df.iloc[-2] and df.iloc[-3] > df.iloc[-1]:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+def bullish_fractal(df):
+    if len(df) > 4:
+        df = df['Low']
+        if df.iloc[-3] <= df.iloc[-4] and df.iloc[-3] <= df.iloc[-5] and df.iloc[-3] < df.iloc[-2] and df.iloc[-3] < df.iloc[-1]:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+    
 def strategy(ticket,df):
     values = []
     for window in windows:
-        values.append(df['EMA_' + str(window)][-1])
+        values.append(df['SMA_' + str(window)][-1])
     
     datum = Datum(ticket)
     if datum in data:
         datum = data[data.index(Datum(ticket))]    
 
-        if (values[0] < values[1] < values [2]) and (df['EMA_20'].iloc[MONOTONIC_OFFSET:].is_monotonic_decreasing and df['EMA_50'].iloc[MONOTONIC_OFFSET:].is_monotonic_decreasing):
-            
+        if (values[0] < values[1]) and bearish_fractal(df):
             if datum.flag != 2:
                 notify(ticket, 2)
-                save_datum(datum,2,'Decreasing')
+                save_datum(datum,2)
 
-        elif (values[0] > values[1] > values[2]) and (df['EMA_20'].iloc[MONOTONIC_OFFSET:].is_monotonic_increasing and df['EMA_50'].iloc[MONOTONIC_OFFSET:].is_monotonic_increasing):
-
-             if datum.flag != 1:
+        elif (values[0] > values[1]) and bullish_fractal(df):
+            if datum.flag != 1:
                 notify(ticket,1)
-                save_datum(datum,1,'Increasing')
+                save_datum(datum,1)
              
 
         elif datum.flag != 0:
-            notify(ticket,0)
-            save_datum(datum,0,'Reset')
+            save_datum(datum,0)
                
     else:                
         data.append(datum)
 
       
              
-def analysis(df,period=PERIOD,verbose=True):
+def analysis(df):
     
     global data    
     data = utils.get_pickle_file(DATA_FILE)
@@ -129,14 +136,13 @@ def analysis(df,period=PERIOD,verbose=True):
        
     grouped_df = df.groupby(["Papel"]).agg(lambda x: ';'.join(x[x.notnull()].astype(str)))
 
-    print_('\n',"TODO")
+    color.write('\n',"TODO")
     
     for group in grouped_df.iterrows():
         ticket = group[0]
-        df,df_resampled = create_resampled_from_group(group,period)
+        df,df_resampled = create_resampled_from_group(group)
         if df is not None:
-            if verbose:
-                print_group(ticket,df_resampled)
+            print_group(ticket,df_resampled)
             strategy(ticket,df_resampled)            
      
 
@@ -144,20 +150,13 @@ def analysis(df,period=PERIOD,verbose=True):
     utils.save_pickle_file(DATA_FILE,data)       
                                                
 
-    
-       
-date = dt.datetime.strptime('2022-02-14 10:15:00','%Y-%m-%d %H:%M:%S')
+def run(pickle_file=PICKLE_FILE):
+    reset_data()
+    while True:
+        df1 = utils.try_to_get_df(pickle_file)  
+        df1.dropna(inplace=True)
+        
+        analysis(df1)
+        time.sleep(3)    
 
 
-##for i in range(120):
-##    new_date =  date + dt.timedelta(minutes=i)
-##    df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
-##
-##    analysis(df1,'5min')
-reset_data()
-while True:
-    df1 = utils.try_to_get_df(PICKLE_FILE)  
-    df1.dropna(inplace=True)
-    
-    analysis(df1)
-    time.sleep(3)

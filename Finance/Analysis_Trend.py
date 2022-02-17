@@ -15,7 +15,6 @@ import numpy as np
 warnings.filterwarnings('ignore')
 PERIOD = '1min'
 FIBONACCI = [23.6, 38.2, 61.8, 78.6]
-PICKLE_FILE = 'btc_tickers.plk'
 STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
 
@@ -58,11 +57,12 @@ def get_tickets(df):
             tickets.append(value[1])
     return tickets    
 
- 
+
 mc = mpf.make_marketcolors(up='cyan',down='fuchsia',inherit=True)
 style  = mpf.make_mpf_style(base_mpf_style='nightclouds',gridstyle='',marketcolors=mc)
 
-fig = mpf.figure(style=style)
+fig = mpf.figure(style=style,figsize=(20,20))
+
 plt.subplots_adjust(0.05, 0.05, 0.95, 0.95, 0.95, 0.95)
 
 dimension = [29,8]
@@ -74,20 +74,13 @@ for pos in positions:
     axes.append([ax,ar])
 
 
-
-date = dt.datetime.strptime('2022-02-10 16:45:00','%Y-%m-%d %H:%M:%S')
-
-
-def analysis(ival):
-    df = utils.try_to_get_df(PICKLE_FILE)
-
-    df.dropna(inplace=True)
-
-
-    #new_date =  date + dt.timedelta(minutes=ival)    
-    #df1 = df[df['Hora'] < new_date.strftime("%Y-%m-%d %H:%M:%S")]
+def analysis(ival,fargs):
     
-    df1 = df
+    df1 = utils.try_to_get_df(fargs)
+
+    df1.dropna(inplace=True)
+   
+    
     df1.reset_index(inplace=True)
     df1['Volume'] = df1['Volume'].apply(utils.to_volume)
     
@@ -142,14 +135,14 @@ def analysis(ival):
          
             
         
-        mpf.plot(df0,type='candle',addplot=apds,ax=ax,mav=(21,50,200),ylabel=ticket,xrotation=0, datetime_format='%H:%M')
-        ax.set_xlabel('')
+        mpf.plot(df0,type='candle',addplot=apds,ax=ax,ylabel=ticket,xrotation=0, datetime_format='%H:%M')
+        
     
 
+def run(pickle_file):
 
-ani = animation.FuncAnimation(fig, analysis)
+    ani = animation.FuncAnimation(fig, analysis, fargs=[pickle_file])
 
-mpf.show()    
+    mpf.show()    
     
-
 
