@@ -121,9 +121,9 @@ def analysis(ival,fargs):
         
         apds = [mpf.make_addplot(df0['rsi'],ax=ar,color='yellow',ylim=(10,90)),
                 mpf.make_addplot(df0['rsi_50'],ax=ar,color='orange',type='line'),
-                mpf.make_addplot(df0['SMA_21'],type='line',color='mediumpurple',ax=ax,width=0.9),
-                mpf.make_addplot(df0['SMA_50'],type='line',color='orange',ax=ax,width=0.9),
-                mpf.make_addplot(df0['SMA_200'],type='line',color='white',ax=ax,width=0.9),
+##                mpf.make_addplot(df0['SMA_21'],type='line',color='mediumpurple',ax=ax,width=0.9),
+##                mpf.make_addplot(df0['SMA_50'],type='line',color='orange',ax=ax,width=0.9),
+##                mpf.make_addplot(df0['SMA_200'],type='line',color='white',ax=ax,width=0.9),
                 mpf.make_addplot(williams_fractal_bullish(df0),type='scatter',ax=ax,color='lime',markersize=10,marker='^'),
                 mpf.make_addplot(williams_fractal_bearish(df0),type='scatter',ax=ax,color='red',markersize=10,marker='v'),]
 

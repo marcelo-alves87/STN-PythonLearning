@@ -50,20 +50,16 @@ def print_group(ticket,df):
         color.write(' ' + str(value) + ' ',windows_color[i])
 
 
-def notify(ticket,status):
+def notify(ticket,status, index):
     path1 = 'Utils/' + ticket + '.mp3'    
     utils.play(ticket,path1,'pt-br')
-    
-    if status == 0:
-       color.write(' * ','TODO')
-       text = 'Reset'
-       path1 = 'Utils/Reset.mp3'    
-    elif status == 1:
-       color.write('++ * ++','STRING')
+    time1 = utils.convert_to_str(index,format='%H:%M')
+    if status == 1:
+       color.write('\n(' + time1 + ') ++' + ticket +' ++','STRING')
        text = 'Bullish'
        path1 = 'Utils/Bullish.mp3'    
     elif status == 2:
-       color.write('-- * --','COMMENT')
+       color.write('\n(' + time1 + ') --' + ticket + ' --','COMMENT')
        text = 'Bearish'
        path1 = 'Utils/Bearish.mp3'
        
@@ -100,24 +96,25 @@ def bullish_fractal(df):
 
     
 def strategy(ticket,df):
-    values = []
-    for window in windows:
-        values.append(df['SMA_' + str(window)][-1])
+   
+##    values = []
+##    for window in windows:
+##        values.append(df['SMA_' + str(window)][-1])
     
     datum = Datum(ticket)
     if datum in data:
         datum = data[data.index(Datum(ticket))]    
 
-        if (values[0] < values[1] < values[2]) and bearish_fractal(df):
+        if (bearish_fractal(df)):
             if datum.flag != 2:
-                notify(ticket, 2)
+                notify(ticket, 2,df.index[-3])
                 save_datum(datum,2)
-
-        elif (values[0] > values[1] > values[2]) and bullish_fractal(df):
+                
+        elif (bullish_fractal(df)):
             if datum.flag != 1:
-                notify(ticket,1)
+                notify(ticket,1, df.index[-3])
                 save_datum(datum,1)
-             
+                 
 
         elif datum.flag != 0:
             save_datum(datum,0)
@@ -136,13 +133,12 @@ def analysis(df):
        
     grouped_df = df.groupby(["Papel"]).agg(lambda x: ';'.join(x[x.notnull()].astype(str)))
 
-    color.write('\n',"TODO")
-    
+      
     for group in grouped_df.iterrows():
         ticket = group[0]
         df,df_resampled = create_resampled_from_group(group)
         if df is not None:
-            print_group(ticket,df_resampled)
+            #print_group(ticket,df_resampled)
             strategy(ticket,df_resampled)            
      
 

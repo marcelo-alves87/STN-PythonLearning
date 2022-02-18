@@ -1,6 +1,5 @@
 import threading
-import Analysis_Trend as at
-import Analysis_Voice as av
+import Analysis_Notify as af
 import Utils as utils
 import datetime as dt
 import pdb
@@ -24,14 +23,14 @@ def increment_date(date,df):
 
 
 def test():
-    date = dt.datetime.strptime('2022-02-16 10:00:00','%Y-%m-%d %H:%M:%S')
+    date = dt.datetime.strptime('2022-02-17 10:30:00','%Y-%m-%d %H:%M:%S')
     df = utils.try_to_get_df(PICKLE_FILE)
     utils.save_df(PICKLE_FILE_TEST,df)
     x = threading.Thread(target=increment_date, args=(date,df,))
     x.start()
-    y = threading.Thread(target=av.run, args=(PICKLE_FILE_TEST,))
+    y = threading.Thread(target=af.run, args=(PICKLE_FILE_TEST,))
     y.start()
     at.run(PICKLE_FILE_TEST)
 
 
-
+test()

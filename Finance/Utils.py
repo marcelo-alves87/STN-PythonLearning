@@ -11,7 +11,10 @@ def convert_to_float(x):
     if x is None or x == '':
         return 0
     else:
-        return float(x)    
+        return float(x)
+
+def convert_to_str(x,format='%Y-%m-%d %H:%M:%S'):
+    return x.strftime(format)
 
 def convert_to_datetime(x):
     if isinstance(x,str):    
