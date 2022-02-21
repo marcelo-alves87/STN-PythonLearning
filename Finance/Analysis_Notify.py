@@ -24,7 +24,7 @@ def reset_data():
 
 
 def create_resampled_from_group(group):
-    if len(group[1]['Hora']) > 0:            
+    if len(group[1]['Hora']) > 0:
         list1 = group[1]['Hora'].split(';')
         list2 = group[1]['Último'].split(';')
         df = pd.DataFrame({'Hora' : list1, 'Último' : list2})
@@ -35,8 +35,8 @@ def create_resampled_from_group(group):
         
         df_resampled = df.resample(PERIOD)['Último'].agg([('High','max'),('Low', 'min'),('Último', 'last')])
         df_resampled.dropna(inplace=True)
-        for window in windows:
-            df_resampled['SMA_' + str(window)] = df_resampled['Último'].rolling(window=window, min_periods=0).mean()
+##        for window in windows:
+##            df_resampled['SMA_' + str(window)] = df_resampled['Último'].rolling(window=window, min_periods=0).mean()
         return df,df_resampled
     else:
         return None
@@ -130,11 +130,12 @@ def analysis(df):
     data = utils.get_pickle_file(DATA_FILE)
     if data is None:
         data = []
-       
+    
     grouped_df = df.groupby(["Papel"]).agg(lambda x: ';'.join(x[x.notnull()].astype(str)))
 
       
     for group in grouped_df.iterrows():
+        
         ticket = group[0]
         df,df_resampled = create_resampled_from_group(group)
         if df is not None:
