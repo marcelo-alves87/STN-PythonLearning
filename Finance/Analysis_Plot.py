@@ -143,4 +143,4 @@ def run(pickle_file=PICKLE_FILE):
     mpf.show()    
     
 
-run()
+#run()

@@ -35,8 +35,8 @@ def create_resampled_from_group(group):
         
         df_resampled = df.resample(PERIOD)['Último'].agg([('High','max'),('Low', 'min'),('Último', 'last')])
         df_resampled.dropna(inplace=True)
-##        for window in windows:
-##            df_resampled['SMA_' + str(window)] = df_resampled['Último'].rolling(window=window, min_periods=0).mean()
+        for window in windows:
+            df_resampled['SMA_' + str(window)] = df_resampled['Último'].rolling(window=window, min_periods=0).mean()
         return df,df_resampled
     else:
         return None
@@ -96,21 +96,21 @@ def bullish_fractal(df):
 
     
 def strategy(ticket,df):
-   
-##    values = []
-##    for window in windows:
-##        values.append(df['SMA_' + str(window)][-1])
     
+    values = []
+    for window in windows:
+        values.append(df['SMA_' + str(window)][-1])
+    price = df['Último'][-1]
     datum = Datum(ticket)
     if datum in data:
         datum = data[data.index(Datum(ticket))]    
 
-        if (bearish_fractal(df)):
+        if price <= values[0] < values[1] < values[2] and bearish_fractal(df):
             if datum.flag != 2:
                 notify(ticket, 2,df.index[-3])
                 save_datum(datum,2)
                 
-        elif (bullish_fractal(df)):
+        elif price >= values[0] > values[1] > values[2] and bullish_fractal(df):
             if datum.flag != 1:
                 notify(ticket,1, df.index[-3])
                 save_datum(datum,1)
@@ -156,4 +156,5 @@ def run(pickle_file=PICKLE_FILE):
         analysis(df1)
         time.sleep(3)    
 
-run()
+#run()
+

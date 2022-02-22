@@ -1,5 +1,6 @@
 import threading
-import Analysis_Notify as af
+import Analysis_Notify as an
+import Analysis_Plot as ap
 import Utils as utils
 import datetime as dt
 import pdb
@@ -11,7 +12,7 @@ PICKLE_FILE_TEST = 'btc_tickers_test.plk'
 
 
 def increment_date(date,df):
-    input('Start ...')
+    
     i = 0
     while True:
         
@@ -19,18 +20,19 @@ def increment_date(date,df):
         df2 = df[df['Hora'] < date1.strftime("%Y-%m-%d %H:%M:%S")]
         utils.save_df(PICKLE_FILE_TEST,df2)
         i += 1
-        time.sleep(3)
+        time.sleep(1)
 
 
 def test():
-    date = dt.datetime.strptime('2022-02-17 10:30:00','%Y-%m-%d %H:%M:%S')
+    
+    date = dt.datetime.strptime('2022-02-21 12:35:00','%Y-%m-%d %H:%M:%S')
     df = utils.try_to_get_df(PICKLE_FILE)
     utils.save_df(PICKLE_FILE_TEST,df)
     x = threading.Thread(target=increment_date, args=(date,df,))
     x.start()
-    y = threading.Thread(target=af.run, args=(PICKLE_FILE_TEST,))
+    y = threading.Thread(target=an.run, args=(PICKLE_FILE_TEST,))
     y.start()
-    at.run(PICKLE_FILE_TEST)
+    ap.run(PICKLE_FILE_TEST)
 
 
 test()
