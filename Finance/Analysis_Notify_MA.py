@@ -11,12 +11,8 @@ import pdb
 PICKLE_FILE = 'btc_tickers.plk'
 DATA_FILE = 'btc_data.plk'
 color = sys.stdout.shell
-windows = [21,50,200]
 windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
-
-WINDOW_OFFSET = 0.01
-
-PERIOD = '5min'
+PERIOD = '1min'
 
 def reset_data():
     if os.path.exists(DATA_FILE):
@@ -35,8 +31,9 @@ def create_resampled_from_group(group):
         
         df_resampled = df.resample(PERIOD)['Último'].agg([('High','max'),('Low', 'min'),('Último', 'last')])
         df_resampled.dropna(inplace=True)
-        for window in windows:
-            df_resampled['SMA_' + str(window)] = df_resampled['Último'].rolling(window=window, min_periods=0).mean()
+
+        df_resampled['SMA_40'] = df_resampled['Último'].rolling(window=40, min_periods=0).mean()
+        df_resampled['EMA_9'] = df_resampled['Último'].ewm(span=9, adjust=False).mean()
         return df,df_resampled
     else:
         return None
@@ -55,13 +52,13 @@ def notify(ticket,status, index):
     utils.play(ticket,path1,'pt-br')
     time1 = utils.convert_to_str(index,format='%H:%M')
     if status == 1:
-       color.write('\n(' + time1 + ') ++' + ticket +' ++','STRING')
-       text = 'Bullish'
-       path1 = 'Utils/Bullish.mp3'    
+       color.write('\n(' + time1 + ') -- ' + ticket +' --','COMMENT')
+       text = 'Down'
+       path1 = 'Utils/Down.mp3'    
     elif status == 2:
-       color.write('\n(' + time1 + ') --' + ticket + ' --','COMMENT')
-       text = 'Bearish'
-       path1 = 'Utils/Bearish.mp3'
+       color.write('\n(' + time1 + ') ++ ' + ticket + ' ++','STRING')
+       text = 'Up'
+       path1 = 'Utils/Up.mp3'
        
     
 
@@ -98,21 +95,21 @@ def bullish_fractal(df):
 def strategy(ticket,df):
     
     values = []
-    for window in windows:
-        values.append(df['SMA_' + str(window)][-1])
+    ema = df['EMA_9'][-1]
+    sma = df['SMA_40'][-1]
     price = df['Último'][-1]
     datum = Datum(ticket)
     if datum in data:
         datum = data[data.index(Datum(ticket))]    
 
-        if price <= values[0] < values[1] < values[2] and bearish_fractal(df):
+        if ema > sma:
             if datum.flag != 2:
-                notify(ticket, 2,df.index[-3])
+                notify(ticket, 2,df.index[-1])
                 save_datum(datum,2)
                 
-        elif price >= values[0] > values[1] > values[2] and bullish_fractal(df):
+        elif ema < sma:
             if datum.flag != 1:
-                notify(ticket,1, df.index[-3])
+                notify(ticket,1, df.index[-1])
                 save_datum(datum,1)
                  
 

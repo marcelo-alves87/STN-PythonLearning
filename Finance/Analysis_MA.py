@@ -10,6 +10,8 @@ import matplotlib.animation as animation
 import time
 import warnings
 import numpy as np
+import pandas_ta as ta
+
 
 PICKLE_FILE = 'btc_tickers.plk'
 warnings.filterwarnings('ignore')
@@ -66,14 +68,13 @@ fig = mpf.figure(style=style,figsize=(20,20))
 plt.subplots_adjust(0.05, 0.05, 0.95, 0.95, 0.95, 0.95)
 
 dimension = [29,8]
-positions = [[(1,52),(57,68)],[(5,56),(61,72)], [(81,132),(137,148)],[(85,136),(141,152)],[(163,214),(219,230)]]
+positions = [(1,68),(5,72),(81,148),(85,152),(163,230)]
 axes = []
 for pos in positions:
-    ax = fig.add_subplot(dimension[0],dimension[1],pos[0])
-    ar = fig.add_subplot(dimension[0],dimension[1],pos[1], sharex=ax)
-    axes.append([ax,ar])
+    ax = fig.add_subplot(dimension[0],dimension[1],pos)
+    axes.append(ax)
 
-
+    
 def analysis(ival,fargs):
     
     df1 = utils.try_to_get_df(fargs)
@@ -86,55 +87,52 @@ def analysis(ival,fargs):
     
     df1['Hora'] = df1['Hora'].apply(utils.convert_to_datetime)
     df1.set_index('Hora',inplace=True)
+    
+
+    
         
     df4 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-    df5 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Volume'].agg([('volume','mean')])
     df6 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Máximo'].agg([('max','last')])
     df7 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Mínimo'].agg([('min', 'last')])
-                                                                        
-    df1 = pd.concat([df4,df5,df6,df7],axis=1)
+
+    df4 = pd.concat([df4,df6,df7],axis=1)
     
-    tickets = get_tickets(df1)
+    tickets = get_tickets(df4)
 
     for i,ticket in enumerate(tickets):
-               
-        df0 = df1.loc[pd.IndexSlice[:,ticket], :]
-        df0['volume'] = df0['volume'].diff()
-        df0.fillna(0,inplace=True)
-        
+      
+        df0 = df4.loc[pd.IndexSlice[:,ticket], :]
         df0.reset_index('Papel',inplace=True)
 
-        df0['SMA_21'] = df0['close'].rolling(window=21, min_periods=0).mean()
-        df0['SMA_50'] = df0['close'].rolling(window=50, min_periods=0).mean()
-        df0['SMA_200'] = df0['close'].rolling(window=200, min_periods=0).mean()
-        df0['rsi'] = utils.RSI(df0['close'])
-        df0['rsi_50'] = 50
-        
-        ax = axes[i][0]
-        ar = axes[i][1]
-        ax.clear()
-        ar.clear()
-
-        df0 = df0.iloc[-RESOLUTION:]
-        
-
-        
-        apds = [mpf.make_addplot(df0['rsi'],ax=ar,color='yellow',ylim=(10,90)),
-                mpf.make_addplot(df0['rsi_50'],ax=ar,color='orange',type='line'),
-                mpf.make_addplot(df0['SMA_21'],type='line',color='mediumpurple',ax=ax,width=0.9),
-                mpf.make_addplot(df0['SMA_50'],type='line',color='orange',ax=ax,width=0.9),
-                mpf.make_addplot(df0['SMA_200'],type='line',color='white',ax=ax,width=0.9),
-                mpf.make_addplot(williams_fractal_bullish(df0),type='scatter',ax=ax,color='lime',markersize=10,marker='^'),
-                mpf.make_addplot(williams_fractal_bearish(df0),type='scatter',ax=ax,color='red',markersize=10,marker='v'),]
-
-
-
-         
-            
-        
-        mpf.plot(df0,type='candle',addplot=apds,ax=ax,ylabel=ticket,xrotation=0, datetime_format='%H:%M')
-        
     
+    
+        ax = axes[i]
+       
+        ax.clear()
+    
+        
+        
+        df0 = df0.iloc[-RESOLUTION:]
+
+          
+
+        df0['EMA_9'] = df0['close'].ewm(span=9, adjust=False).mean()
+        df0['SMA_40'] = df0['close'].rolling(window=40, min_periods=0).mean()
+
+        apds = [mpf.make_addplot(df0['EMA_9'],type='line',color='green',ax=ax,width=0.9),
+                mpf.make_addplot(df0['SMA_40'],type='line',color='red',ax=ax,width=0.9),
+                mpf.make_addplot(williams_fractal_bullish(df0),type='scatter',ax=ax,color='lime',markersize=10,marker='^'),
+                mpf.make_addplot(williams_fractal_bearish(df0),type='scatter',ax=ax,color='red',markersize=10,marker='v'),
+                ]
+
+        hlines =[df0['max'][-1],df0['min'][-1]]
+     
+        for fib in FIBONACCI:
+            hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
+    
+        mpf.plot(df0,type='candle',hlines=dict(hlines=hlines,linestyle='--'),addplot=apds,ax=ax,ylabel=ticket,xrotation=0, datetime_format='%H:%M')
+   
+            
 
 def run(pickle_file=PICKLE_FILE):
 

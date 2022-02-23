@@ -15,7 +15,7 @@ yfin.pdr_override()
 
 
 
-def get_data_from_yahoo(interval = 5, period = '1m'):
+def get_data_from_yahoo(interval = 6, period = '1m'):
     
     df = dtr.get_leverage_btc(False)
         
