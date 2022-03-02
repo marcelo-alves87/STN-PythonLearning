@@ -11,7 +11,7 @@ import time
 import warnings
 import numpy as np
 import pandas_ta as ta
-
+from ScrollableWindow import ScrollableWindow
 
 PICKLE_FILE = 'btc_tickers.plk'
 warnings.filterwarnings('ignore')
@@ -60,24 +60,12 @@ def get_tickets(df):
     return tickets    
 
 
-mc = mpf.make_marketcolors(up='cyan',down='fuchsia',inherit=True)
-style  = mpf.make_mpf_style(base_mpf_style='nightclouds',gridstyle='',marketcolors=mc)
 
-fig = mpf.figure(style=style,figsize=(20,20))
-
-plt.subplots_adjust(0.05, 0.05, 0.95, 0.95, 0.95, 0.95)
-
-dimension = [29,8]
-positions = [(1,68),(5,72),(81,148),(85,152),(163,230)]
-axes = []
-for pos in positions:
-    ax = fig.add_subplot(dimension[0],dimension[1],pos)
-    axes.append(ax)
 
     
-def analysis(ival,fargs):
+def analysis(pickle_file):
     
-    df1 = utils.try_to_get_df(fargs)
+    df1 = utils.try_to_get_df(pickle_file)
 
     df1.dropna(inplace=True)
         
@@ -133,15 +121,28 @@ def analysis(ival,fargs):
         else:
             hlines = []
             
-        mpf.plot(df0,type='candle',hlines=dict(hlines=hlines,linestyle='--'),addplot=apds,ax=ax,ylabel=ticket,xrotation=0, datetime_format='%H:%M')
-   
+        mpf.plot(df0,type='candle',hlines=dict(hlines=hlines,linestyle='--'),addplot=apds,ax=ax,xrotation=0, datetime_format='%H:%M')
+        ax.set_ylabel(ticket,fontsize=20)
             
 
 def run(pickle_file=PICKLE_FILE):
-
-    ani = animation.FuncAnimation(fig, analysis, fargs=[pickle_file])
-
-    mpf.show()    
     
+    mc = mpf.make_marketcolors(up='cyan',down='fuchsia',inherit=True)
+    style  = mpf.make_mpf_style(base_mpf_style='nightclouds',gridstyle='',marketcolors=mc)
+
+    fig = mpf.figure(style=style,figsize=(19,20))
+
+    plt.subplots_adjust(0.05, 0.05, 0.95, 0.95, 0.95, 0.95)
+
+    dimension = [40,8]
+    positions = [(1,68),(5,72),(81,148),(85,152),(161,220),(165,224),(233,308),(237,312)]
+    global axes
+    axes = []
+    for pos in positions:
+        ax = fig.add_subplot(dimension[0],dimension[1],pos)
+        axes.append(ax)
+       
+    a = ScrollableWindow(fig,analysis,pickle_file)
+
 
 #run()
