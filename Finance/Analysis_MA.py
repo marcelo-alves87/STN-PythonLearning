@@ -125,11 +125,14 @@ def analysis(ival,fargs):
                 mpf.make_addplot(williams_fractal_bearish(df0),type='scatter',ax=ax,color='red',markersize=10,marker='v'),
                 ]
 
-        hlines =[df0['max'][-1],df0['min'][-1]]
-     
-        for fib in FIBONACCI:
-            hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
-    
+        if df0['max'][-1] > 0 and df0['min'][-1] > 0:
+            hlines =[df0['max'][-1],df0['min'][-1]]
+         
+            for fib in FIBONACCI:
+                hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
+        else:
+            hlines = []
+            
         mpf.plot(df0,type='candle',hlines=dict(hlines=hlines,linestyle='--'),addplot=apds,ax=ax,ylabel=ticket,xrotation=0, datetime_format='%H:%M')
    
             
@@ -141,4 +144,4 @@ def run(pickle_file=PICKLE_FILE):
     mpf.show()    
     
 
-run()
+#run()

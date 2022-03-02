@@ -5,7 +5,7 @@ import pandas as pd
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 LEVERAGE = [5,6] #5% to 6%
 FREE_FLOAT_FILE = 'Free-Float_1-2022.csv'
-BTC_FILE = 'BTC Rico 22-02-2022-_YI.pdf'
+BTC_FILE = 'BTC Rico 23-02-2022-aEM.pdf'
 
 def get_leverage_tickers():
     tickers = []

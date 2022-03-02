@@ -12,7 +12,7 @@ PICKLE_FILE = 'btc_tickers.plk'
 DATA_FILE = 'btc_data.plk'
 color = sys.stdout.shell
 windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
-PERIOD = '1min'
+PERIOD = '15min'
 
 def reset_data():
     if os.path.exists(DATA_FILE):
@@ -153,5 +153,5 @@ def run(pickle_file=PICKLE_FILE):
         analysis(df1)
         time.sleep(3)    
 
-run()
+#run()
 
