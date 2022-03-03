@@ -48,5 +48,5 @@ def get_data_from_yahoo(interval = 6, period = '1m', join = False, now = dt.date
   
 
 #join = True, now = dt.datetime.strptime('2022-02-24','%Y-%m-%d')            
-
+#get_data_from_yahoo()
 get_data_from_yahoo(join = True, now = dt.datetime.strptime('2022-02-24','%Y-%m-%d')) 

@@ -14,7 +14,9 @@ import pandas_ta as ta
 from ScrollableWindow import ScrollableWindow
 import sys
 import math
+from Datum import Datum
 
+DATA_FILE = 'btc_data.plk'
 PICKLE_FILE = 'btc_tickers.plk'
 warnings.filterwarnings('ignore')
 PERIODS = ['1min','5min','15min','30min','60min']
@@ -22,6 +24,7 @@ FIBONACCI = [23.6, 38.2, 61.8, 78.6]
 STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
 color = sys.stdout.shell
+data = []
 
 def williams_fractal_bullish(df):
     
@@ -73,6 +76,11 @@ def group_by_period(df1,period):
 
     return df4
 
+def save_datum(datum,flag):
+    
+    index = data.index(datum)
+    data[index].flag = flag
+
 def notify(ticket,status,index):
     path1 = 'Utils/' + ticket + '.mp3'    
     utils.play(ticket,path1,'pt-br')
@@ -90,11 +98,30 @@ def notify(ticket,status,index):
 
     utils.play(text,path1,'en-us')
 
-def strategy(ticket,mavs,time1):
-    if mavs[0] < 0 and mavs[1] < 0 and mavs[2] > 0 and mavs[3] > 0 and mavs[4] < 0:
-        notify(ticket,1,time1)
+def check_mavs(ticket,mavs,time1):
+    if mavs[0] < 0 and mavs[1] < 0 and mavs[2] > 0 and mavs[3] > 0 and mavs[4] < 0:       
+        return 1
     elif mavs[0] > 0 and mavs[1] > 0 and mavs[2] < 0 and mavs[3] < 0 and mavs[4] > 0:
-        notify(ticket,2,time1)    
+        
+        return 2
+    else:
+        return 0
+
+def strategy(ticket,mavs,time1):
+    datum = Datum(ticket)
+    b = check_mavs(ticket,mavs,time1)
+    if datum in data:
+        index = data.index(datum)       
+        if data[index].flag is False and b == 1:
+            notify(ticket,1,time1)
+            data[index].flag = True
+        elif data[index].flag is False and b == 2:
+            notify(ticket,2,time1)
+            data[index].flag = True
+        elif b == 0:
+            data[index].flag = False
+    else:        
+        data.append(datum)
     
 def analysis(pickle_file):
     
@@ -213,4 +240,4 @@ def run(pickle_file=PICKLE_FILE):
     a = ScrollableWindow(fig,analysis,pickle_file)
 
 
-run()
+#run()

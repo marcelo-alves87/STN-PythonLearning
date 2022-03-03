@@ -13,11 +13,7 @@ DATA_FILE = 'btc_data.plk'
 color = sys.stdout.shell
 windows_color = ['DEFINITION', 'KEYWORD', 'COMMENT']
 PERIOD = '15min'
-
-def reset_data():
-    if os.path.exists(DATA_FILE):
-        os.remove(DATA_FILE)
-
+data = []
 
 def create_resampled_from_group(group):
     if len(group[1]['Hora']) > 0:
@@ -145,7 +141,7 @@ def analysis(df):
                                                
 
 def run(pickle_file=PICKLE_FILE):
-    reset_data()
+    
     while True:
         df1 = utils.try_to_get_df(pickle_file)  
         df1.dropna(inplace=True)

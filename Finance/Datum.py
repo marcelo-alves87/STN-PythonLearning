@@ -3,7 +3,7 @@ class Datum:
 
     def __init__(self, ticket):
         self.ticket = ticket        
-        self.flag = 0 
+        self.flag = False 
         
 
     def __eq__(self, other):
