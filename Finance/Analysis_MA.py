@@ -12,7 +12,7 @@ import warnings
 import numpy as np
 import pandas_ta as ta
 from ScrollableWindow import ScrollableWindow
-
+import sys
 
 PICKLE_FILE = 'btc_tickers.plk'
 warnings.filterwarnings('ignore')
@@ -20,6 +20,7 @@ PERIODS = ['1min','5min','15min','30min','60min']
 FIBONACCI = [23.6, 38.2, 61.8, 78.6]
 STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
+color = sys.stdout.shell
 
 def williams_fractal_bullish(df):
     
@@ -71,6 +72,28 @@ def group_by_period(df1,period):
 
     return df4
 
+def notify(ticket,status,index):
+    path1 = 'Utils/' + ticket + '.mp3'    
+    utils.play(ticket,path1,'pt-br')
+    time1 = utils.convert_to_str(index,format='%H:%M')
+    if status == 1:
+       color.write('\n(' + time1 + ') -- ' + ticket +' --','COMMENT')
+       text = 'Down'
+       path1 = 'Utils/Down.mp3'    
+    elif status == 2:
+       color.write('\n(' + time1 + ') ++ ' + ticket + ' ++','STRING')
+       text = 'Up'
+       path1 = 'Utils/Up.mp3'
+       
+    
+
+    utils.play(text,path1,'en-us')
+
+def strategy(ticket,mavs,time1):
+    if mavs[0] < 0 and mavs[1] < 0 and mavs[2] > 0 and mavs[3] > 0 and mavs[4] < 0:
+        notify(ticket,1,time1)
+    elif mavs[0] > 0 and mavs[1] > 0 and mavs[2] < 0 and mavs[3] < 0 and mavs[4] > 0:
+        notify(ticket,2,time1)    
     
 def analysis(pickle_file):
     
@@ -107,8 +130,9 @@ def analysis(pickle_file):
             df2.reset_index('Papel',inplace=True)
             df2['EMA_9'] = df2['close'].ewm(span=9, adjust=False).mean()
             df2['SMA_40'] = df2['close'].rolling(window=40, min_periods=0).mean()        
-            mavs.append(round(df2['EMA_9'][-1] - df2['SMA_40'][-1],2))        
+            mavs.append(round(df2['EMA_9'][-1] - df2['SMA_40'][-1],2))
         
+        strategy(ticket,mavs,df2.index[-1])
         ax = axes[i]
        
         ax.clear() 
@@ -124,8 +148,8 @@ def analysis(pickle_file):
         if df0['max'][-1] > 0 and df0['min'][-1] > 0:
             hlines =[df0['max'][-1],df0['min'][-1]]
          
-            for fib in FIBONACCI:
-                hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
+##            for fib in FIBONACCI:
+##                hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
         else:
             hlines = []
             
@@ -167,4 +191,4 @@ def run(pickle_file=PICKLE_FILE):
     a = ScrollableWindow(fig,analysis,pickle_file)
 
 
-#run()
+run()
