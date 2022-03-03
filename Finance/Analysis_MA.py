@@ -13,6 +13,7 @@ import numpy as np
 import pandas_ta as ta
 from ScrollableWindow import ScrollableWindow
 import sys
+import math
 
 PICKLE_FILE = 'btc_tickers.plk'
 warnings.filterwarnings('ignore')
@@ -125,12 +126,16 @@ def analysis(pickle_file):
         df0 = df0.iloc[-RESOLUTION:]
 
         mavs = []
-        for df in dfs:
+        for df in dfs:            
             df2 = df.loc[pd.IndexSlice[:,ticket], :]
             df2.reset_index('Papel',inplace=True)
-            df2['EMA_9'] = df2['close'].ewm(span=9, adjust=False).mean()
-            df2['SMA_40'] = df2['close'].rolling(window=40, min_periods=0).mean()        
-            mavs.append(round(df2['EMA_9'][-1] - df2['SMA_40'][-1],2))
+            if len(df2.index) > 40:
+                df2['EMA_9'] = df2['close'].ewm(span=9, adjust=False).mean()
+                df2['SMA_40'] = df2['close'].rolling(window=40, min_periods=0).mean()
+                mavs.append(round(df2['EMA_9'][-1] - df2['SMA_40'][-1],2))
+            else:
+                mavs.append(0)
+            
         
         strategy(ticket,mavs,df2.index[-1])
         ax = axes[i]
@@ -180,8 +185,21 @@ def run(pickle_file=PICKLE_FILE):
 
     plt.subplots_adjust(0.05, 0.05, 0.95, 0.95, 0.95, 0.95)
 
-    dimension = [40,8]
-    positions = [(1,68),(5,72),(81,148),(85,152),(161,220),(165,224),(233,308),(237,312)]
+    
+    df1 = utils.try_to_get_df(pickle_file)
+    ntickets = len(df1.groupby('Papel').first().index.to_list())
+    
+    positions = []
+    j1 = 0
+    for i in range(ntickets):
+        if i % 2 == 0:            
+            positions.append((j1 + 1,j1 + 68))
+            positions.append((j1 + 5,j1 + 72))
+            j1 += 80
+    
+            
+    dimension = [j1/8,8]
+    
     global axes
     axes = []
     for pos in positions:
