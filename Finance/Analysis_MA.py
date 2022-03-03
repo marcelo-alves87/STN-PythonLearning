@@ -240,4 +240,4 @@ def run(pickle_file=PICKLE_FILE):
     a = ScrollableWindow(fig,analysis,pickle_file)
 
 
-#run()
+run()

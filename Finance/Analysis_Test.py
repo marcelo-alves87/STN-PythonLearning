@@ -13,10 +13,11 @@ PICKLE_FILE_TEST = 'btc_tickers_test.plk'
 def increment_date(date,df):
     
     i = 0
-    while True:
-        pdb.set_trace()
+    
+    while True:        
         date1 =  date + dt.timedelta(minutes=i)    
         df2 = df[df['Hora'] < date1.strftime("%Y-%m-%d %H:%M:%S")]
+        
         utils.save_df(PICKLE_FILE_TEST,df2)
         i += 1
         time.sleep(3)
@@ -24,9 +25,9 @@ def increment_date(date,df):
 
 def test():
     
-    date = dt.datetime.strptime('2022-03-02 10:34:00','%Y-%m-%d %H:%M:%S')
+    date = dt.datetime.strptime('2022-03-02 17:00:00','%Y-%m-%d %H:%M:%S')
     df = utils.try_to_get_df(PICKLE_FILE)
-    pdb.set_trace()
+    
     utils.save_df(PICKLE_FILE_TEST,df)
     x = threading.Thread(target=increment_date, args=(date,df,))
     x.start()

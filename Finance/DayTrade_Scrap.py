@@ -94,6 +94,7 @@ def scrap_rico():
         
         df['Hora'] = df['Hora'].apply(convert_to_datetime_str)
         df = df.dropna()
+        
         if len(df) > 0:
             
             df = pd.concat([main_df, df]).reset_index(drop=True)
@@ -102,6 +103,7 @@ def scrap_rico():
             
                path = 'stock_dfs/' + name.upper() + '.csv'
                if os.path.exists(path):
+                   
                    df1 = pd.read_csv(path)
                     
                    df1['Datetime'] = df1['Datetime'].apply(lambda x: x[:-6])
@@ -109,7 +111,7 @@ def scrap_rico():
                    df1['Papel'] = name
                    df1 = df1[['Papel','Hora','Último']]
                                          
-                   df = pd.concat([df, df1])
+                   df = pd.concat([df1, df])
                    df.fillna(0,inplace=True)
                    
                    os.remove(path)
