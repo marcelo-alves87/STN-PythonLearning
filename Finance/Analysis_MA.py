@@ -6,16 +6,17 @@ import threading
 import mplfinance as mpf
 import matplotlib.dates as dates
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+import matplotlib.lines as mlines
 import time
 import warnings
 import numpy as np
 import pandas_ta as ta
 from ScrollableWindow import ScrollableWindow
 
+
 PICKLE_FILE = 'btc_tickers.plk'
 warnings.filterwarnings('ignore')
-PERIOD = '5min'
+PERIODS = ['1min','5min','15min','30min','60min']
 FIBONACCI = [23.6, 38.2, 61.8, 78.6]
 STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
@@ -60,7 +61,15 @@ def get_tickets(df):
     return tickets    
 
 
+def group_by_period(df1,period):
 
+    df4 = df1.groupby([pd.Grouper(freq=period), 'Papel'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+    df6 = df1.groupby([pd.Grouper(freq=period), 'Papel'])['Máximo'].agg([('max','last')])
+    df7 = df1.groupby([pd.Grouper(freq=period), 'Papel'])['Mínimo'].agg([('min', 'last')])
+
+    df4 = pd.concat([df4,df6,df7],axis=1)
+
+    return df4
 
     
 def analysis(pickle_file):
@@ -76,36 +85,35 @@ def analysis(pickle_file):
     df1['Hora'] = df1['Hora'].apply(utils.convert_to_datetime)
     df1.set_index('Hora',inplace=True)
     
-
     
-        
-    df4 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-    df6 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Máximo'].agg([('max','last')])
-    df7 = df1.groupby([pd.Grouper(freq=PERIOD), 'Papel'])['Mínimo'].agg([('min', 'last')])
+    dfs = []
+    for period in PERIODS:
+        dfs.append(group_by_period(df1,period))
 
-    df4 = pd.concat([df4,df6,df7],axis=1)
-    
-    tickets = get_tickets(df4)
+    tickets = df1.groupby('Papel').first().index.to_list()
+   
 
     for i,ticket in enumerate(tickets):
-      
-        df0 = df4.loc[pd.IndexSlice[:,ticket], :]
+        
+        df0 = dfs[1].loc[pd.IndexSlice[:,ticket], :]
         df0.reset_index('Papel',inplace=True)
-
-    
-    
-        ax = axes[i]
-       
-        ax.clear()
-    
-        
-        
+        df0['EMA_9'] = df0['close'].ewm(span=9, adjust=False).mean()
+        df0['SMA_40'] = df0['close'].rolling(window=40, min_periods=0).mean()        
         df0 = df0.iloc[-RESOLUTION:]
 
-          
-
-        df0['EMA_9'] = df0['close'].ewm(span=9, adjust=False).mean()
-        df0['SMA_40'] = df0['close'].rolling(window=40, min_periods=0).mean()
+        mavs = []
+        for df in dfs:
+            df2 = df.loc[pd.IndexSlice[:,ticket], :]
+            df2.reset_index('Papel',inplace=True)
+            df2['EMA_9'] = df2['close'].ewm(span=9, adjust=False).mean()
+            df2['SMA_40'] = df2['close'].rolling(window=40, min_periods=0).mean()        
+            mavs.append(round(df2['EMA_9'][-1] - df2['SMA_40'][-1],2))        
+        
+        ax = axes[i]
+       
+        ax.clear() 
+        
+                
 
         apds = [mpf.make_addplot(df0['EMA_9'],type='line',color='green',ax=ax,width=0.9),
                 mpf.make_addplot(df0['SMA_40'],type='line',color='red',ax=ax,width=0.9),
@@ -123,7 +131,21 @@ def analysis(pickle_file):
             
         mpf.plot(df0,type='candle',hlines=dict(hlines=hlines,linestyle='--'),addplot=apds,ax=ax,xrotation=0, datetime_format='%H:%M')
         ax.set_ylabel(ticket,fontsize=20)
-            
+
+        handles = []
+        for mav in mavs:
+          if mav > 0:   
+            green = mlines.Line2D([], [], color='green', marker='^', linestyle='None',
+                          markersize=10, label=mav)
+            handles.append(green)
+          else:  
+            red = mlines.Line2D([], [], color='red', marker='v', linestyle='None',
+                          markersize=10, label=mav)
+            handles.append(red)   
+
+        ax.legend(handles=handles,loc='upper left')
+        
+          
 
 def run(pickle_file=PICKLE_FILE):
     
