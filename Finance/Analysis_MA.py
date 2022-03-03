@@ -191,11 +191,15 @@ def run(pickle_file=PICKLE_FILE):
     
     positions = []
     j1 = 0
+    
     for i in range(ntickets):
-        if i % 2 == 0:            
+        if ntickets % 2 != 0 and i == ntickets - 1:
+            positions.append((j1 + 1,j1 + 68))
+            j1 += 80 
+        elif i % 2 == 0:            
             positions.append((j1 + 1,j1 + 68))
             positions.append((j1 + 5,j1 + 72))
-            j1 += 80
+            j1 += 80    
     
             
     dimension = [j1/8,8]
