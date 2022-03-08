@@ -20,7 +20,7 @@ def fetch_ticker(ticker,start,tomorrow,period):
         print(ticker,'não foi encontrado')
 
 
-def get_data_from_yahoo(interval = 6, period = '1m', join = False, now = dt.date.today()):
+def get_data_from_yahoo(interval = 5, period = '1m', join = False, now = dt.date.today()):
     
     df = dtr.get_leverage_btc(False)
         
@@ -48,5 +48,5 @@ def get_data_from_yahoo(interval = 6, period = '1m', join = False, now = dt.date
   
 
 #join = True, now = dt.datetime.strptime('2022-02-24','%Y-%m-%d')            
-#get_data_from_yahoo()
-get_data_from_yahoo(join = True, now = dt.datetime.strptime('2022-02-24','%Y-%m-%d')) 
+get_data_from_yahoo()
+#get_data_from_yahoo(join = True, now = dt.datetime.strptime('2022-02-24','%Y-%m-%d')) 
