@@ -67,7 +67,7 @@ def get_tickets(df):
 
 
 def group_by_period(df1,period):
-
+    
     df4 = df1.groupby([pd.Grouper(freq=period), 'Papel'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
     df6 = df1.groupby([pd.Grouper(freq=period), 'Papel'])['Máximo'].agg([('max','last')])
     df7 = df1.groupby([pd.Grouper(freq=period), 'Papel'])['Mínimo'].agg([('min', 'last')])

@@ -14,6 +14,14 @@ from selenium.common.exceptions import WebDriverException
 import json
 import Utils as utils
 
+##8329
+##
+##window.localStorage.setItem('info',JSON.stringify(i))
+##window.localStorage.setItem('data',JSON.stringify(u))
+##window.localStorage.setItem('info2',s)
+##window.localStorage.getItem('info')
+
+
 PICKLE_FILE = 'btc_tickers.plk'
 URL = "https://rico.com.vc/arealogada/home-broker"
 
@@ -22,14 +30,22 @@ def datetime_localstorage(x):
    x = x - dt.timedelta(hours=6)
    return utils.convert_to_str(x)
 
+def get_localstorage_(driver):
+   try:
+      info = json.loads(driver.execute_script("return window.localStorage.getItem(\'info\')"))
+      data = json.loads(driver.execute_script("return window.localStorage.getItem(\'data\')"))
+      info2 = driver.execute_script("return window.localStorage.getItem(\'info2\')")
+      return info,data,info2
+   except WebDriverException as e:
+      time.sleep(1)
+      return get_localstorage_(driver)
+   
 def get_localstorage(driver,tickets,period):
    for ticket in tickets:
       
       input('Do local storage for {} at each {}'.format(ticket,period))
       
-      info = json.loads(driver.execute_script("return window.localStorage.getItem(\'info\')"))
-      data = json.loads(driver.execute_script("return window.localStorage.getItem(\'data\')"))
-      info2 = driver.execute_script("return window.localStorage.getItem(\'info2\')")
+      info, data, info2 = get_localstorage_(driver)
 
       df_data = pd.DataFrame(data)
       
@@ -45,9 +61,14 @@ def get_localstorage(driver,tickets,period):
 
       path = 'stock_dfs/' + ticker.upper() + '.csv'
       if os.path.exists(path):
+         
          df1 = pd.read_csv(path)
          os.remove(path)
-         df_data = pd.concat([df1,df_data])
+         df_data.reset_index(inplace=True)
+         df_data = df_data[df_data['Datetime'] < df1['Datetime'][0]]
+         
+         df_data = pd.concat([df_data,df1])
+         df_data.set_index('Datetime',inplace=True)
             
       df_data.to_csv(path) 
       
@@ -99,7 +120,7 @@ def scrap_rico():
     driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
     driver.get(URL) 
     
-    get_localstorage(driver,df_btc['Papel'],'1min')
+    #get_localstorage(driver,df_btc['Papel'],'1min')
     get_localstorage(driver,df_btc['Papel'],'5min')
     
     while(True):
