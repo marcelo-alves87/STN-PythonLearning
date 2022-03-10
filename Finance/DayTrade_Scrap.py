@@ -112,17 +112,18 @@ def scrap_rico():
 
     df_btc = update_main_df()
 
-    if os.path.exists(PICKLE_FILE):
-       os.remove(PICKLE_FILE)
+
        
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
     driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
     driver.get(URL) 
-    
-    #get_localstorage(driver,df_btc['Papel'],'1min')
-    get_localstorage(driver,df_btc['Papel'],'5min')
-    
+
+##    if os.path.exists(PICKLE_FILE):
+##       os.remove(PICKLE_FILE)
+##    get_localstorage(driver,df_btc['Papel'],'1min')
+##    get_localstorage(driver,df_btc['Papel'],'5min')
+    input('Wait ...')
     while(True):
 
         
