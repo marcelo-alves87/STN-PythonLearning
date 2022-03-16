@@ -99,9 +99,9 @@ def notify(ticket,status,index):
     utils.play(text,path1,'en-us')
 
 def check_mavs(ticket,mavs,time1):
-    if mavs[0] < 0 and mavs[1] < 0 and mavs[2] > 0 and mavs[3] > 0 and mavs[4] < 0:       
+    if mavs[1] < 0:       
         return 1
-    elif mavs[0] > 0 and mavs[1] > 0 and mavs[2] < 0 and mavs[3] < 0 and mavs[4] > 0:
+    elif mavs[1] > 0:
         
         return 2
     else:
@@ -112,18 +112,19 @@ def strategy(ticket,mavs,time1):
     b = check_mavs(ticket,mavs,time1)
     if datum in data:
         index = data.index(datum)       
-        if data[index].flag is False and b == 1:
+        if data[index].flag is True and b == 1:
             notify(ticket,1,time1)
-            data[index].flag = True
+            data[index].flag = False
         elif data[index].flag is False and b == 2:
             notify(ticket,2,time1)
             data[index].flag = True
         elif b == 0:
-            data[index].flag = False
+            #data[index].flag = False
+            pass
     else:        
         data.append(datum)
     
-def analysis(pickle_file):
+def analysis(pickle_file, fibonacci = False):
     
     df1 = utils.try_to_get_df(pickle_file)
 
@@ -179,9 +180,10 @@ def analysis(pickle_file):
 
         if df0['max'][-1] > 0 and df0['min'][-1] > 0:
             hlines =[df0['max'][-1],df0['min'][-1]]
-         
-##            for fib in FIBONACCI:
-##                hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
+            
+        if fibonacci:  
+           for fib in FIBONACCI:
+               hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
         else:
             hlines = []
             

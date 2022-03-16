@@ -14,11 +14,11 @@ from selenium.common.exceptions import WebDriverException
 import json
 import Utils as utils
 
-##8329
+##139097
 ##
-##window.localStorage.setItem('info',JSON.stringify(i))
-##window.localStorage.setItem('data',JSON.stringify(u))
-##window.localStorage.setItem('info2',s)
+##window.localStorage.setItem('info',JSON.stringify(t))
+##window.localStorage.setItem('data',JSON.stringify(i))
+##window.localStorage.setItem('info2',a)
 ##window.localStorage.getItem('info')
 
 
@@ -46,8 +46,8 @@ def get_localstorage(driver,tickets,period):
       input('Do local storage for {} at each {}'.format(ticket,period))
       
       info, data, info2 = get_localstorage_(driver)
-
-      df_data = pd.DataFrame(data)
+      
+      df_data = pd.DataFrame(data['quotes'])
       
       df_data = df_data[['dtDateTime', 'nOpen', 'nMax', 'nMin', 'nClose','nVolume']]
       df_data.rename(columns={'dtDateTime': 'Datetime', 'nOpen': 'Open', 'nMax': 'High', 'nMin': 'Low', 'nClose' : 'Close', 'nVolume' : 'Volume'}, inplace=True)
@@ -119,10 +119,10 @@ def scrap_rico():
     driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
     driver.get(URL) 
 
-##    if os.path.exists(PICKLE_FILE):
-##       os.remove(PICKLE_FILE)
-##    get_localstorage(driver,df_btc['Papel'],'1min')
-##    get_localstorage(driver,df_btc['Papel'],'5min')
+    if os.path.exists(PICKLE_FILE):
+       os.remove(PICKLE_FILE)
+    get_localstorage(driver,df_btc['Papel'],'1min')
+    get_localstorage(driver,df_btc['Papel'],'5min')
     input('Wait ...')
     while(True):
 
