@@ -25,7 +25,7 @@ STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
 color = sys.stdout.shell
 data = []
-PRICE_ALERT = {'MGLU3' : 5.04}
+PRICE_ALERT = {'MGLU3' : [5.16,5.06], 'BRFS3' : 15.88, 'CSNA3' : 23.85, 'GGBR4' : 27.85, 'VALE3': 90.27, 'PETR4': 30.93}
 def williams_fractal_bullish(df):
     
     signal = []
@@ -127,14 +127,22 @@ def strategy(ticket,mavs,time1):
     else:        
         data.append(datum)
         
+def check_price(price, ticket, df):
+    if price >= df['low'][-1] and price <= df['high'][-1]:
+            notify(ticket,3,df.index[-1])
+            del PRICE_ALERT[ticket]
+  
+
 def price_alert(ticket,df):
     if ticket in PRICE_ALERT:
         
         price = PRICE_ALERT[ticket]
-        if price >= df['low'][-1] and price <= df['high'][-1]:
-            notify(ticket,3,df.index[-1])
-            del PRICE_ALERT[ticket]
-
+        if isinstance(price,list):
+            
+            check_price(price[0],ticket,df)
+            check_price(price[1],ticket,df)
+        else:
+            check_price(price,ticket,df)
         
     
 def analysis(pickle_file, fibonacci = False):
