@@ -25,7 +25,8 @@ STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
 color = sys.stdout.shell
 data = []
-PRICE_ALERT = {'MGLU3' : [5.16,5.06], 'BRFS3' : 15.88, 'CSNA3' : 23.85, 'GGBR4' : 27.85, 'VALE3': 90.27, 'PETR4': 30.93}
+PRICE_ALERT = {'MGLU3' : [5.77,5.72]}
+HLINES = {'PETR4' : [32.1,31.35], 'MGLU3' : [5.84,5.73], 'CSNA3' : [26.72,25.68]}
 def williams_fractal_bullish(df):
     
     signal = []
@@ -145,7 +146,7 @@ def price_alert(ticket,df):
             check_price(price,ticket,df)
         
     
-def analysis(pickle_file, fibonacci = False):
+def analysis(pickle_file):
     
     df1 = utils.try_to_get_df(pickle_file)
 
@@ -186,7 +187,7 @@ def analysis(pickle_file, fibonacci = False):
                 mavs.append(0)
             
         
-        strategy(ticket,mavs,df2.index[-1])
+        #strategy(ticket,mavs,df2.index[-1])
         price_alert(ticket,df0)
         ax = axes[i]
        
@@ -200,14 +201,14 @@ def analysis(pickle_file, fibonacci = False):
                 mpf.make_addplot(williams_fractal_bearish(df0),type='scatter',ax=ax,color='red',markersize=10,marker='v'),
                 ]
 
-        if df0['max'][-1] > 0 and df0['min'][-1] > 0:
-            hlines =[df0['max'][-1],df0['min'][-1]]
-            
-        if fibonacci:  
+        hlines = []
+        if ticket in HLINES:
+           max1 = HLINES[ticket][0]
+           min1 = HLINES[ticket][1]
+           hlines.append(max1)
+           hlines.append(min1)
            for fib in FIBONACCI:
-               hlines.append(df0['max'][-1] - (df0['max'][-1] - df0['min'][-1])*fib/100)
-        else:
-            hlines = []
+               hlines.append(max1 - (max1 - min1)*fib/100)
             
         mpf.plot(df0,type='candle',hlines=dict(hlines=hlines,linestyle='--'),addplot=apds,ax=ax,xrotation=0, datetime_format='%H:%M')
         ax.set_ylabel(ticket,fontsize=20)

@@ -21,7 +21,7 @@ import Utils as utils
 ##window.localStorage.setItem('info2',a)
 ##window.localStorage.getItem('info')
 
-
+MY_TICKETS = ['MGLU3', 'CSNA3', 'PETR4']
 PICKLE_FILE = 'btc_tickers.plk'
 URL = "https://rico.com.vc/arealogada/home-broker"
 
@@ -83,6 +83,8 @@ def convert_to_datetime_str(x):
 def merge_free_float_with_btc():
     #Tickers that allow leverage and BTC
     df1 = dtr.get_leverage_btc()
+    mask = df1['Papel'].isin(MY_TICKETS)
+    df1 = df1[mask]
     df2 = dtr.get_free_float()
     df = pd.merge(df1, df2, on='Papel', how='outer')
     df.drop(['Acao', 'Tipo', 'Free Float'], 1, inplace=True)
@@ -90,7 +92,6 @@ def merge_free_float_with_btc():
     return df
 
 def update_main_df():
-    
     df_btc = merge_free_float_with_btc()
     if os.path.isfile(PICKLE_FILE):
         main_df = pd.read_pickle(PICKLE_FILE)

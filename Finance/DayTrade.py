@@ -26,7 +26,7 @@ def get_btc_df():
       df = df.append(df1)
     return df
 
-def get_leverage_btc(verbose=True):
+def get_leverage_btc(verbose=False):
     #Tickers that allow leverage
     lev_tickers = get_leverage_tickers()
     #Tickers that allow BTC
