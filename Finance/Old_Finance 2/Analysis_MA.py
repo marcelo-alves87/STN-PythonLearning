@@ -25,8 +25,8 @@ STATUS_FILE = 'btc_status.plk'
 RESOLUTION = 100
 color = sys.stdout.shell
 data = []
-PRICE_ALERT = {'MGLU3' : [5.77,5.72]}
-HLINES = {'PETR4' : [32.1,31.35], 'MGLU3' : [5.84,5.73], 'CSNA3' : [26.72,25.68]}
+PRICE_ALERT = {'MGLU3' : [6.05,5.92]}
+HLINES = {}
 def williams_fractal_bullish(df):
     
     signal = []
@@ -129,6 +129,7 @@ def strategy(ticket,mavs,time1):
         data.append(datum)
         
 def check_price(price, ticket, df):
+    
     if price >= df['low'][-1] and price <= df['high'][-1]:
             notify(ticket,3,df.index[-1])
             del PRICE_ALERT[ticket]

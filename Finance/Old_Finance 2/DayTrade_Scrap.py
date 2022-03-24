@@ -21,7 +21,7 @@ import Utils as utils
 ##window.localStorage.setItem('info2',a)
 ##window.localStorage.getItem('info')
 
-MY_TICKETS = ['MGLU3', 'CSNA3', 'PETR4']
+MY_TICKETS = ['MGLU3', 'CSNA3', 'PETR4', 'BRFS3']
 PICKLE_FILE = 'btc_tickers.plk'
 URL = "https://rico.com.vc/arealogada/home-broker"
 
@@ -120,10 +120,10 @@ def scrap_rico():
     driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
     driver.get(URL) 
 
-    if os.path.exists(PICKLE_FILE):
-       os.remove(PICKLE_FILE)
-    get_localstorage(driver,df_btc['Papel'],'1min')
-    get_localstorage(driver,df_btc['Papel'],'5min')
+##    if os.path.exists(PICKLE_FILE):
+##       os.remove(PICKLE_FILE)
+##    get_localstorage(driver,df_btc['Papel'],'1min')
+##    get_localstorage(driver,df_btc['Papel'],'5min')
     input('Wait ...')
     while(True):
 
