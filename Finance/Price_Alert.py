@@ -14,7 +14,7 @@ import sys
 color = sys.stdout.shell
 PRICE_ALERT = 'Price_Alert.txt' # write the price interval
 URL = "https://rico.com.vc/arealogada/home-broker"
-
+b_list = []
 
 def price_alert():
     if os.path.exists(PRICE_ALERT):
@@ -32,12 +32,15 @@ def price_alert():
                    json.dump(data, f) 
 
 def notify(ticket, time1):
-    path1 = 'Utils/' + ticket + '.mp3'    
-    utils.play(ticket,path1,'pt-br')
-    path1 = 'Utils/Strike.mp3'
-    utils.play('Strike',path1,'en-us')
-    color.write('(' + time1 + ') ** ' + ticket + ' **\n','KEYWORD')
-    
+    global b_list
+    if ticket not in b_list:
+        path1 = 'Utils/' + ticket + '.mp3'    
+        utils.play(ticket,path1,'pt-br')
+        path1 = 'Utils/Strike.mp3'
+        utils.play('Strike',path1,'en-us')
+        color.write('(' + time1 + ') ** ' + ticket + ' **\n','KEYWORD')
+        b_list.append(ticket)
+        
 def get_page_source(driver):
    try :
        return driver.page_source       
@@ -74,40 +77,42 @@ def scrap_rico():
         df['Abertura'] = df['Abertura']/100
        
         price_alert()
-
+        global b_list
         for index, row in df.iterrows():
-            if row['Ativo'] != 'IBOV':
+            if row['Ativo'] != 'IBOV' and row['Ativo'] not in b_list:
                 
                 length = row['Máximo'] - row['Mínimo']
+
+                if length >= 0.35:
                 
-                if row['Último'] > row['Abertura']:                   
+                    if row['Último'] > row['Abertura']:                   
 
-                    fib618 = row['Máximo'] - length*0.618
+                        fib618 = row['Máximo'] - length*0.618
 
-                    fib50 = row['Máximo'] - length*0.5
+                        fib50 = row['Máximo'] - length*0.5
 
-                    fib382 = row['Máximo'] - length*0.382
+                        fib382 = row['Máximo'] - length*0.382
 
-                    if row['Último'] < fib382 and row['Último'] > fib618:
-                        notify(row['Ativo'],row['Data/Hora'])
-                        print('Fibonacci Levels:\n')
-                        for i,j in enumerate([0.00, -0.272, -0.618, -1.618]):
-                            print('Level {} : {}'.format(i,row['Máximo'] - length*j))
+                        if row['Último'] < fib382 and row['Último'] > fib618:
+                            notify(row['Ativo'],row['Data/Hora'])
+                            print('Fibonacci Levels:\n')
+                            for i,j in enumerate([0.00, -0.272, -0.618, -1.618]):
+                                print('Level {} : {}'.format(i,row['Máximo'] - length*j))
 
-                else:
+                    else:
 
-                    fib618 = row['Mínimo'] + length*0.618
+                        fib618 = row['Mínimo'] + length*0.618
 
-                    fib50 = row['Mínimo'] + length*0.5
+                        fib50 = row['Mínimo'] + length*0.5
 
-                    fib382 = row['Mínimo'] + length*0.382
+                        fib382 = row['Mínimo'] + length*0.382
 
-                    if row['Último'] > fib382 and row['Último'] < fib618:
-                        notify(row['Ativo'],row['Data/Hora'])
-                        print('Fibonacci Levels:\n')
-                        for i,j in enumerate([0.00, -0.272, -0.618, -1.618]):
-                            print('Level {} : {}'.format(i,row['Mínimo'] + length*j))
-        
+                        if row['Último'] > fib382 and row['Último'] < fib618:
+                            notify(row['Ativo'],row['Data/Hora'])
+                            print('Fibonacci Levels:\n')
+                            for i,j in enumerate([0.00, -0.272, -0.618, -1.618]):
+                                print('Level {} : {}'.format(i,row['Mínimo'] + length*j))
+            
         time.sleep(3)
 
 
