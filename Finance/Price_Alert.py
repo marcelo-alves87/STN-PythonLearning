@@ -11,6 +11,7 @@ from selenium.common.exceptions import WebDriverException
 import Utils as utils
 import sys
 import DayTrade as dtr
+import datetime as dt
 
 color = sys.stdout.shell
 PRICE_ALERT = 'Price_Alert.txt' # write the price interval
@@ -18,6 +19,15 @@ URL = "https://rico.com.vc/arealogada/home-broker"
 b_list = []
 THRESHOLD = 0.2 #20 centavos
 
+def to_str(date):
+    return date.strftime('%H:%M')
+
+def check_leverages_tickers(df,leverage):
+    df3 = df.merge(leverage, left_on=['Ativo'], right_on=['Papel'], how='outer')
+    list1 = df3[df3['Ativo'].isnull()]['Papel'].to_list()
+    if len(list1) > 0:
+        color.write('** The following tickers arent in Rico table (' + ','.join(str(x) for x in list1) + ') **\n','COMMENT')
+        
 def price_alert():
     if os.path.exists(PRICE_ALERT):
        with open(PRICE_ALERT) as f:
@@ -44,7 +54,7 @@ def notify(ticket, time1):
         b_list.append(ticket)
 
 def warning(ticket):
-    color.write('** ' + ticket + ' ** not in leverage set\n','COMMENT')
+    color.write('** ' + ticket + ' ** isnt in leverage set\n','COMMENT')
     
 def get_page_source(driver):
    try :
@@ -55,6 +65,7 @@ def get_page_source(driver):
 
 def scrap_rico():
     main_df = pd.DataFrame()
+    #main_df = pd.read_pickle('df.pkl')
     leverage = dtr.get_leverage_btc(True)  
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
@@ -90,18 +101,25 @@ def scrap_rico():
             main_df = pd.concat([main_df, df])
 
         price_alert()
-        
+        check_leverages_tickers(main_df,leverage)
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         
         for name in groups.index.unique():
-            df_ticket = groups.loc[name][::-1]
-            for i in range(len(df_ticket)):
-                if (df_ticket[:i+1]['low'].is_monotonic_decreasing or df_ticket[:i+1]['high'].is_monotonic_increasing):
-                    pdb.set_trace()
-                    if abs(df_ticket[:i+1].iloc[-1]['close'] - df_ticket[:i+1].iloc[0]['close']) >= THRESHOLD:
-                        notify(name, df_ticket.iloc[0]['Data/Hora']) 
-                        break
+            if name == 'IBOV':
+                pass
+            elif not (leverage['Papel'] == name).any():
+                warning(name)
+                main_df = main_df.drop(main_df[main_df['Ativo'] == name].index)
+            else:    
+                df_ticket = groups.loc[name][::-1]
+                for i in range(len(df_ticket)):
+                      df_i = df_ticket.iloc[:i+1]
+                      if 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
+                          if df_i['low'].is_monotonic_decreasing or df_i['high'].is_monotonic_increasing:
+                            if abs(df_i.iloc[-1]['close'] - df_i.iloc[0]['close']) >= THRESHOLD:
+                                notify(name, to_str(df_i.iloc[0]['Data/Hora'])) 
+                                
         time.sleep(3)
 
 
