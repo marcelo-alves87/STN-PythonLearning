@@ -17,7 +17,7 @@ color = sys.stdout.shell
 PRICE_ALERT = 'Price_Alert.txt' # write the price interval
 URL = "https://rico.com.vc/arealogada/home-broker"
 b_list = []
-THRESHOLD = 0.2 #20 centavos
+THRESHOLD = 0.02 #2%
 
 def to_str(date):
     return date.strftime('%H:%M')
@@ -116,8 +116,13 @@ def scrap_rico():
                 for i in range(len(df_ticket)):
                       df_i = df_ticket.iloc[:i+1]
                       if 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
-                          if df_i['low'].is_monotonic_decreasing or df_i['high'].is_monotonic_increasing:
-                            if abs(df_i.iloc[-1]['close'] - df_i.iloc[0]['close']) >= THRESHOLD:
+                          if df_i['low'].is_monotonic_decreasing:                                
+                            if ((df_i.iloc[0]['close']/df_i.iloc[-1]['close']) - 1) >= THRESHOLD:
+                                pdb.set_trace()
+                                notify(name, to_str(df_i.iloc[0]['Data/Hora'])) 
+                          elif df_i['high'].is_monotonic_increasing:
+                            if ((df_i.iloc[-1]['close']/df_i.iloc[0]['close']) - 1) >= THRESHOLD:
+                                pdb.set_trace()
                                 notify(name, to_str(df_i.iloc[0]['Data/Hora'])) 
                                 
         time.sleep(3)
