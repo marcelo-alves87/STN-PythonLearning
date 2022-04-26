@@ -12,12 +12,15 @@ import Utils as utils
 import sys
 import DayTrade as dtr
 import datetime as dt
+import pickle
 
 color = sys.stdout.shell
+MAIN_DF_FILE = 'main_df.plk'
 PRICE_ALERT = 'Price_Alert.txt' # write the price interval
+TREND_ALERT = 'Trend_Alert.txt' # write the price interval
 URL = "https://rico.com.vc/arealogada/home-broker"
-THRESHOLD = 0.02 #2%
-
+THRESHOLD = 0.015 #1.5%
+b_list = []
 def to_str(date):
     return date.strftime('%H:%M')
 
@@ -42,21 +45,37 @@ def price_alert():
                 with open(PRICE_ALERT, 'w') as f:
                    json.dump(data, f) 
 
-def notify(ticket, time1, type1='None'):
-    global b_list
-    if ticket not in b_list:
-        path1 = 'Utils/' + ticket + '.mp3'    
-        utils.play(ticket,path1,'pt-br')
-        path1 = 'Utils/Strike.mp3'
-        utils.play('Strike',path1,'en-us')
-        if type1 == 'None':
-            color.write('(' + time1 + ') ** ' + ticket + ' **\n','KEYWORD')
-        elif type1 == 'Bull':
-            color.write('(' + time1 + ') ** ' + ticket + ' **\n','STRING')
-        elif type1 == 'Bear':
-            color.write('(' + time1 + ') ** ' + ticket + ' **\n','COMMENT')
-        b_list.append(ticket)
+def notify_trend_append(ticket,time1,type1, max1, min1,data):
+       notify(ticket,time1,type1)
+       dict1 = {ticket: [max1,min1]}
+       data.update(dict1)
+       with open(TREND_ALERT, 'w') as f:
+           json.dump(data, f) 
+       
 
+def notify_trend(ticket,time1,type1, max1, min1):
+    if os.path.exists(TREND_ALERT):
+        with open (TREND_ALERT, 'rb') as f:
+            data = json.load(f)
+            if ticket in data:  
+                pass
+            else:
+                notify_trend_append(ticket,time1,type1,max1,min1,data) 
+    else:
+       notify_trend_append(ticket,time1,type1,max1,min1,{})
+       
+def notify(ticket, time1, type1='None'):
+    path1 = 'Utils/' + ticket + '.mp3'    
+    utils.play(ticket,path1,'pt-br')
+    path1 = 'Utils/Strike.mp3'
+    utils.play('Strike',path1,'en-us')
+    if type1 == 'None':
+        color.write('(' + time1 + ') ** ' + ticket + ' **\n','KEYWORD')
+    elif type1 == 'Bull':
+        color.write('(' + time1 + ') ** ' + ticket + ' **\n','STRING')
+    elif type1 == 'Bear':
+        color.write('(' + time1 + ') ** ' + ticket + ' **\n','COMMENT')
+    
 def warning(ticket):
     color.write('** ' + ticket + ' ** isnt in leverage set\n','COMMENT')
     
@@ -68,8 +87,13 @@ def get_page_source(driver):
        return get_page_source(driver)
 
 def scrap_rico():
-    main_df = pd.DataFrame()
+    if os.path.exists(MAIN_DF_FILE):
+        main_df = pd.read_pickle(MAIN_DF_FILE)
+    else:
+        main_df = pd.DataFrame()
     #main_df = pd.read_pickle('df.pkl')
+    if os.path.exists(TREND_ALERT):
+        os.remove(TREND_ALERT)
     leverage = dtr.get_leverage_btc(True)  
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
@@ -94,7 +118,7 @@ def scrap_rico():
         df['Máximo'] = df['Máximo']/100
         df['Mínimo'] = df['Mínimo']/100
         df['Abertura'] = df['Abertura']/100
-
+        
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'])
         df.set_index('Data/Hora',inplace=True)
 
@@ -102,7 +126,8 @@ def scrap_rico():
             main_df = df
         else:
             main_df = pd.concat([main_df, df])
-
+            main_df.to_pickle(MAIN_DF_FILE)
+        
         price_alert()
         check_leverages_tickers(main_df,leverage)
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
@@ -121,15 +146,16 @@ def scrap_rico():
                       if len(df_i) > 1 and 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
                           if df_i['low'].is_monotonic_decreasing:
                             if ((df_i.iloc[0]['close']/df_i.iloc[-1]['close']) - 1) >= THRESHOLD:
-                                notify(name, to_str(df_i.iloc[0]['Data/Hora']), 'Bull') 
+                                notify_trend(name, to_str(df_i.iloc[0]['Data/Hora']), 'Bull', df_i.iloc[0]['close'], df_i.iloc[-1]['close']) 
                           elif df_i['high'].is_monotonic_increasing:                            
                             if ((df_i.iloc[-1]['close']/df_i.iloc[0]['close']) - 1) >= THRESHOLD:
-                                notify(name, to_str(df_i.iloc[0]['Data/Hora']), 'Bear') 
+                                notify_trend(name, to_str(df_i.iloc[0]['Data/Hora']), 'Bear', df_i.iloc[-1]['close'], df_i.iloc[0]['close']) 
 
                                
         time.sleep(3)
 
 scrap_rico()
+#
 
 ##139082
 ##window.localStorage.setItem('data',JSON.stringify(t))
