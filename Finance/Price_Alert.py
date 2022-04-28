@@ -19,8 +19,9 @@ MAIN_DF_FILE = 'main_df.plk'
 PRICE_ALERT = 'Price_Alert.txt' # write the price interval
 TREND_ALERT = 'Trend_Alert.txt' # write the price interval
 URL = "https://rico.com.vc/arealogada/home-broker"
-THRESHOLD = 0.015 #1.5%
-b_list = []
+THRESHOLD = 0.01 #1%
+
+
 def to_str(date):
     return date.strftime('%H:%M')
 
@@ -40,45 +41,48 @@ def price_alert():
              value = df2.iloc[-1]['Último']
              time1 = df2.iloc[-1]['Data/Hora']
              if value >= interval[0] or value <= interval[1]:
-                notify(ticket,time1)
+                warning(ticket,time1) 
+                notify(ticket)
                 data.pop(ticket, None)
                 with open(PRICE_ALERT, 'w') as f:
                    json.dump(data, f) 
 
-def notify_trend_append(ticket,time1,type1, max1, min1,data):
-       notify(ticket,time1,type1)
-       dict1 = {ticket: [max1,min1]}
-       data.update(dict1)
+def warning_trend_append(ticket,time1,type1, max1, min1,trends):
+       warning(ticket,time1,type1)
+       dict1 = {ticket: { 'Prices' : [max1,min1], 'Type' : type1 }}
+       trends.update(dict1)
        with open(TREND_ALERT, 'w') as f:
-           json.dump(data, f) 
-       
+           json.dump(trends, f) 
 
-def notify_trend(ticket,time1,type1, max1, min1):
-    if os.path.exists(TREND_ALERT):
-        with open (TREND_ALERT, 'rb') as f:
-            data = json.load(f)
-            if ticket in data:  
-                pass
-            else:
-                notify_trend_append(ticket,time1,type1,max1,min1,data) 
-    else:
-       notify_trend_append(ticket,time1,type1,max1,min1,{})
-       
-def notify(ticket, time1, type1='None'):
+def warning(ticket,time1,type1=None):
+    if type1 is None:
+        color.write('(' + to_str(time1) + ') ** ' + ticket + ' **\n','KEYWORD')
+    elif type1 == 'Bull':
+        color.write('(' + to_str(time1) + ') ** ' + ticket + ' **\n','STRING')
+    elif type1 == 'Bear':
+        color.write('(' + to_str(time1) + ') ** ' + ticket + ' **\n','COMMENT')
+        
+def notify(ticket):
     path1 = 'Utils/' + ticket + '.mp3'    
     utils.play(ticket,path1,'pt-br')
     path1 = 'Utils/Strike.mp3'
     utils.play('Strike',path1,'en-us')
-    if type1 == 'None':
-        color.write('(' + time1 + ') ** ' + ticket + ' **\n','KEYWORD')
-    elif type1 == 'Bull':
-        color.write('(' + time1 + ') ** ' + ticket + ' **\n','STRING')
-    elif type1 == 'Bear':
-        color.write('(' + time1 + ') ** ' + ticket + ' **\n','COMMENT')
     
-def warning(ticket):
+    
+def warning_(ticket):
     color.write('** ' + ticket + ' ** isnt in leverage set\n','COMMENT')
-    
+
+def update_trend(name,dict1,trends):
+    del trends[name]                    
+    trends.update(dict1)
+    with open(TREND_ALERT, 'w') as f:
+        json.dump(trends, f)
+
+def remove_trend(name,trends):
+    del trends[name]     
+    with open(TREND_ALERT, 'w') as f:
+        json.dump(trends, f)
+        
 def get_page_source(driver):
    try :
        return driver.page_source       
@@ -91,9 +95,8 @@ def scrap_rico():
         main_df = pd.read_pickle(MAIN_DF_FILE)
     else:
         main_df = pd.DataFrame()
-    #main_df = pd.read_pickle('df.pkl')
-    if os.path.exists(TREND_ALERT):
-        os.remove(TREND_ALERT)
+##    if os.path.exists(TREND_ALERT):
+##        os.remove(TREND_ALERT)
     leverage = dtr.get_leverage_btc(True)  
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
@@ -132,13 +135,51 @@ def scrap_rico():
         check_leverages_tickers(main_df,leverage)
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
-
+        trends = {}
+        if os.path.exists(TREND_ALERT):
+            with open (TREND_ALERT, 'rb') as f:
+                trends = json.load(f)
+                
+        
         for name in groups.index.unique():
             if name == 'IBOV':
                 pass
             elif not (leverage['Papel'] == name).any():
-                warning(name)
+                warning_(name)
                 main_df = main_df.drop(main_df[main_df['Ativo'] == name].index)
+            elif name in trends:
+                df_ticket = groups.loc[name]
+                df_i = df_ticket.iloc[-1]
+
+                if trends[name]['Type'] == 'Bull' and df_i['close'] > trends[name]['Prices'][0]:
+                    trends[name]['Prices'][0] = df_i['close']
+                    dict1 = {name : trends[name]}
+                    update_trend(name,dict1,trends)
+                elif trends[name]['Type'] == 'Bear' and df_i['close'] < trends[name]['Prices'][1]:
+                    trends[name]['Prices'][1] = df_i['close']
+                    dict1 = {name : trends[name]}
+                    update_trend(name,dict1,trends)
+                elif trends[name]['Type'] == 'Bull':
+                     length = trends[name]['Prices'][0] - trends[name]['Prices'][1]
+                     fib618 = trends[name]['Prices'][0] - length*0.618
+                     fib50 = trends[name]['Prices'][0] - length*0.5
+                     fib382 = trends[name]['Prices'][0] - length*0.382
+
+                     if df_i['close'] < fib382 and df_i['close'] > fib618:
+                         remove_trend(name,trends)
+                         notify(name)
+                         warning(name,df_i['Data/Hora'])
+                         
+                elif trends[name]['Type'] == 'Bear':
+                     length = trends[name]['Prices'][0] - trends[name]['Prices'][1]
+                     fib618 = trends[name]['Prices'][1] + length*0.618
+                     fib50 = trends[name]['Prices'][1] + length*0.5
+                     fib382 = trends[name]['Prices'][1] + length*0.382
+
+                     if df_i['close'] > fib382 and df_i['close'] < fib618:
+                         remove_trend(name,trends)
+                         notify(name)
+                         warning(name,df_i['Data/Hora'])
             else:    
                 df_ticket = groups.loc[name][::-1]
                 for i in range(len(df_ticket)):
@@ -146,15 +187,16 @@ def scrap_rico():
                       if len(df_i) > 1 and 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
                           if df_i['low'].is_monotonic_decreasing:
                             if ((df_i.iloc[0]['close']/df_i.iloc[-1]['close']) - 1) >= THRESHOLD:
-                                notify_trend(name, to_str(df_i.iloc[0]['Data/Hora']), 'Bull', df_i.iloc[0]['close'], df_i.iloc[-1]['close']) 
+                                warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bull', df_i.iloc[0]['close'], df_i.iloc[-1]['close'],trends) 
                           elif df_i['high'].is_monotonic_increasing:                            
                             if ((df_i.iloc[-1]['close']/df_i.iloc[0]['close']) - 1) >= THRESHOLD:
-                                notify_trend(name, to_str(df_i.iloc[0]['Data/Hora']), 'Bear', df_i.iloc[-1]['close'], df_i.iloc[0]['close']) 
+                                warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bear', df_i.iloc[-1]['close'], df_i.iloc[0]['close'],trends) 
 
                                
         time.sleep(3)
 
 scrap_rico()
+#pdb.set_trace()        
 #
 
 ##139082
