@@ -64,7 +64,7 @@ def warning(ticket,time1,type1=None,targets=None):
         color.write('(' + to_str(time1) + ') ** ' + ticket + ' **\n','COMMENT')
     if targets is not None:
         for i,j in enumerate(targets):
-            color.write(ticket + ' ( Target ' + str(i+1) + '): ' + str(j) + '\n','COMMENT')
+            color.write(ticket + ' ( Target ' + str(i+1) + '): ' + str(j) + '\n','KEYWORD')
             
 def notify(ticket):
     path1 = 'Utils/' + ticket + '.mp3'    
