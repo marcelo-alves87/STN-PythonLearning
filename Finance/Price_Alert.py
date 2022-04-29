@@ -16,12 +16,12 @@ import pickle
 
 color = sys.stdout.shell
 MAIN_DF_FILE = 'main_df.plk'
+CONFIG = 'config.txt'
 PRICE_ALERT = 'Price_Alert.txt' # write the price interval
 TREND_ALERT = 'Trend_Alert.txt' # write the price interval
 URL = "https://rico.com.vc/arealogada/home-broker"
-THRESHOLD = 0.01 #1%
 MY_TARGETS = [0.00, -0.272, -0.618, -1.618]
-b_list = ['IBOV']
+
 def to_str(date):
     return date.strftime('%H:%M')
 
@@ -55,7 +55,7 @@ def warning_trend_append(ticket,time1,type1, max1, min1,trends):
        with open(TREND_ALERT, 'w') as f:
            json.dump(trends, f) 
 
-def warning(ticket,time1,type1=None,targets=None):
+def warning(ticket,time1,type1=None,targets=None,prices=None):
     if type1 is None:
         color.write('(' + to_str(time1) + ') ** ' + ticket + ' **\n','KEYWORD')
     elif type1 == 'Bull':
@@ -64,7 +64,7 @@ def warning(ticket,time1,type1=None,targets=None):
         color.write('(' + to_str(time1) + ') ** ' + ticket + ' **\n','COMMENT')
     if targets is not None:
         for i,j in enumerate(targets):
-            color.write(ticket + ' ( Target ' + str(i+1) + '): ' + str(j) + '\n','KEYWORD')
+            color.write(ticket + '[' + str(prices[0]) + ', ' + str(prices[1]) + '] ( Target ' + str(i+1) + '): ' + str(j) + '\n','KEYWORD')
             
 def notify(ticket):
     path1 = 'Utils/' + ticket + '.mp3'    
@@ -111,7 +111,11 @@ def scrap_rico():
     driver.switch_to.window(driver.window_handles[1])
     print('Running ...')
     while(True):
-        
+        with open(CONFIG) as f:
+         config = json.load(f)
+        THRESHOLD = config['THRESHOLD']
+        b_list = config['b_list']
+        driver.execute_script("document.getElementById('app-menu').click()")
         html = get_page_source(driver)   
         soup = BeautifulSoup(html, features='lxml')
 
@@ -174,7 +178,7 @@ def scrap_rico():
                          targets = []
                          for i in MY_TARGETS:
                              targets.append(trends[name]['Prices'][0] - length*i)
-                         warning(name,df_i['Data/Hora'],'Bull',targets)
+                         warning(name,df_i['Data/Hora'],'Bull',targets,trends[name]['Prices'])
                          remove_trend(name,trends)
                         
                 elif trends[name]['Type'] == 'Bear':
@@ -188,7 +192,7 @@ def scrap_rico():
                          targets = []
                          for i in MY_TARGETS:
                              targets.append(trends[name]['Prices'][1] + length*i)
-                         warning(name,df_i['Data/Hora'],'Bear',targets)
+                         warning(name,df_i['Data/Hora'],'Bear',targets,trends[name]['Prices'])
                          remove_trend(name,trends)
                          
             else:    
