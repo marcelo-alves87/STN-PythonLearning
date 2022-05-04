@@ -64,7 +64,7 @@ def warning(ticket,time1,type1=None,targets=None,prices=None):
         color.write('(' + to_str(time1) + ') ** ' + ticket + ' **\n','COMMENT')
     if targets is not None:
         for i,j in enumerate(targets):
-            color.write(ticket +  ' [' + type1  + '] [' + str(prices[0]) + ', ' + str(prices[1]) + ': ' + str(round(((prices[0]/prices[1]) - 1),2)*100)  + '%] ( Target ' + str(i+1) + '): ' + str(j) + '\n','KEYWORD')
+            color.write(ticket + ' (' + to_str(time1) + ') [' + type1  + '] [' + str(prices[0]) + ', ' + str(prices[1]) + ': ' + str(round(((prices[0]/prices[1]) - 1),2)*100)  + '%] ( Target ' + str(i+1) + '): ' + str(round(j,2)) + '\n','KEYWORD')
             
 def notify(ticket):
     path1 = 'Utils/' + ticket + '.mp3'    
@@ -86,6 +86,9 @@ def remove_trend(name,trends):
     del trends[name]     
     with open(TREND_ALERT, 'w') as f:
         json.dump(trends, f)
+    b_list.append(name)
+    with open(CONFIG, 'w') as f:
+         json.dump({'THRESHOLD' : THRESHOLD, 'b_list' : b_list, 'TREND_SIZE' : TREND_SIZE}, f)    
         
 def get_page_source(driver):
    try :
@@ -94,13 +97,93 @@ def get_page_source(driver):
        time.sleep(1)
        return get_page_source(driver)
 
+def define_config():
+    global THRESHOLD, b_list, TREND_SIZE
+    with open(CONFIG) as f:
+         config = json.load(f)
+    THRESHOLD = config['THRESHOLD']
+    b_list = config['b_list']
+    TREND_SIZE = config['TREND_SIZE']
+
+def analysis_data(main_df,leverage=None):
+    if not main_df.empty:
+        price_alert(main_df)
+        if leverage is not None:
+            check_leverages_tickers(main_df,leverage)
+        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+        groups.reset_index('Data/Hora',inplace=True)
+        trends = {}
+        if os.path.exists(TREND_ALERT):
+            with open (TREND_ALERT, 'rb') as f:
+                trends = json.load(f)
+        define_config()
+        for name in groups.index.unique():
+            if name in b_list:
+                pass
+            elif leverage is not None and not (leverage['Papel'] == name).any():
+                warning_(name)
+                main_df = main_df.drop(main_df[main_df['Ativo'] == name].index)
+            elif name in trends:
+                df_ticket = groups.loc[name]
+                df_i = df_ticket.iloc[-1]
+
+                if trends[name]['Type'] == 'Bull' and df_i['high'] > trends[name]['Prices'][0]:
+                    trends[name]['Prices'][0] = df_i['high']
+                    dict1 = {name : trends[name]}
+                    update_trend(name,dict1,trends)
+                elif trends[name]['Type'] == 'Bear' and df_i['low'] < trends[name]['Prices'][1]:
+                    trends[name]['Prices'][1] = df_i['low']
+                    dict1 = {name : trends[name]}
+                    update_trend(name,dict1,trends)
+                elif trends[name]['Type'] == 'Bull':
+                     length = trends[name]['Prices'][0] - trends[name]['Prices'][1]
+                     fib618 = trends[name]['Prices'][0] - length*0.618
+                     fib50 = trends[name]['Prices'][0] - length*0.5
+                     fib382 = trends[name]['Prices'][0] - length*0.382
+
+                     if df_i['low'] < fib382 and df_i['low'] > fib618:
+                         notify(name)
+                         targets = []
+                         for i in MY_TARGETS:
+                             targets.append(trends[name]['Prices'][0] - length*i)
+                         warning(name,df_i['Data/Hora'],'Bull',targets,trends[name]['Prices'])
+                         remove_trend(name,trends)
+                        
+                elif trends[name]['Type'] == 'Bear':
+                     length = trends[name]['Prices'][0] - trends[name]['Prices'][1]
+                     fib618 = trends[name]['Prices'][1] + length*0.618
+                     fib50 = trends[name]['Prices'][1] + length*0.5
+                     fib382 = trends[name]['Prices'][1] + length*0.382
+
+                     if df_i['high'] > fib382 and df_i['high'] < fib618:
+                         notify(name)
+                         targets = []
+                         for i in MY_TARGETS:
+                             targets.append(trends[name]['Prices'][1] + length*i)
+                         warning(name,df_i['Data/Hora'],'Bear',targets,trends[name]['Prices'])
+                         remove_trend(name,trends)
+                         
+            else:
+                df_ticket = groups.loc[name][::-1]
+                if len(df_ticket) >= TREND_SIZE:
+                    for i in range(len(df_ticket)):
+                          df_i = df_ticket.iloc[:i+1]
+                          if len(df_i) > 1 and 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
+                              if df_i['low'].is_monotonic_decreasing:
+                                if ((df_i.iloc[0]['high']/df_i.iloc[-1]['low']) - 1) >= THRESHOLD:
+                                    warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bull', df_i.iloc[0]['high'], df_i.iloc[-1]['low'],trends)
+                                    break
+                              elif df_i['high'].is_monotonic_increasing:                            
+                                if ((df_i.iloc[-1]['high']/df_i.iloc[0]['low']) - 1) >= THRESHOLD:
+                                    warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bear', df_i.iloc[-1]['high'], df_i.iloc[0]['low'],trends)
+                                    break
+
 def scrap_rico():
     if os.path.exists(MAIN_DF_FILE):
         main_df = pd.read_pickle(MAIN_DF_FILE)
     else:
         main_df = pd.DataFrame()
-##    if os.path.exists(TREND_ALERT):
-##        os.remove(TREND_ALERT)
+    
     leverage = dtr.get_leverage_btc(True)  
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
@@ -111,10 +194,7 @@ def scrap_rico():
     driver.switch_to.window(driver.window_handles[1])
     print('Running ...')
     while(True):
-        with open(CONFIG) as f:
-         config = json.load(f)
-        THRESHOLD = config['THRESHOLD']
-        b_list = config['b_list']
+        
         driver.execute_script("document.getElementById('app-menu').click()")
         html = get_page_source(driver)   
         soup = BeautifulSoup(html, features='lxml')
@@ -138,81 +218,34 @@ def scrap_rico():
         else:
             main_df = pd.concat([main_df, df])
             main_df.to_pickle(MAIN_DF_FILE)
-        
-        price_alert(main_df)
-        check_leverages_tickers(main_df,leverage)
-        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-        groups.reset_index('Data/Hora',inplace=True)
-        trends = {}
-        if os.path.exists(TREND_ALERT):
-            with open (TREND_ALERT, 'rb') as f:
-                trends = json.load(f)
-                
-        
-        for name in groups.index.unique():
-            if name in b_list:
-                pass
-            elif not (leverage['Papel'] == name).any():
-                warning_(name)
-                main_df = main_df.drop(main_df[main_df['Ativo'] == name].index)
-            elif name in trends:
-                df_ticket = groups.loc[name]
-                df_i = df_ticket.iloc[-1]
 
-                if trends[name]['Type'] == 'Bull' and df_i['high'] > trends[name]['Prices'][0]:
-                    trends[name]['Prices'][0] = df_i['high']
-                    dict1 = {name : trends[name]}
-                    update_trend(name,dict1,trends)
-                elif trends[name]['Type'] == 'Bear' and df_i['low'] < trends[name]['Prices'][1]:
-                    trends[name]['Prices'][1] = df_i['low']
-                    dict1 = {name : trends[name]}
-                    update_trend(name,dict1,trends)
-                elif trends[name]['Type'] == 'Bull':
-                     length = trends[name]['Prices'][0] - trends[name]['Prices'][1]
-                     fib618 = trends[name]['Prices'][0] - length*0.618
-                     fib50 = trends[name]['Prices'][0] - length*0.5
-                     fib382 = trends[name]['Prices'][0] - length*0.382
-
-                     if df_i['close'] < fib382 and df_i['close'] > fib618:
-                         notify(name)
-                         targets = []
-                         for i in MY_TARGETS:
-                             targets.append(trends[name]['Prices'][0] - length*i)
-                         warning(name,df_i['Data/Hora'],'Bull',targets,trends[name]['Prices'])
-                         remove_trend(name,trends)
-                        
-                elif trends[name]['Type'] == 'Bear':
-                     length = trends[name]['Prices'][0] - trends[name]['Prices'][1]
-                     fib618 = trends[name]['Prices'][1] + length*0.618
-                     fib50 = trends[name]['Prices'][1] + length*0.5
-                     fib382 = trends[name]['Prices'][1] + length*0.382
-
-                     if df_i['close'] > fib382 and df_i['close'] < fib618:
-                         notify(name)
-                         targets = []
-                         for i in MY_TARGETS:
-                             targets.append(trends[name]['Prices'][1] + length*i)
-                         warning(name,df_i['Data/Hora'],'Bear',targets,trends[name]['Prices'])
-                         remove_trend(name,trends)
-                         
-            else:    
-                df_ticket = groups.loc[name][::-1]
-                for i in range(len(df_ticket)):
-                      df_i = df_ticket.iloc[:i+1]
-                      if len(df_i) > 1 and 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
-                          if df_i['low'].is_monotonic_decreasing:
-                            if ((df_i.iloc[0]['high']/df_i.iloc[-1]['low']) - 1) >= THRESHOLD:
-                                warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bull', df_i.iloc[0]['high'], df_i.iloc[-1]['low'],trends)
-                                break
-                          elif df_i['high'].is_monotonic_increasing:                            
-                            if ((df_i.iloc[-1]['high']/df_i.iloc[0]['low']) - 1) >= THRESHOLD:
-                                warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bear', df_i.iloc[-1]['high'], df_i.iloc[0]['low'],trends)
-                                break
+        analysis_data(main_df,leverage)
 
                                
         time.sleep(3)
 
+def test():
+    if os.path.exists(MAIN_DF_FILE):
+        main_df = pd.read_pickle(MAIN_DF_FILE)
+
+    if os.path.exists(TREND_ALERT):
+            os.remove(TREND_ALERT)
+
+    index = min(main_df.index)
+    max_index = max(main_df.index)
+
+    while index < max_index:
+        
+        df = main_df[main_df.index < index]
+        analysis_data(df)
+        index += dt.timedelta(minutes=1) 
+
+        #time.sleep(3)
+
 scrap_rico()
+
+
+    
 #pdb.set_trace()        
 #
 ## how to scrap rico data
