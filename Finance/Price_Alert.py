@@ -165,18 +165,19 @@ def analysis_data(main_df,leverage=None):
                          
             else:
                 df_ticket = groups.loc[name][::-1]
-                if len(df_ticket) >= TREND_SIZE:
-                    for i in range(len(df_ticket)):
-                          df_i = df_ticket.iloc[:i+1]
-                          if len(df_i) > 1 and 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
-                              if df_i['low'].is_monotonic_decreasing:
-                                if ((df_i.iloc[0]['high']/df_i.iloc[-1]['low']) - 1) >= THRESHOLD:
-                                    warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bull', df_i.iloc[0]['high'], df_i.iloc[-1]['low'],trends)
-                                    break
-                              elif df_i['high'].is_monotonic_increasing:                            
-                                if ((df_i.iloc[-1]['high']/df_i.iloc[0]['low']) - 1) >= THRESHOLD:
-                                    warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bear', df_i.iloc[-1]['high'], df_i.iloc[0]['low'],trends)
-                                    break
+                
+                for i in range(len(df_ticket)):
+                      df_i = df_ticket.iloc[:i+1]
+                  
+                      if len(df_i) >= TREND_SIZE and 'low' in df_i and 'high' in df_i and not isinstance(df_i['low'],float) and not isinstance(df_i['high'],float):                      
+                          if df_i['low'].is_monotonic_decreasing:
+                            if ((df_i.iloc[0]['high']/df_i.iloc[-1]['low']) - 1) >= THRESHOLD:
+                                warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bull', df_i.iloc[0]['high'], df_i.iloc[-1]['low'],trends)
+                                break
+                          elif df_i['high'].is_monotonic_increasing:                            
+                            if ((df_i.iloc[-1]['high']/df_i.iloc[0]['low']) - 1) >= THRESHOLD:
+                                warning_trend_append(name, df_i.iloc[0]['Data/Hora'], 'Bear', df_i.iloc[-1]['high'], df_i.iloc[0]['low'],trends)
+                                break
 
 def scrap_rico():
     if os.path.exists(MAIN_DF_FILE):
