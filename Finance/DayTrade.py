@@ -4,7 +4,7 @@ import pdb
 
 LEVERAGE_FILE = 'Alavancagem_Rico.txt'
 MAX_LEVERAGE = 5 # 5%
-BTC_FILE = 'BTC Rico 03-05-2022-9yc.pdf'
+BTC_FILE = 'BTC Rico 05-05-2022-Pq8.pdf'
 
 def get_leverage_tickers():
     tickers = []
