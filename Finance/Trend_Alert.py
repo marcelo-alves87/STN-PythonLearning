@@ -15,6 +15,8 @@ import datetime as dt
 import pickle
 
 THRESHOLD = 0.98
+BULLISH_TRENDS = 'Bullish_Trends.txt'
+BEARISH_TRENDS = 'Bearish_Trends.txt'
 MAIN_DF_FILE = 'main_df.pickle'
 URL = "https://rico.com.vc/"
 bullish_trends = {}
@@ -29,6 +31,11 @@ def get_page_source(driver):
 
 def verify_trends(main_df):
     if not main_df.empty:
+
+        with open (BULLISH_TRENDS, 'rb') as f:
+                bullish_trends = json.load(f)
+        with open (BEARISH_TRENDS, 'rb') as f:
+                bearish_trends = json.load(f)        
         
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
@@ -54,7 +61,12 @@ def verify_trends(main_df):
                     if level < THRESHOLD:
                         print(df_ticket.index[-1], '********** ' + name + ' ********* ', bearish_trends[name], df_ticket['low'][-3])
                         bearish_trends.pop(name)                                
-            
+
+
+        with open(BULLISH_TRENDS, 'w') as f:
+              json.dump(bullish_trends, f)
+        with open(BEARISH_TRENDS, 'w') as f:
+              json.dump(bearish_trends, f)       
                 
 def main():
     main_df = pd.DataFrame()
@@ -116,7 +128,7 @@ def test():
         verify_trends(df)
         
         time = time + dt.timedelta(minutes = 5)
-main()
-#test()
+#main()
+test()
 
 
