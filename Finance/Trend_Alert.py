@@ -128,7 +128,18 @@ def test():
         verify_trends(df)
         
         time = time + dt.timedelta(minutes = 5)
+
+def reset():
+   empty_json = {}
+   if os.path.exists(MAIN_DF_FILE):
+      os.remove(MAIN_DF_FILE)
+   with open(BULLISH_TRENDS, 'w') as f:
+      json.dump(empty_json, f)
+   with open(BEARISH_TRENDS, 'w') as f:
+      json.dump(empty_json, f)
+      
+reset()
 #main()
-test()
+#test()
 
 
