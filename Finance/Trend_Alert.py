@@ -14,13 +14,15 @@ import DayTrade as dtr
 import datetime as dt
 import pickle
 
-THRESHOLD = 0.98
 BULLISH_TRENDS = 'Bullish_Trends.txt'
 BEARISH_TRENDS = 'Bearish_Trends.txt'
+FIBO_ALERT = "Fibo_Alert.txt"
 MAIN_DF_FILE = 'main_df.pickle'
+CONFIG_FILE = 'config.txt'
 URL = "https://rico.com.vc/"
 bullish_trends = {}
 bearish_trends = {}
+
 
 def get_page_source(driver):
    try :
@@ -30,44 +32,114 @@ def get_page_source(driver):
        return get_page_source(driver)
 
 def verify_trends(main_df):
+    
     if not main_df.empty:
-
+        fibo_alert = None
+        config = None
         with open (BULLISH_TRENDS, 'rb') as f:
                 bullish_trends = json.load(f)
         with open (BEARISH_TRENDS, 'rb') as f:
-                bearish_trends = json.load(f)        
+                bearish_trends = json.load(f)
+        with open (FIBO_ALERT, 'rb') as f:
+                fibo_alert = json.load(f)
+        with open (CONFIG_FILE, 'rb') as f:
+                config = json.load(f)        
         
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
-        
-            df_ticket = groups.loc[name][::-1]
-            if isinstance(df_ticket, pd.DataFrame) and len(df_ticket.index) > 2:
-                df_ticket.set_index('Data/Hora', inplace=True)
-                df_ticket.sort_index(inplace=True)                    
+         df_ticket = groups.loc[name][::-1]
 
-                if df_ticket['low'][-2] >= df_ticket['low'][-3] and name not in bullish_trends:
-                    bullish_trends[name] = df_ticket['low'][-3]
-                elif df_ticket['low'][-2] < df_ticket['low'][-3] and  name in bullish_trends:
+         if isinstance(df_ticket, pd.DataFrame) and len(df_ticket.index) > 2:
+             df_ticket.set_index('Data/Hora', inplace=True)
+             df_ticket.sort_index(inplace=True)                    
+
+             if df_ticket['low'][-2] >= df_ticket['low'][-3] and name not in bullish_trends:
+                 bullish_trends[name] = df_ticket['low'][-3]
+             elif name in bullish_trends:
+                 if df_ticket['low'][-2] < df_ticket['low'][-3]:
                     level = bullish_trends[name]/df_ticket['high'][-3]
-                    if level < THRESHOLD:
-                        print(df_ticket.index[-1], '********** ' + name + ' ********* ', bullish_trends[name], df_ticket['high'][-3])
-                        bullish_trends.pop(name)                
-                    
-                if df_ticket['high'][-2] <= df_ticket['high'][-3] and name not in bearish_trends:
-                    bearish_trends[name] = df_ticket['high'][-3]
-                elif df_ticket['high'][-2] > df_ticket['high'][-3] and name in bearish_trends:
+                    if level < config['THRESHOLD']:
+                        fibo_alert[name] = [bullish_trends[name], df_ticket['high'][-3], 'ON']
+                        bullish_trends.pop(name)
+                    elif df_ticket['low'][-2] < bullish_trends[name]:
+                       bullish_trends[name] = df_ticket['low'][-2]
+                       
+                                        
+             if df_ticket['high'][-2] <= df_ticket['high'][-3] and name not in bearish_trends:
+                 bearish_trends[name] = df_ticket['high'][-3]
+             elif name in bearish_trends:
+                 if df_ticket['high'][-2] > df_ticket['high'][-3]:
                     level = df_ticket['low'][-3]/bearish_trends[name]
-                    if level < THRESHOLD:
-                        print(df_ticket.index[-1], '********** ' + name + ' ********* ', bearish_trends[name], df_ticket['low'][-3])
-                        bearish_trends.pop(name)                                
-
-
+                    if level < config['THRESHOLD']:                        
+                       fibo_alert[name] = [bearish_trends[name], df_ticket['low'][-3], 'ON']
+                       bearish_trends.pop(name)
+                    elif df_ticket['high'][-2] > bearish_trends[name]:
+                       bearish_trends[name] = df_ticket['high'][-2]                    
+              
+             fibo_alert = do_fibo_alert(fibo_alert, df_ticket, name, config)
+             
         with open(BULLISH_TRENDS, 'w') as f:
               json.dump(bullish_trends, f)
         with open(BEARISH_TRENDS, 'w') as f:
-              json.dump(bearish_trends, f)       
-                
+              json.dump(bearish_trends, f)
+        with open(FIBO_ALERT, 'w') as f:              
+              json.dump(fibo_alert, f)         
+        
+        
+        
+def do_fibo_alert(fibo_alert, df, name, config):
+     
+     if name in fibo_alert:
+       lvl100 = fibo_alert[name][0]
+       lvl0 = fibo_alert[name][1]
+       status = fibo_alert[name][2]
+       
+       if status == 'ON':                                 
+         if lvl0 > lvl100:
+            if df['high'][-1] > lvl0:
+               fibo_alert[name] = [lvl100, df['high'][-1], 'ON']
+            elif df['high'][-2] > lvl0:
+               fibo_alert[name] = [lvl100, df['high'][-2], 'ON']   
+            else:
+               lvl236 = round(lvl0 - ((lvl0 - lvl100) * 23.6 / 100),2)
+               lvl328 = round(lvl0 - ((lvl0 - lvl100) * 32.8 / 100),2)
+               lvl50 = round(lvl0 - ((lvl0 - lvl100) * 50 / 100),2)
+               lvl618 = round(lvl0 - ((lvl0 - lvl100) * 61.8 / 100),2)
+
+               levels = [lvl236, lvl328, lvl50, lvl618]   
+              
+               for i in range(len(levels) - 1):
+                  lvl_start = levels[i]
+                  lvl_end = levels[i + 1]
+                  if df['low'][-1] <= lvl_start and df['low'][-1] >= lvl_end - config['PRICE_OFFSET']:                     
+                     fibo_alert[name] = [lvl100, lvl0, 'OFF']
+                     break                    
+         else:
+            if df['low'][-1] < lvl0:
+               fibo_alert[name] = [lvl100, df['low'][-1], 'ON']
+            elif df['low'][-2] < lvl0:
+               fibo_alert[name] = [lvl100, df['low'][-1], 'ON']   
+            else:
+               lvl236 = round(lvl0 + ((lvl100 - lvl0) * 23.6 / 100),2)
+               lvl328 = round(lvl0 + ((lvl100 - lvl0) * 32.8 / 100),2)
+               lvl50 = round(lvl0 + ((lvl100 - lvl0) * 50 / 100),2)
+               lvl618 = round(lvl0 + ((lvl100 - lvl0) * 61.8 / 100),2)
+
+               levels = [lvl236, lvl328, lvl50, lvl618]   
+              
+               for i in range(len(levels) - 1):
+                  lvl_start = levels[i]
+                  lvl_end = levels[i + 1]
+                  if df['high'][-1] >= lvl_start and df['high'][-1] <= lvl_end + config['PRICE_OFFSET']:
+                     fibo_alert[name] = [lvl100, lvl0, 'OFF']
+                     break    
+       elif status == 'OFF':
+          print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2))
+          fibo_alert[name] = [lvl100, lvl0, 'SBY']
+     return fibo_alert        
+
+                    
 def main():
     main_df = pd.DataFrame()
     if os.path.exists(MAIN_DF_FILE):
@@ -94,6 +166,7 @@ def main():
 
         df = df[['Ativo','Máximo','Mínimo','Data/Hora','Último', 'Abertura']]
 
+          
         df['Último'] = df['Último']/100
         df['Máximo'] = df['Máximo']/100
         df['Mínimo'] = df['Mínimo']/100
@@ -109,37 +182,41 @@ def main():
             main_df.to_pickle(MAIN_DF_FILE)
 
         verify_trends(main_df)
-                               
+
         time.sleep(3)
 
 def test():
-    
+        
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    time = main_df.index[0]
+    time1 = main_df.index[0]
     last_time = main_df.index[-1]
     
-    while time < last_time:
+    while time1 < last_time:
 
         df = main_df.reset_index()
-        df = df[df['Data/Hora'] < time]        
+        df = df[df['Data/Hora'] < time1]        
         df.set_index('Data/Hora', inplace=True)
         df.sort_index(inplace=True)
-        
+       
         verify_trends(df)
-        
-        time = time + dt.timedelta(minutes = 5)
 
-def reset():
+        #time.sleep(1)       
+        
+        time1 = time1 + dt.timedelta(minutes = 5)
+
+def reset(reset_main):
    empty_json = {}
-   if os.path.exists(MAIN_DF_FILE):
+   if reset_main and os.path.exists(MAIN_DF_FILE):
       os.remove(MAIN_DF_FILE)
    with open(BULLISH_TRENDS, 'w') as f:
       json.dump(empty_json, f)
    with open(BEARISH_TRENDS, 'w') as f:
       json.dump(empty_json, f)
+   with open(FIBO_ALERT, 'w') as f:
+      json.dump(empty_json, f)   
       
-reset()
+reset(reset_main=False)
 #main()
-#test()
+test()
 
 
