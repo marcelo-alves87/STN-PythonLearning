@@ -102,12 +102,11 @@ def do_fibo_alert(fibo_alert, df, name, config):
             elif df['high'][-2] > lvl0:
                fibo_alert[name] = [lvl100, df['high'][-2], 'ON']   
             else:
-               lvl236 = round(lvl0 - ((lvl0 - lvl100) * 23.6 / 100),2)
                lvl328 = round(lvl0 - ((lvl0 - lvl100) * 32.8 / 100),2)
                lvl50 = round(lvl0 - ((lvl0 - lvl100) * 50 / 100),2)
                lvl618 = round(lvl0 - ((lvl0 - lvl100) * 61.8 / 100),2)
 
-               levels = [lvl236, lvl328, lvl50, lvl618]   
+               levels = [lvl328, lvl50, lvl618]   
               
                for i in range(len(levels) - 1):
                   lvl_start = levels[i]
@@ -121,12 +120,11 @@ def do_fibo_alert(fibo_alert, df, name, config):
             elif df['low'][-2] < lvl0:
                fibo_alert[name] = [lvl100, df['low'][-1], 'ON']   
             else:
-               lvl236 = round(lvl0 + ((lvl100 - lvl0) * 23.6 / 100),2)
                lvl328 = round(lvl0 + ((lvl100 - lvl0) * 32.8 / 100),2)
                lvl50 = round(lvl0 + ((lvl100 - lvl0) * 50 / 100),2)
                lvl618 = round(lvl0 + ((lvl100 - lvl0) * 61.8 / 100),2)
 
-               levels = [lvl236, lvl328, lvl50, lvl618]   
+               levels = [lvl328, lvl50, lvl618]   
               
                for i in range(len(levels) - 1):
                   lvl_start = levels[i]
@@ -136,6 +134,29 @@ def do_fibo_alert(fibo_alert, df, name, config):
                      break    
        elif status == 'OFF':
           print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2))
+          if lvl0 > lvl100:
+             tgt0 = round(lvl0,2)
+             tgt0272 = round(lvl0 - ((lvl0 - lvl100) * -27.2 / 100),2)
+             tgt0618 = round(lvl0 - ((lvl0 - lvl100) * -61.8 / 100),2)
+             tgt1618 = round(lvl0 - ((lvl0 - lvl100) * -161.8 / 100),2)
+
+             targets = [tgt0, tgt0272, tgt0618, tgt1618]
+              
+             for i,target in enumerate(targets):
+               print('Target',i + 1,' : ',target)
+                
+          else:
+             tgt0 = round(lvl0,2)
+             tgt0272 = round(lvl0 + ((lvl100 - lvl0) * -27.2 / 100),2)
+             tgt0618 = round(lvl0 + ((lvl100 - lvl0) * -61.8 / 100),2)
+             tgt1618 = round(lvl0 + ((lvl100 - lvl0) * -161.8 / 100),2)
+
+             targets = [tgt0, tgt0272, tgt0618, tgt1618]
+              
+             for i,target in enumerate(targets):
+               print('Target',i + 1,' : ',target)
+             
+          
           fibo_alert[name] = [lvl100, lvl0, 'SBY']
      return fibo_alert        
 
