@@ -49,8 +49,10 @@ def verify_trends(main_df):
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
          df_ticket = groups.loc[name][::-1]
-
+         
+         
          if isinstance(df_ticket, pd.DataFrame) and len(df_ticket.index) > 2:
+             
              df_ticket.set_index('Data/Hora', inplace=True)
              df_ticket.sort_index(inplace=True)                    
 
@@ -194,6 +196,9 @@ def main():
         df['Abertura'] = df['Abertura']/100
         
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'])
+        
+        df = df[df['Data/Hora'] > '10:00:00']
+        
         df.set_index('Data/Hora',inplace=True)
 
         if main_df.empty:
@@ -218,12 +223,12 @@ def test():
         df = df[df['Data/Hora'] < time1]        
         df.set_index('Data/Hora', inplace=True)
         df.sort_index(inplace=True)
-       
+
         verify_trends(df)
 
         #time.sleep(1)       
         
-        time1 = time1 + dt.timedelta(minutes = 5)
+        time1 += dt.timedelta(minutes = 5)
 
 def reset(reset_main):
    empty_json = {}
@@ -236,8 +241,8 @@ def reset(reset_main):
    with open(FIBO_ALERT, 'w') as f:
       json.dump(empty_json, f)   
       
-reset(reset_main=False)
-#main()
-test()
+reset(reset_main=True)
+main()
+#test()
 
 
