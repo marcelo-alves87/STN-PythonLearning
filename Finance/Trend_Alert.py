@@ -61,7 +61,7 @@ def verify_trends(main_df):
              elif name in bullish_trends:
                  if df_ticket['low'][-2] < df_ticket['low'][-3]:
                     level = bullish_trends[name]/df_ticket['high'][-3]
-                    if level < config['THRESHOLD']:
+                    if level <= config['THRESHOLD']:
                         fibo_alert[name] = [bullish_trends[name], df_ticket['high'][-3], 'ON']
                         bullish_trends.pop(name)
                     elif df_ticket['low'][-2] < bullish_trends[name]:
@@ -73,7 +73,7 @@ def verify_trends(main_df):
              elif name in bearish_trends:
                  if df_ticket['high'][-2] > df_ticket['high'][-3]:
                     level = df_ticket['low'][-3]/bearish_trends[name]
-                    if level < config['THRESHOLD']:                        
+                    if level <= config['THRESHOLD']:                        
                        fibo_alert[name] = [bearish_trends[name], df_ticket['low'][-3], 'ON']
                        bearish_trends.pop(name)
                     elif df_ticket['high'][-2] > bearish_trends[name]:
@@ -154,6 +154,19 @@ def do_fibo_alert(fibo_alert, df, name, config):
           print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2), last_lvl)          
      return fibo_alert        
 
+
+def handle_finance(row):
+   row = row.replace(',','.')
+   if 'k' in row:
+      row = float(row.replace('k',''))
+      row = row * 10**3
+   elif 'M' in row:
+      row = float(row.replace('M',''))
+      row = row * 10**6
+   elif 'B' in row:
+      row = float(row.replace('B',''))
+      row = row * 10**9   
+   return row
                     
 def main():
     main_df = pd.DataFrame()
@@ -179,15 +192,19 @@ def main():
 
         df = pd.read_html(str(tables[0]))[0]
 
-        df = df[['Ativo','Máximo','Mínimo','Data/Hora','Último', 'Abertura']]
+        
+
+        df = df[['Ativo','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro']]
 
           
         df['Último'] = df['Último']/100
         df['Máximo'] = df['Máximo']/100
         df['Mínimo'] = df['Mínimo']/100
         df['Abertura'] = df['Abertura']/100
+        df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row))  
         
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'])
+
         
         df = df[df['Data/Hora'] > '10:00:00']
         
@@ -213,9 +230,12 @@ def test():
 
         df = main_df.reset_index()
         df = df[df['Data/Hora'] < time1]        
+        #df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row)) 
+        
         df.set_index('Data/Hora', inplace=True)
         df.sort_index(inplace=True)
 
+        
         verify_trends(df)
 
         #time.sleep(1)       
