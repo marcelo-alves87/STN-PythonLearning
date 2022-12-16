@@ -96,70 +96,62 @@ def do_fibo_alert(fibo_alert, df, name, config):
        lvl100 = fibo_alert[name][0]
        lvl0 = fibo_alert[name][1]
        status = fibo_alert[name][2]
-       
-       if status == 'ON':                                 
+       last_lvl = -1
+       if len(fibo_alert[name]) > 3:
+          last_lvl = fibo_alert[name][3]
+       if status != 'OFF':                                 
          if lvl0 > lvl100:
-            if df['high'][-1] > lvl0:
+            if status == 'ON' and df['high'][-1] > lvl0:
                fibo_alert[name] = [lvl100, df['high'][-1], 'ON']
-            elif df['high'][-2] > lvl0:
-               fibo_alert[name] = [lvl100, df['high'][-2], 'ON']   
+            elif status == 'ON' and df['high'][-2] > lvl0:
+               fibo_alert[name] = [lvl100, df['high'][-2], 'ON']
+            elif df['close'][-1] < lvl100 - config['PRICE_OFFSET']:
+               fibo_alert[name] = [lvl100, lvl0, 'OFF', lvl100]
+            elif df['high'][-1] >= lvl0:
+               fibo_alert[name] = [lvl100, lvl0, 'OFF', last_lvl]         
             else:
+               lvl236 = round(lvl0 - ((lvl0 - lvl100) * 23.6 / 100),2)
                lvl328 = round(lvl0 - ((lvl0 - lvl100) * 32.8 / 100),2)
                lvl50 = round(lvl0 - ((lvl0 - lvl100) * 50 / 100),2)
                lvl618 = round(lvl0 - ((lvl0 - lvl100) * 61.8 / 100),2)
+               lvl786 = round(lvl0 - ((lvl0 - lvl100) * 78.6 / 100),2)
 
-               levels = [lvl328, lvl50, lvl618]   
+               levels = [lvl236, lvl328, lvl50, lvl618, lvl786, lvl100]   
               
-               for i in range(len(levels) - 1):
+               for i in range(len(levels) - 1):                  
                   lvl_start = levels[i]
                   lvl_end = levels[i + 1]
-                  if df['low'][-1] <= lvl_start and df['low'][-1] >= lvl_end - config['PRICE_OFFSET']:                     
-                     fibo_alert[name] = [lvl100, lvl0, 'OFF']
-                     break                    
+                  if df['low'][-1] <= lvl_start and df['low'][-1] >= lvl_end - config['PRICE_OFFSET'] and (last_lvl == -1 or levels[last_lvl] > lvl_end ):                     
+                     fibo_alert[name] = [lvl100, lvl0, 'SBY', i + 1]
+                     break
+                  
          else:
-            if df['low'][-1] < lvl0:
+            if status == 'ON' and df['low'][-1] < lvl0:
                fibo_alert[name] = [lvl100, df['low'][-1], 'ON']
-            elif df['low'][-2] < lvl0:
-               fibo_alert[name] = [lvl100, df['low'][-1], 'ON']   
+            elif status == 'ON' and df['low'][-2] < lvl0:
+               fibo_alert[name] = [lvl100, df['low'][-2], 'ON']
+            elif df['close'][-1] > lvl100 + config['PRICE_OFFSET']:
+               fibo_alert[name] = [lvl100, lvl0, 'OFF', lvl100]
+            elif df['low'][-1] <= lvl0:
+               fibo_alert[name] = [lvl100, lvl0, 'OFF', last_lvl]         
             else:
+               lvl236 = round(lvl0 + ((lvl100 - lvl0) * 23.6 / 100),2)
                lvl328 = round(lvl0 + ((lvl100 - lvl0) * 32.8 / 100),2)
                lvl50 = round(lvl0 + ((lvl100 - lvl0) * 50 / 100),2)
                lvl618 = round(lvl0 + ((lvl100 - lvl0) * 61.8 / 100),2)
+               lvl786 = round(lvl0 + ((lvl100 - lvl0) * 78.6 / 100),2)
 
-               levels = [lvl328, lvl50, lvl618]   
+               levels = [lvl236, lvl328, lvl50, lvl618, lvl786, lvl100]   
               
-               for i in range(len(levels) - 1):
+               for i in range(len(levels) - 1):                  
                   lvl_start = levels[i]
                   lvl_end = levels[i + 1]
-                  if df['high'][-1] >= lvl_start and df['high'][-1] <= lvl_end + config['PRICE_OFFSET']:
-                     fibo_alert[name] = [lvl100, lvl0, 'OFF']
-                     break    
+                  if df['high'][-1] >= lvl_start and df['high'][-1] <= lvl_end + config['PRICE_OFFSET'] and (last_lvl == -1 or levels[last_lvl] < lvl_end ):                     
+                     fibo_alert[name] = [lvl100, lvl0, 'SBY', i + 1]
+                     break
+                  
        elif status == 'OFF':
-          print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2))
-          if lvl0 > lvl100:
-             tgt0 = round(lvl0,2)
-             tgt0272 = round(lvl0 - ((lvl0 - lvl100) * -27.2 / 100),2)
-             tgt0618 = round(lvl0 - ((lvl0 - lvl100) * -61.8 / 100),2)
-             tgt1618 = round(lvl0 - ((lvl0 - lvl100) * -161.8 / 100),2)
-
-             targets = [tgt0, tgt0272, tgt0618, tgt1618]
-              
-             for i,target in enumerate(targets):
-               print('Target',i + 1,' : ',target)
-                
-          else:
-             tgt0 = round(lvl0,2)
-             tgt0272 = round(lvl0 + ((lvl100 - lvl0) * -27.2 / 100),2)
-             tgt0618 = round(lvl0 + ((lvl100 - lvl0) * -61.8 / 100),2)
-             tgt1618 = round(lvl0 + ((lvl100 - lvl0) * -161.8 / 100),2)
-
-             targets = [tgt0, tgt0272, tgt0618, tgt1618]
-              
-             for i,target in enumerate(targets):
-               print('Target',i + 1,' : ',target)
-             
-          
-          fibo_alert[name] = [lvl100, lvl0, 'SBY']
+          print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2), last_lvl)          
      return fibo_alert        
 
                     
@@ -241,8 +233,7 @@ def reset(reset_main):
    with open(FIBO_ALERT, 'w') as f:
       json.dump(empty_json, f)   
       
-reset(reset_main=True)
-main()
-#test()
-
+reset(reset_main=False)
+#main()
+test()
 
