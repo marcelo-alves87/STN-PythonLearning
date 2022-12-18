@@ -22,7 +22,8 @@ CONFIG_FILE = 'config.txt'
 URL = "https://rico.com.vc/"
 bullish_trends = {}
 bearish_trends = {}
-
+trends_lvl = {}
+trends_lvl_suc = {}
 
 def get_page_source(driver):
    try :
@@ -81,6 +82,7 @@ def verify_trends(main_df):
               
              fibo_alert = do_fibo_alert(fibo_alert, df_ticket, name, config)
              
+             
         with open(BULLISH_TRENDS, 'w') as f:
               json.dump(bullish_trends, f)
         with open(BEARISH_TRENDS, 'w') as f:
@@ -101,60 +103,71 @@ def do_fibo_alert(fibo_alert, df, name, config):
           last_lvl = fibo_alert[name][3]
        if status != 'OFF':                                 
          if lvl0 > lvl100:
-            if status == 'ON' and df['high'][-1] > lvl0:
+            lvl236 = round(lvl0 - ((lvl0 - lvl100) * 23.6 / 100),2)
+            lvl328 = round(lvl0 - ((lvl0 - lvl100) * 32.8 / 100),2)
+            lvl50 = round(lvl0 - ((lvl0 - lvl100) * 50 / 100),2)
+            lvl618 = round(lvl0 - ((lvl0 - lvl100) * 61.8 / 100),2)
+            lvl786 = round(lvl0 - ((lvl0 - lvl100) * 78.6 / 100),2)
+
+            levels = [lvl236, lvl328, lvl50, lvl618, lvl786, lvl100]   
+            
+            if status == 'ON' and df['high'][-1] >= lvl0:
                fibo_alert[name] = [lvl100, df['high'][-1], 'ON']
-            elif status == 'ON' and df['high'][-2] > lvl0:
+            elif status == 'ON' and df['high'][-2] >= lvl0:
                fibo_alert[name] = [lvl100, df['high'][-2], 'ON']
             elif df['close'][-1] < lvl100 - config['PRICE_OFFSET']:
-               fibo_alert[name] = [lvl100, lvl0, 'OFF', lvl100]
+               fibo_alert[name] = [lvl100, lvl0, 'OFF', len(levels)]
             elif df['high'][-1] >= lvl0:
                fibo_alert[name] = [lvl100, lvl0, 'OFF', last_lvl]         
             else:
-               lvl236 = round(lvl0 - ((lvl0 - lvl100) * 23.6 / 100),2)
-               lvl328 = round(lvl0 - ((lvl0 - lvl100) * 32.8 / 100),2)
-               lvl50 = round(lvl0 - ((lvl0 - lvl100) * 50 / 100),2)
-               lvl618 = round(lvl0 - ((lvl0 - lvl100) * 61.8 / 100),2)
-               lvl786 = round(lvl0 - ((lvl0 - lvl100) * 78.6 / 100),2)
-
-               levels = [lvl236, lvl328, lvl50, lvl618, lvl786, lvl100]   
-              
+               
                for i in range(len(levels) - 1):                  
                   lvl_start = levels[i]
                   lvl_end = levels[i + 1]
                   if df['low'][-1] <= lvl_start and df['low'][-1] >= lvl_end - config['PRICE_OFFSET'] and (last_lvl == -1 or levels[last_lvl] > lvl_end ):                     
                      fibo_alert[name] = [lvl100, lvl0, 'SBY', i + 1]
+                     trends_lvl[name, 'Bullish'] = i + 1
                      break
                   
          else:
-            if status == 'ON' and df['low'][-1] < lvl0:
+
+            lvl236 = round(lvl0 + ((lvl100 - lvl0) * 23.6 / 100),2)
+            lvl328 = round(lvl0 + ((lvl100 - lvl0) * 32.8 / 100),2)
+            lvl50 = round(lvl0 + ((lvl100 - lvl0) * 50 / 100),2)
+            lvl618 = round(lvl0 + ((lvl100 - lvl0) * 61.8 / 100),2)
+            lvl786 = round(lvl0 + ((lvl100 - lvl0) * 78.6 / 100),2)
+
+            levels = [lvl236, lvl328, lvl50, lvl618, lvl786, lvl100]   
+
+            
+            if status == 'ON' and df['low'][-1] <= lvl0:
                fibo_alert[name] = [lvl100, df['low'][-1], 'ON']
-            elif status == 'ON' and df['low'][-2] < lvl0:
+            elif status == 'ON' and df['low'][-2] <= lvl0:
                fibo_alert[name] = [lvl100, df['low'][-2], 'ON']
             elif df['close'][-1] > lvl100 + config['PRICE_OFFSET']:
-               fibo_alert[name] = [lvl100, lvl0, 'OFF', lvl100]
+               fibo_alert[name] = [lvl100, lvl0, 'OFF', len(levels)]
             elif df['low'][-1] <= lvl0:
                fibo_alert[name] = [lvl100, lvl0, 'OFF', last_lvl]         
             else:
-               lvl236 = round(lvl0 + ((lvl100 - lvl0) * 23.6 / 100),2)
-               lvl328 = round(lvl0 + ((lvl100 - lvl0) * 32.8 / 100),2)
-               lvl50 = round(lvl0 + ((lvl100 - lvl0) * 50 / 100),2)
-               lvl618 = round(lvl0 + ((lvl100 - lvl0) * 61.8 / 100),2)
-               lvl786 = round(lvl0 + ((lvl100 - lvl0) * 78.6 / 100),2)
-
-               levels = [lvl236, lvl328, lvl50, lvl618, lvl786, lvl100]   
-              
                for i in range(len(levels) - 1):                  
                   lvl_start = levels[i]
                   lvl_end = levels[i + 1]
                   if df['high'][-1] >= lvl_start and df['high'][-1] <= lvl_end + config['PRICE_OFFSET'] and (last_lvl == -1 or levels[last_lvl] < lvl_end ):                     
-                     fibo_alert[name] = [lvl100, lvl0, 'SBY', i + 1]
+                     fibo_alert[name] = [lvl100, lvl0, 'SBY', i + 1]                     
+                     trends_lvl[name, 'Bearish'] = i + 1
                      break
                   
        elif status == 'OFF':
-          print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2), last_lvl)          
+          print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2), last_lvl)
+          
+          if last_lvl in trends_lvl_suc:
+             trends_lvl_suc[last_lvl] += 1
+          else:
+             trends_lvl_suc[last_lvl] = 1
+          
+          fibo_alert.pop(name)          
      return fibo_alert        
-
-
+   
 def handle_finance(row):
    row = row.replace(',','.')
    if 'k' in row:
@@ -220,6 +233,10 @@ def main():
 
         time.sleep(3)
 
+def analysis():
+   print(trends_lvl)
+   print(trends_lvl_suc)
+
 def test():
         
     main_df = pd.read_pickle(MAIN_DF_FILE)
@@ -230,7 +247,7 @@ def test():
 
         df = main_df.reset_index()
         df = df[df['Data/Hora'] < time1]        
-        #df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row)) 
+        df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row)) 
         
         df.set_index('Data/Hora', inplace=True)
         df.sort_index(inplace=True)
@@ -241,6 +258,8 @@ def test():
         #time.sleep(1)       
         
         time1 += dt.timedelta(minutes = 5)
+
+    analysis()    
 
 def reset(reset_main):
    empty_json = {}
