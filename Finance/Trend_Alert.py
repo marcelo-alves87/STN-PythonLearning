@@ -90,7 +90,15 @@ def verify_trends(main_df):
         with open(FIBO_ALERT, 'w') as f:              
               json.dump(fibo_alert, f)         
         
-        
+def count_trends_lvl(type, my_dict, lvl, index=None):
+   d = type+str(lvl)
+   if index:
+      d = type+str(lvl)+str(index)
+   if d in my_dict:
+      my_dict[d] +=1
+   else:
+      my_dict[d] = 1
+
         
 def do_fibo_alert(fibo_alert, df, name, config):
      
@@ -126,7 +134,7 @@ def do_fibo_alert(fibo_alert, df, name, config):
                   lvl_end = levels[i + 1]
                   if df['low'][-1] <= lvl_start and df['low'][-1] >= lvl_end - config['PRICE_OFFSET'] and (last_lvl == -1 or levels[last_lvl] > lvl_end ):                     
                      fibo_alert[name] = [lvl100, lvl0, 'SBY', i + 1]
-                     trends_lvl[name, 'Bullish'] = i + 1
+                     count_trends_lvl('Bullish', trends_lvl, i + 1, df.index[-1])                     
                      break
                   
          else:
@@ -154,17 +162,17 @@ def do_fibo_alert(fibo_alert, df, name, config):
                   lvl_end = levels[i + 1]
                   if df['high'][-1] >= lvl_start and df['high'][-1] <= lvl_end + config['PRICE_OFFSET'] and (last_lvl == -1 or levels[last_lvl] < lvl_end ):                     
                      fibo_alert[name] = [lvl100, lvl0, 'SBY', i + 1]                     
-                     trends_lvl[name, 'Bearish'] = i + 1
+                     count_trends_lvl('Bearish', trends_lvl, i + 1, df.index[-1])
                      break
                   
        elif status == 'OFF':
-          print(df.index[-1],'********',name, '********', lvl100, lvl0, round(lvl100/lvl0, 2) if lvl0 > lvl100 else round(lvl0/lvl100, 2), last_lvl)
-          
-          if last_lvl in trends_lvl_suc:
-             trends_lvl_suc[last_lvl] += 1
+          if lvl0 > lvl100:             
+             print(df.index[-1],'********',name, '********', 'Bullish', lvl100, lvl0, round(lvl100/lvl0, 2), last_lvl)
+             count_trends_lvl('Bullish', trends_lvl_suc , last_lvl)
           else:
-             trends_lvl_suc[last_lvl] = 1
-          
+             print(df.index[-1],'********',name, '********', 'Bearish', lvl100, lvl0, round(lvl0/lvl100, 2), last_lvl)
+             count_trends_lvl('Bearish', trends_lvl_suc , last_lvl)
+         
           fibo_alert.pop(name)          
      return fibo_alert        
    
@@ -234,8 +242,19 @@ def main():
         time.sleep(3)
 
 def analysis():
-   print(trends_lvl)
-   print(trends_lvl_suc)
+
+   print('These items have succeeded:')
+   print(dict(sorted(trends_lvl_suc.items())))
+   print('Total:')   
+   new_dict = {} 
+   for key in trends_lvl:
+      key1 = key[:8]
+      if key1 in new_dict:
+         new_dict[key1] += 1
+      else:   
+         new_dict[key1] = 1
+   print(dict(sorted(new_dict.items())))
+   
 
 def test():
         
@@ -275,4 +294,5 @@ def reset(reset_main):
 reset(reset_main=False)
 #main()
 test()
+
 
