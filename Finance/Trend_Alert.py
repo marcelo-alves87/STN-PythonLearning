@@ -13,10 +13,12 @@ import sys
 import DayTrade as dtr
 import datetime as dt
 import pickle
+import winsound
 
 BULLISH_TRENDS = 'Bullish_Trends.txt'
 BEARISH_TRENDS = 'Bearish_Trends.txt'
 FIBO_ALERT = "Fibo_Alert.txt"
+PRICE_ALERT = "Price_Alert.txt"
 MAIN_DF_FILE = 'main_df.pickle'
 CONFIG_FILE = 'config.txt'
 URL = "https://rico.com.vc/"
@@ -35,14 +37,17 @@ def get_page_source(driver):
 def verify_trends(main_df):
     
     if not main_df.empty:
-        fibo_alert = None
+        
         config = None
+        price_alert = None
         with open (BULLISH_TRENDS, 'rb') as f:
                 bullish_trends = json.load(f)
         with open (BEARISH_TRENDS, 'rb') as f:
                 bearish_trends = json.load(f)
         with open (FIBO_ALERT, 'rb') as f:
                 fibo_alert = json.load(f)
+        with open (PRICE_ALERT, 'rb') as f:
+                price_alert = json.load(f)        
         with open (CONFIG_FILE, 'rb') as f:
                 config = json.load(f)        
         
@@ -82,13 +87,12 @@ def verify_trends(main_df):
               
              fibo_alert = do_fibo_alert(fibo_alert, df_ticket, name, config)
              
-             
         with open(BULLISH_TRENDS, 'w') as f:
               json.dump(bullish_trends, f)
         with open(BEARISH_TRENDS, 'w') as f:
               json.dump(bearish_trends, f)
         with open(FIBO_ALERT, 'w') as f:              
-              json.dump(fibo_alert, f)         
+              json.dump(fibo_alert, f)
         
 def count_trends_lvl(type, my_dict, lvl, index=None):
    d = type+str(lvl)
@@ -99,7 +103,10 @@ def count_trends_lvl(type, my_dict, lvl, index=None):
    else:
       my_dict[d] = 1
 
-        
+def alert():
+   winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
+   time.sleep(1)
+
 def do_fibo_alert(fibo_alert, df, name, config):
      
      if name in fibo_alert:
@@ -166,29 +173,36 @@ def do_fibo_alert(fibo_alert, df, name, config):
                      break
                   
        elif status == 'OFF':
-          if lvl0 > lvl100:             
-             print(df.index[-1],'********',name, '********', 'Bullish', lvl100, lvl0, round(lvl100/lvl0, 2), last_lvl)
-             count_trends_lvl('Bullish', trends_lvl_suc , last_lvl)
-          else:
-             print(df.index[-1],'********',name, '********', 'Bearish', lvl100, lvl0, round(lvl0/lvl100, 2), last_lvl)
-             count_trends_lvl('Bearish', trends_lvl_suc , last_lvl)
-         
+          if last_lvl == 6:
+             
+             if lvl0 > lvl100:             
+                print(df.index[-1],'********',name, '********', 'Bullish', lvl100, lvl0, round(lvl100/lvl0, 2), last_lvl)
+                count_trends_lvl('Bullish', trends_lvl_suc , last_lvl)
+             else:
+                print(df.index[-1],'********',name, '********', 'Bearish', lvl100, lvl0, round(lvl0/lvl100, 2), last_lvl)
+                count_trends_lvl('Bearish', trends_lvl_suc , last_lvl)
+
+             alert()
+
           fibo_alert.pop(name)          
      return fibo_alert        
    
 def handle_finance(row):
-   row = row.replace(',','.')
-   if 'k' in row:
-      row = float(row.replace('k',''))
-      row = row * 10**3
-   elif 'M' in row:
-      row = float(row.replace('M',''))
-      row = row * 10**6
-   elif 'B' in row:
-      row = float(row.replace('B',''))
-      row = row * 10**9   
-   return row
-                    
+   if isinstance(row, float):
+      return row
+   else:
+      row = row.replace(',','.')
+      if 'k' in row:
+         row = float(row.replace('k',''))
+         row = row * 10**3
+      elif 'M' in row:
+         row = float(row.replace('M',''))
+         row = row * 10**6
+      elif 'B' in row:
+         row = float(row.replace('B',''))
+         row = row * 10**9   
+      return row
+                       
 def main():
     main_df = pd.DataFrame()
     if os.path.exists(MAIN_DF_FILE):
@@ -239,23 +253,8 @@ def main():
 
         verify_trends(main_df)
 
-        time.sleep(3)
-
-def analysis():
-
-   print('These items have succeeded:')
-   print(dict(sorted(trends_lvl_suc.items())))
-   print('Total:')   
-   new_dict = {} 
-   for key in trends_lvl:
-      key1 = key[:8]
-      if key1 in new_dict:
-         new_dict[key1] += 1
-      else:   
-         new_dict[key1] = 1
-   print(dict(sorted(new_dict.items())))
-   
-
+        time.sleep(1)
+  
 def test():
         
     main_df = pd.read_pickle(MAIN_DF_FILE)
@@ -278,7 +277,7 @@ def test():
         
         time1 += dt.timedelta(minutes = 5)
 
-    analysis()    
+    
 
 def reset(reset_main):
    empty_json = {}
@@ -289,8 +288,9 @@ def reset(reset_main):
    with open(BEARISH_TRENDS, 'w') as f:
       json.dump(empty_json, f)
    with open(FIBO_ALERT, 'w') as f:
-      json.dump(empty_json, f)   
-      
+      json.dump(empty_json, f)
+   
+  
 reset(reset_main=False)
 #main()
 test()
