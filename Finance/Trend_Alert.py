@@ -174,7 +174,6 @@ def do_fibo_alert(fibo_alert, df, name, config):
                   
        elif status == 'OFF':
           if last_lvl == 6:
-             
              if lvl0 > lvl100:             
                 print(df.index[-1],'********',name, '********', 'Bullish', lvl100, lvl0, round(lvl100/lvl0, 2), last_lvl)
                 count_trends_lvl('Bullish', trends_lvl_suc , last_lvl)
@@ -187,11 +186,13 @@ def do_fibo_alert(fibo_alert, df, name, config):
           fibo_alert.pop(name)          
      return fibo_alert        
    
-def handle_finance(row):
+def handle_finance(row):   
    if isinstance(row, float):
       return row
    else:
-      row = row.replace(',','.')
+      row = row.replace('.','')
+      row = row.replace(',','')
+      row = row[:-3] + '.' + row[-3:]
       if 'k' in row:
          row = float(row.replace('k',''))
          row = row * 10**3
@@ -227,10 +228,9 @@ def main():
 
         df = pd.read_html(str(tables[0]))[0]
 
-        
-
         df = df[['Ativo','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro']]
 
+        df = df.drop(df[df['Ativo'] == 'IBOV'].index)        
           
         df['Último'] = df['Último']/100
         df['Máximo'] = df['Máximo']/100
@@ -240,8 +240,11 @@ def main():
         
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'])
 
-        
-        df = df[df['Data/Hora'] > '10:00:00']
+        start_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 10:00:00'
+        end_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 18:00:00'
+
+        df = df[df['Data/Hora'] >= start_date]
+        df = df[df['Data/Hora'] <= end_date]
         
         df.set_index('Data/Hora',inplace=True)
 
@@ -273,8 +276,7 @@ def test():
         
         verify_trends(df)
 
-        #time.sleep(1)       
-        
+        #time.sleep(1)
         time1 += dt.timedelta(minutes = 5)
 
     
@@ -291,8 +293,8 @@ def reset(reset_main):
       json.dump(empty_json, f)
    
   
-reset(reset_main=False)
-#main()
-test()
+reset(reset_main=True)
+main()
+#test()
 
 
