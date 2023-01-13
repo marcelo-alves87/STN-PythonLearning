@@ -214,7 +214,7 @@ def main():
     driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
     driver.get(URL) 
 
-    input('Wait ...')
+    input('Waiting ...')
     driver.switch_to.window(driver.window_handles[1])
     print('Running ...')
     
@@ -237,7 +237,8 @@ def main():
         df['Mínimo'] = df['Mínimo']/100
         df['Abertura'] = df['Abertura']/100
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row))  
-        
+
+        df['Data/Hora'] = df['Data/Hora'].replace('-','00:00:00') 
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'])
 
         start_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 10:00:00'
