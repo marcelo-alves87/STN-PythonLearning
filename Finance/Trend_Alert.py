@@ -10,10 +10,10 @@ import json
 from selenium.common.exceptions import WebDriverException
 import Utils as utils
 import sys
-import DayTrade as dtr
 import datetime as dt
 import pickle
 import winsound
+from pyautogui import press, typewrite
 
 BULLISH_TRENDS = 'Bullish_Trends.txt'
 BEARISH_TRENDS = 'Bearish_Trends.txt'
@@ -203,7 +203,34 @@ def handle_finance(row):
          row = float(row.replace('B',''))
          row = row * 10**9   
       return row
-                       
+
+def get_tickets():
+   data = []
+   f = open("Tickets.txt", "r")
+   for line in f:
+      data.append(f.readline().rstrip())
+   f.close()
+   return data
+
+  
+# You have to return to the browser quickly, and do nothing until the end of the inserting.   
+def insert_tickets(driver):
+   time.sleep(5)
+   tickets = get_tickets()
+   for ticket in tickets:
+      time.sleep(1)
+      driver.execute_script("document.querySelector('.nelo-dialog-titlebar-buttons__button--cross-button').click()")
+      time.sleep(2)
+      typewrite(ticket)
+      time.sleep(2)
+      found = driver.execute_script("return document.querySelector('.tickerform-component-results').getElementsByTagName(\"li\").length")
+      if found > 0:
+         press('down')
+         time.sleep(1)
+         press('enter')
+      else:   
+         press('esc')   
+              
 def main():
     main_df = pd.DataFrame()
     if os.path.exists(MAIN_DF_FILE):
@@ -217,10 +244,14 @@ def main():
     input('Waiting ...')
     driver.switch_to.window(driver.window_handles[1])
     print('Running ...')
-    
+    insert_tickets(driver)
     while(True):
+
         
         driver.execute_script("document.getElementById('app-menu').click()")
+
+        
+        
         html = get_page_source(driver)   
         soup = BeautifulSoup(html, features='lxml')
 
@@ -297,5 +328,4 @@ def reset(reset_main):
 reset(reset_main=True)
 main()
 #test()
-
 

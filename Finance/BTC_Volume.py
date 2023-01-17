@@ -13,7 +13,7 @@ def get_btc_df():
       df = df.append(df1)
 
     df['Taxa (% a.a)'] = df['Taxa (% a.a)'].apply(lambda row: handle_taxa(row))
-    df = df[df['Taxa (% a.a)'] < 10]
+    #df = df[df['Taxa (% a.a)'] < 10]
   
     return df
 
@@ -31,6 +31,7 @@ def handle_volume(volume):
         return str(round(volume/10**3,2)) + 'k'
     else:
         return volume
+    
 def btc_volume(tickers=None):
 
     df_btc = get_btc_df()
@@ -44,9 +45,11 @@ def btc_volume(tickers=None):
             df = pd.read_csv('Old_Finance/stock_dfs/{}.csv'.format(ticker))
             df.set_index('Date', inplace=True)
             df.sort_index(inplace=True)
-            if len(df.index) > 2 and df['Volume'][-2] >= 10**6 and df['Volume'][-2] < 10**9 and (df_btc['Papel'] == ticker).any():
-                print(ticker, str(df_btc.loc[df_btc['Papel'] == ticker]['Taxa (% a.a)'].values[0]) + '%',\
-                      str(df_btc.loc[df_btc['Papel'] == ticker]['Disponibilidade'].values[0]), handle_volume(df['Volume'][-2]))
+            #if len(df.index) > 2:
+            if len(df.index) > 2 and df['Volume'][-2] >= 10**6 and (df_btc['Papel'] == ticker).any():
+                print(ticker)
+                #print(ticker, str(df_btc.loc[df_btc['Papel'] == ticker]['Taxa (% a.a)'].values[0]) + '%',\
+                #      str(df_btc.loc[df_btc['Papel'] == ticker]['Disponibilidade'].values[0]), handle_volume(df['Volume'][-2]))
         else:
             print('%s not found!' %ticker)
 
@@ -58,4 +61,4 @@ def ticker_details():
 
     btc_volume(tickers)
         
-ticker_details()
+btc_volume()
