@@ -130,7 +130,7 @@ def do_fibo_alert(fibo_alert, df, name, config):
                fibo_alert[name] = [lvl100, df['high'][-1], 'ON']
             elif status == 'ON' and df['high'][-2] >= lvl0:
                fibo_alert[name] = [lvl100, df['high'][-2], 'ON']
-            elif df['close'][-1] < lvl100 - config['PRICE_OFFSET']:
+            elif df['low'][-1] < lvl100 - config['PRICE_OFFSET']:
                fibo_alert[name] = [lvl100, lvl0, 'OFF', len(levels)]
             elif df['high'][-1] >= lvl0:
                fibo_alert[name] = [lvl100, lvl0, 'OFF', last_lvl]         
@@ -159,7 +159,7 @@ def do_fibo_alert(fibo_alert, df, name, config):
                fibo_alert[name] = [lvl100, df['low'][-1], 'ON']
             elif status == 'ON' and df['low'][-2] <= lvl0:
                fibo_alert[name] = [lvl100, df['low'][-2], 'ON']
-            elif df['close'][-1] > lvl100 + config['PRICE_OFFSET']:
+            elif df['high'][-1] > lvl100 + config['PRICE_OFFSET']:
                fibo_alert[name] = [lvl100, lvl0, 'OFF', len(levels)]
             elif df['low'][-1] <= lvl0:
                fibo_alert[name] = [lvl100, lvl0, 'OFF', last_lvl]         
@@ -244,7 +244,7 @@ def main():
     input('Waiting ...')
     driver.switch_to.window(driver.window_handles[1])
     print('Running ...')
-    insert_tickets(driver)
+    #insert_tickets(driver)
     while(True):
 
         
