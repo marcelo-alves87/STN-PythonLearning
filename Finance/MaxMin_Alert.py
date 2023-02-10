@@ -14,12 +14,12 @@ import datetime as dt
 import pickle
 import winsound
 from pyautogui import press, typewrite
+import warnings
 
 
-MAIN_DF_FILE = 'main_df_03022023.pickle'
+
+MAIN_DF_FILE = 'main_df.pickle'
 URL = "https://rico.com.vc/"
-count_ticket_short = {}
-count_ticket_long = {}
 last_lvl = {}
 
 def get_page_source(driver):
@@ -30,46 +30,37 @@ def get_page_source(driver):
        return get_page_source(driver)
 
 def verify_trends(main_df):
-    global last_lvl
-    global count_ticket_short
-    global count_ticket_long
-    
     if not main_df.empty:
         
-        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+        groups = main_df.groupby([pd.Grouper(freq='1min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
          df_ticket = groups.loc[name][::-1]
          
-         
          if isinstance(df_ticket, pd.DataFrame) and len(df_ticket.index) > 2:
+           
            df_ticket.set_index('Data/Hora',inplace=True)
            df_ticket.sort_index(inplace=True)
+           
            if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
               and df_ticket['Mínimo']['open'][-1]/df_ticket['Máximo']['close'][-1] < 0.98:
-              do_count_ticket(name, count_ticket_short)
-              last_lvl[name] = df_ticket['Mínimo']['open'][-1]
-              notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['close'][-1], df_ticket['Mínimo']['open'][-1], count_ticket_short[name])
-           elif name in last_lvl and df_ticket['Último']['low'][-1] > last_lvl[name]:
+              last_lvl[name] = [df_ticket['Mínimo']['open'][-1], 'Bearish'] 
+              notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['close'][-1], df_ticket['Mínimo']['open'][-1], df_ticket['Variação']['open'][-1])
+           elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:              
               last_lvl.pop(name)
 
            if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
               and df_ticket['Mínimo']['close'][-1]/df_ticket['Máximo']['open'][-1] < 0.98:
-              do_count_ticket(name, count_ticket_long)
-              last_lvl[name] = df_ticket['Máximo']['open'][-1]
-              notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], count_ticket_long[name])
-           elif name in last_lvl and df_ticket['Último']['high'][-1] < last_lvl[name]:
-              last_lvl.pop(name)   
+              last_lvl[name] = [df_ticket['Máximo']['open'][-1], 'Bullish']
+              notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['open'][-1])
+           elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
+              last_lvl.pop(name)
 
-def do_count_ticket(name, count_ticket):
-   
-   if name not in count_ticket:
-      count_ticket[name] = 1
-   else:
-      count_ticket[name] += 1
+              
 
-def notify(index, name, type, lvl0, lvl100, count):
-   print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), count)
+
+def notify(index, name, type, lvl0, lvl100, variation):
+   print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation)
    #winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    #time.sleep(1)
 
@@ -146,10 +137,10 @@ def main():
 
         df = pd.read_html(str(tables[0]))[0]
 
-        df = df[['Ativo','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro']]
+        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro']]
 
-        df = df.drop(df[df['Ativo'] == 'IBOV'].index)        
-          
+        df = df.drop(df[df['Ativo'] == 'IBOV'].index)
+
         df['Último'] = df['Último']/100
         df['Máximo'] = df['Máximo']/100
         df['Mínimo'] = df['Mínimo']/100
@@ -164,6 +155,7 @@ def main():
 
         df = df[df['Data/Hora'] >= start_date]
         df = df[df['Data/Hora'] <= end_date]
+
         
         df.set_index('Data/Hora',inplace=True)
 
@@ -173,12 +165,13 @@ def main():
             main_df = pd.concat([main_df, df])
             main_df.to_pickle(MAIN_DF_FILE)
 
+    
         verify_trends(main_df)
 
         time.sleep(1)
   
 def test():
-        
+    
     main_df = pd.read_pickle(MAIN_DF_FILE)
     time1 = main_df.index[0]
     last_time = main_df.index[-1]
@@ -204,8 +197,8 @@ def reset(reset_main):
    if reset_main and os.path.exists(MAIN_DF_FILE):
       os.remove(MAIN_DF_FILE)
    
-  
-reset(reset_main=False)
-#main()
-test()
+warnings.simplefilter(action='ignore', category=FutureWarning)
+reset(reset_main=True)
+main()
+#test()
 
