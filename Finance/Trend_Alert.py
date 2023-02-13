@@ -20,7 +20,7 @@ BULLISH_TRENDS = 'Bullish_Trends.txt'
 BEARISH_TRENDS = 'Bearish_Trends.txt'
 FIBO_ALERT = "Fibo_Alert.txt"
 PRICE_ALERT = "Price_Alert.txt"
-MAIN_DF_FILE = 'main_df_13022013_1204.pickle'
+MAIN_DF_FILE = 'main_df.pickle'
 CONFIG_FILE = 'config.txt'
 URL = "https://rico.com.vc/"
 bullish_trends = {}
@@ -328,7 +328,7 @@ def reset(reset_main):
       json.dump(empty_json, f)
    
 warnings.simplefilter(action='ignore', category=FutureWarning)  
-reset(reset_main=False)
-#main()
-test()
+reset(reset_main=True)
+main()
+#test()
 
