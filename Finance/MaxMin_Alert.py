@@ -32,7 +32,7 @@ def get_page_source(driver):
 def verify_trends(main_df):
     if not main_df.empty:
         
-        groups = main_df.groupby([pd.Grouper(freq='1min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
          df_ticket = groups.loc[name][::-1]
@@ -43,14 +43,14 @@ def verify_trends(main_df):
            df_ticket.sort_index(inplace=True)
            
            if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
-              and df_ticket['Mínimo']['open'][-1]/df_ticket['Máximo']['close'][-1] < 0.98:
+              and df_ticket['Mínimo']['open'][-1]/df_ticket['Máximo']['close'][-1] < 0.987:
               last_lvl[name] = [df_ticket['Mínimo']['open'][-1], 'Bearish'] 
               notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['close'][-1], df_ticket['Mínimo']['open'][-1], df_ticket['Variação']['open'][-1])
            elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:              
               last_lvl.pop(name)
 
            if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
-              and df_ticket['Mínimo']['close'][-1]/df_ticket['Máximo']['open'][-1] < 0.98:
+              and df_ticket['Mínimo']['close'][-1]/df_ticket['Máximo']['open'][-1] < 0.987:
               last_lvl[name] = [df_ticket['Máximo']['open'][-1], 'Bullish']
               notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['open'][-1])
            elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
@@ -158,7 +158,8 @@ def main():
 
         
         df.set_index('Data/Hora',inplace=True)
-
+        df.sort_index(inplace=True)
+        
         if main_df.empty:
             main_df = df
         else:
