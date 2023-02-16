@@ -62,8 +62,8 @@ def verify_trends(main_df):
 
 def notify(index, name, type, lvl0, lvl100, variation):
    print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation)
-   #winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
-   #time.sleep(1)
+   winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
+   time.sleep(1)
 
 def handle_finance(row):   
    if isinstance(row, float):
@@ -108,8 +108,28 @@ def insert_tickets(driver):
          time.sleep(1)
          press('enter')
       else:   
-         press('esc')   
-              
+         press('esc')
+
+def get_all_tickets_status(driver):
+   main_df = None
+   has_next = True
+   while has_next:
+       html = get_page_source(driver)   
+       soup = BeautifulSoup(html, features='lxml')
+       tables = soup.find_all('table', class_='nelo-table-group') 
+       df = pd.read_html(str(tables[0]))[0]
+       df.dropna(inplace=True)
+       driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop += 100")
+       if main_df is None:
+          main_df = df
+       else:
+          df2 = df[df['Ativo'].isin(main_df['Ativo']) == False]
+          if df2.empty:
+             has_next = False
+          else:
+             main_df = pd.concat([main_df, df2])
+   return main_df
+
 def main():
     main_df = pd.DataFrame()
     if os.path.exists(MAIN_DF_FILE):
@@ -128,16 +148,10 @@ def main():
 
         
         driver.execute_script("document.getElementById('app-menu').click()")
-
+        driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop = 0") 
         
+        df = get_all_tickets_status(driver)
         
-        html = get_page_source(driver)   
-        soup = BeautifulSoup(html, features='lxml')
-
-        tables = soup.find_all('table', class_='nelo-table-group') 
-
-        df = pd.read_html(str(tables[0]))[0]
-
         df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro']]
 
         df = df.drop(df[df['Ativo'] == 'IBOV'].index)
