@@ -58,12 +58,22 @@ def verify_trends(main_df):
               last_lvl.pop(name)
 
               
-
+def get_status(variation):
+   variation = variation.replace('%','')
+   variation = variation.replace(',','.')
+   variation = float(variation)
+   if variation > 0:
+      return 1
+   elif variation < 0:
+      return -1
+   else:
+      return 0
 
 def notify(index, name, type, lvl0, lvl100, variation):
-   print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation)
-   winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
-   time.sleep(1)
+   if (get_status(variation) == 1 and type == 'Short') or (get_status(variation) == -1 and type == 'Long'): 
+      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation)
+      winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
+      time.sleep(1)
 
 def handle_finance(row):   
    if isinstance(row, float):
