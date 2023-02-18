@@ -19,8 +19,11 @@ import warnings
 
 
 MAIN_DF_FILE = 'main_df.pickle'
+PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 last_lvl = {}
+price_alert = {}
+black_list = []
 
 def get_page_source(driver):
    try :
@@ -32,6 +35,9 @@ def get_page_source(driver):
 def verify_trends(main_df):
     
     if not main_df.empty:
+        
+        with open (PRICE_ALERT, 'rb') as f:
+           price_alert = json.load(f)
         
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
@@ -56,7 +62,11 @@ def verify_trends(main_df):
               notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['close'][-1])
            elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
               last_lvl.pop(name)
-
+           
+           if name in price_alert and name not in black_list and df_ticket['Último']['high'][-1] >= price_alert[name] \
+              and df_ticket['Último']['low'][-1] <= price_alert[name]:
+              notify(df_ticket.index[-1], name, 'Alert', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)
+              black_list.append(name)
               
 def get_status(variation):
    variation = variation.replace('%','')
@@ -69,8 +79,8 @@ def get_status(variation):
    else:
       return 0
 
-def notify(index, name, type, lvl0, lvl100, variation):
-   if (get_status(variation) == 1 and type == 'Short') or (get_status(variation) == -1 and type == 'Long'): 
+def notify(index, name, type, lvl0, lvl100, variation, ignore_restrictions=False):
+   if ignore_restrictions or ((get_status(variation) == 1 and type == 'Short') or (get_status(variation) == -1 and type == 'Long')): 
       print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation)
       winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
       time.sleep(1)
@@ -220,9 +230,12 @@ def test():
     
 
 def reset(reset_main):
+   empty_json = {}
    if reset_main and os.path.exists(MAIN_DF_FILE):
       os.remove(MAIN_DF_FILE)
-   
+   with open(PRICE_ALERT, 'w') as f:
+      json.dump(empty_json, f)
+      
 warnings.simplefilter(action='ignore', category=FutureWarning)
 reset(reset_main=True)
 main()
