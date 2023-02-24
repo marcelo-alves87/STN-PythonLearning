@@ -24,7 +24,7 @@ URL = "https://rico.com.vc/"
 last_lvl = {}
 price_alert = {}
 black_list = []
-lvls = [0, 23.6,32.8,50,61.8,78.6, 100]
+lvls = [0,23.6,32.8,50,61.8,78.6, 100]
 count = {}
 
 def get_page_source(driver):
@@ -50,23 +50,23 @@ def verify_trends(main_df):
            
            df_ticket.set_index('Data/Hora',inplace=True)
            df_ticket.sort_index(inplace=True)
-           
-           if name not in last_lvl and df_ticket['Mínimo']['close'][-2]/df_ticket['Máximo']['close'][-2] < 0.987:
-              last_lvl[name] = [df_ticket['Mínimo']['close'][-2], df_ticket['Máximo']['close'][-2]]               
+
+           if name not in last_lvl and df_ticket['Mínimo']['low'][-2]/df_ticket['Máximo']['high'][-2] < 0.987:
+              last_lvl[name] = [df_ticket['Mínimo']['low'][-2], df_ticket['Máximo']['high'][-2]]
            elif name in last_lvl:
               bull_fibo = get_fibo(last_lvl[name][1],last_lvl[name][0])
               for i in range(len(bull_fibo) - 1):
-                if df_ticket['Último']['close'][-2] > bull_fibo[lvls[i]] \
-                   and df_ticket['Último']['close'][-2] <= bull_fibo[lvls[i + 1]]:
+                if df_ticket['Último']['high'][-2] > bull_fibo[lvls[i]] \
+                   and df_ticket['Último']['high'][-2] <= bull_fibo[lvls[i + 1]]:
                       insert_count(lvls[i + 1], name, df_ticket.index[-2], df_ticket['Variação']['close'][-2], 'Bullish')
               bear_fibo = get_fibo(last_lvl[name][0],last_lvl[name][1])
               for i in range(len(bear_fibo) - 1):
-                if df_ticket['Último']['close'][-2] < bull_fibo[lvls[i]] \
-                   and df_ticket['Último']['close'][-2] >= bull_fibo[lvls[i + 1]]:
+                if df_ticket['Último']['low'][-2] < bear_fibo[lvls[i]] \
+                   and df_ticket['Último']['low'][-2] >= bear_fibo[lvls[i + 1]]:
                       insert_count(lvls[i + 1], name, df_ticket.index[-2], df_ticket['Variação']['close'][-2], 'Bearish')
 
 def insert_count(lvl, name, time, variation, type):
-   if lvl in count:
+   if lvl in count and name not in count[lvl]:
       count[lvl].append([name, time, variation, type])
    else:
       count[lvl] = [name, time, variation, type]
@@ -82,12 +82,6 @@ def get_status(variation):
       return -1
    else:
       return 0
-
-def notify(index, name, type, lvl0, lvl100, variation, ignore_restrictions=False):
-   if ignore_restrictions or ((get_status(variation) == 1 and type == 'Short') or (get_status(variation) == -1 and type == 'Long')): 
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation)
-      winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
-      time.sleep(1)
 
 def handle_finance(row):   
    if isinstance(row, float):
@@ -195,5 +189,6 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 reset(reset_main=False)
 #main()
 test()
+#count[78.6]
 pdb.set_trace()
 
