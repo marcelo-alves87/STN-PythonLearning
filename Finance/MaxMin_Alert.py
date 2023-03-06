@@ -21,6 +21,7 @@ import warnings
 MAIN_DF_FILE = 'main_df.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
+THRESHOLD = 0.99
 last_lvl = {}
 price_alert = {}
 black_list = []
@@ -39,7 +40,7 @@ def verify_trends(main_df):
         with open (PRICE_ALERT, 'rb') as f:
            price_alert = json.load(f)
         
-        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
          df_ticket = groups.loc[name][::-1]
@@ -48,25 +49,35 @@ def verify_trends(main_df):
            
            df_ticket.set_index('Data/Hora',inplace=True)
            df_ticket.sort_index(inplace=True)
+
+           if name not in black_list and df_ticket['Estado Atual']['close'][-1] != 'Aberto':
+              notify(df_ticket.index[-1], name, df_ticket['Estado Atual']['close'][-1], df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)   
+              black_list.append(name)
+           elif name in black_list and df_ticket['Estado Atual']['close'][-1] == 'Aberto':
+              black_list.remove(name)
            
            if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
-              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < 0.987:
+              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
               notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1], df_ticket['Variação']['close'][-1])
            elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:
               last_lvl.pop(name)
 
            if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
-              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < 0.987:
+              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Mínimo']['low'][-1], 'Bullish']
               notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1], df_ticket['Variação']['close'][-1])
            elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
               last_lvl.pop(name)
-           
-           if name in price_alert and name not in black_list and df_ticket['Último']['high'][-1] >= price_alert[name] \
-              and df_ticket['Último']['low'][-1] <= price_alert[name]:
+
+           if name in price_alert and df_ticket['Último']['high'][-1] >= price_alert[name] \
+              and df_ticket['Último']['low'][-1] <= price_alert[name]:              
               notify(df_ticket.index[-1], name, 'Alert', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)
-              black_list.append(name)
+              price_alert.pop(name) 
+              with open(PRICE_ALERT, 'w') as f:
+                 json.dump(price_alert, f)
+              time.sleep(1)   
+
               
 def get_status(variation):
    variation = variation.replace('%','')
@@ -172,7 +183,7 @@ def main():
         
         df = get_all_tickets_status(driver)
         
-        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro']]
+        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', 'Estado Atual']]
 
         df = df.drop(df[df['Ativo'] == 'IBOV'].index)
 
@@ -220,8 +231,7 @@ def test():
         
         df.set_index('Data/Hora', inplace=True)
         df.sort_index(inplace=True)
-
-        
+         
         verify_trends(df)
 
         #time.sleep(1)
@@ -235,9 +245,10 @@ def reset(reset_main):
       os.remove(MAIN_DF_FILE)
    with open(PRICE_ALERT, 'w') as f:
       json.dump(empty_json, f)
+   
       
 warnings.simplefilter(action='ignore', category=FutureWarning)
-reset(reset_main=False)
-#main()
-test()
+reset(reset_main=True)
+main()
+#test()
 
