@@ -25,6 +25,7 @@ THRESHOLD = 0.99
 last_lvl = {}
 price_alert = {}
 black_list = []
+INVESTMENT = 200
 
 def get_page_source(driver):
    try :
@@ -51,7 +52,7 @@ def verify_trends(main_df):
            df_ticket.sort_index(inplace=True)
 
            if name not in black_list and df_ticket['Estado Atual']['close'][-1] != 'Aberto':
-              notify(df_ticket.index[-1], name, df_ticket['Estado Atual']['close'][-1], df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)   
+              notify(df_ticket.index[-1], name, df_ticket['Estado Atual']['close'][-1], df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)   
               black_list.append(name)
            elif name in black_list and df_ticket['Estado Atual']['close'][-1] == 'Aberto':
               black_list.remove(name)
@@ -72,7 +73,7 @@ def verify_trends(main_df):
 
            if name in price_alert and df_ticket['Último']['high'][-1] >= price_alert[name] \
               and df_ticket['Último']['low'][-1] <= price_alert[name]:              
-              notify(df_ticket.index[-1], name, 'Alert', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)
+              notify(df_ticket.index[-1], name, 'Alert', df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)
               price_alert.pop(name) 
               with open(PRICE_ALERT, 'w') as f:
                  json.dump(price_alert, f)
@@ -90,11 +91,35 @@ def get_status(variation):
    else:
       return 0
 
+def cal_gross_value(type, lvl0, lvl100):
+   if type == 'Short':
+      lvlx = lvl100 - (lvl0 - lvl100)
+      price = lvl100
+   else:
+      lvlx = lvl0 + (lvl0 - lvl100)
+      price = lvl0
+         
+   leverage = INVESTMENT * 100
+   volume = int(leverage/price)
+
+   if type == 'Short':
+      gross_value = (price - lvlx) * volume
+   else:
+      gross_value = (lvlx - price) * volume
+   return round(gross_value,2)
+
+def sound_alert():
+   winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
+   time.sleep(1)
+   
 def notify(index, name, type, lvl0, lvl100, variation, ignore_restrictions=False):
-   if ignore_restrictions or ((get_status(variation) == 1 and type == 'Short') or (get_status(variation) == -1 and type == 'Long')): 
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation)
-      winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
-      time.sleep(1)
+   
+   if ignore_restrictions:
+      print(index,'********',name, '********', type, lvl0, variation)
+      sound_alert()      
+   elif ((get_status(variation) == 1 and type == 'Short') or (get_status(variation) == -1 and type == 'Long')):      
+      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, cal_gross_value(type, lvl0, lvl100))
+      sound_alert()
 
 def handle_finance(row):   
    if isinstance(row, float):
