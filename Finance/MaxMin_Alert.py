@@ -21,7 +21,7 @@ import warnings
 MAIN_DF_FILE = 'main_df.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
-THRESHOLD = 0.99
+THRESHOLD = 0.98
 last_lvl = {}
 price_alert = {}
 black_list = []
@@ -50,9 +50,10 @@ def verify_trends(main_df):
            
            df_ticket.set_index('Data/Hora',inplace=True)
            df_ticket.sort_index(inplace=True)
-
+           
            if name not in black_list and df_ticket['Estado Atual']['close'][-1] != 'Aberto':
-              notify(df_ticket.index[-1], name, df_ticket['Estado Atual']['close'][-1], df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)   
+              notify(df_ticket.index[-1], name, df_ticket['Estado Atual']['close'][-1], df_ticket['Último']['close'][-1],\
+                     df_ticket['Último']['close'][-1], df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2], ignore_restrictions=True)   
               black_list.append(name)
            elif name in black_list and df_ticket['Estado Atual']['close'][-1] == 'Aberto':
               black_list.remove(name)
@@ -60,20 +61,23 @@ def verify_trends(main_df):
            if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
               and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
-              notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1], df_ticket['Variação']['close'][-1])
+              notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1],\
+                     df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2])
            elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:
               last_lvl.pop(name)
 
            if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
               and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Mínimo']['low'][-1], 'Bullish']
-              notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1], df_ticket['Variação']['close'][-1])
+              notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1],\
+                     df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2])
            elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
               last_lvl.pop(name)
 
            if name in price_alert and df_ticket['Último']['high'][-1] >= price_alert[name] \
               and df_ticket['Último']['low'][-1] <= price_alert[name]:              
-              notify(df_ticket.index[-1], name, 'Alert', df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1], df_ticket['Variação']['close'][-1], ignore_restrictions=True)
+              notify(df_ticket.index[-1], name, 'Alert', df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1],
+                     df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2], ignore_restrictions=True)
               price_alert.pop(name) 
               with open(PRICE_ALERT, 'w') as f:
                  json.dump(price_alert, f)
@@ -85,11 +89,11 @@ def get_status(variation):
    variation = variation.replace(',','.')
    variation = float(variation)
    if variation > 0:
-      return 1
+      return [1,variation]
    elif variation < 0:
-      return -1
+      return [-1,variation]
    else:
-      return 0
+      return [0,variation]
 
 def cal_gross_value(type, lvl0, lvl100):
    if type == 'Short':
@@ -112,13 +116,14 @@ def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
    
-def notify(index, name, type, lvl0, lvl100, variation, ignore_restrictions=False):
-   
+def notify(index, name, type, lvl0, lvl100, variation, finance, ignore_restrictions=False):
+   var = get_status(variation)
    if ignore_restrictions:
-      print(index,'********',name, '********', type, lvl0, variation)
+      print(index,'********',name, '********', type, lvl0, variation, finance)
       sound_alert()      
-   elif ((get_status(variation) == 1 and type == 'Short') or (get_status(variation) == -1 and type == 'Long')):      
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, cal_gross_value(type, lvl0, lvl100))
+   elif ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long'))\
+        or (var[0] == 1 and var[1] > 2.85 and var[1] < 4):      
+      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, round(finance/1000, 2), cal_gross_value(type, lvl0, lvl100))
       sound_alert()
 
 def handle_finance(row):   
