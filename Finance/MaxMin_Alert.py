@@ -51,13 +51,6 @@ def verify_trends(main_df):
            df_ticket.set_index('Data/Hora',inplace=True)
            df_ticket.sort_index(inplace=True)
            
-           if name not in black_list and df_ticket['Estado Atual']['close'][-1] != 'Aberto':
-              notify(df_ticket.index[-1], name, df_ticket['Estado Atual']['close'][-1], df_ticket['Último']['close'][-1],\
-                     df_ticket['Último']['close'][-1], df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2], ignore_restrictions=True)   
-              black_list.append(name)
-           elif name in black_list and df_ticket['Estado Atual']['close'][-1] == 'Aberto':
-              black_list.remove(name)
-           
            if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
               and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
@@ -95,6 +88,21 @@ def get_status(variation):
    else:
       return [0,variation]
 
+def print_finance(row):   
+   if isinstance(row, float):
+       row = round(row,2)
+       if row > 10 ** 9:
+           row = row / 10 ** 9 
+           row = '{} B'.format(row)
+       elif row > 10 ** 6:
+           row = row / 10 ** 6 
+           row = '{} M'.format(row)
+       elif row > 10 ** 3:
+           row = row / 10 ** 3
+           row = '{} k'.format(row)
+        
+   return row   
+
 def cal_gross_value(type, lvl0, lvl100):
    if type == 'Short':
       lvlx = lvl100 - (lvl0 - lvl100)
@@ -123,7 +131,7 @@ def notify(index, name, type, lvl0, lvl100, variation, finance, ignore_restricti
       sound_alert()      
    elif ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long'))\
         or (var[0] == 1 and var[1] > 2.85 and var[1] < 4):      
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, round(finance/1000, 2), cal_gross_value(type, lvl0, lvl100))
+      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, print_finance(finance), cal_gross_value(type, lvl0, lvl100))
       sound_alert()
 
 def handle_finance(row):   
