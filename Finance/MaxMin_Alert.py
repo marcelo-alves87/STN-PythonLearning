@@ -41,21 +41,23 @@ def verify_trends(main_df):
         with open (PRICE_ALERT, 'rb') as f:
            price_alert = json.load(f)
         
-        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual'].agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
+                    .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
          df_ticket = groups.loc[name][::-1]
          
          if isinstance(df_ticket, pd.DataFrame) and len(df_ticket.index) > 2:
-           
+
+
            df_ticket.set_index('Data/Hora',inplace=True)
            df_ticket.sort_index(inplace=True)
-           
+
            if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
               and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
               notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1],\
-                     df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2])
+                     df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
            elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:
               last_lvl.pop(name)
 
@@ -63,14 +65,14 @@ def verify_trends(main_df):
               and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Mínimo']['low'][-1], 'Bullish']
               notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1],\
-                     df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2])
+                     df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
            elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
               last_lvl.pop(name)
 
            if name in price_alert and df_ticket['Último']['high'][-1] >= price_alert[name] \
               and df_ticket['Último']['low'][-1] <= price_alert[name]:              
               notify(df_ticket.index[-1], name, 'Alert', df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1],
-                     df_ticket['Variação']['close'][-1], main_df[main_df['Ativo'] == name]['Financeiro'][-2], ignore_restrictions=True)
+                     df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], ignore_restrictions=True)
               price_alert.pop(name) 
               with open(PRICE_ALERT, 'w') as f:
                  json.dump(price_alert, f)
@@ -88,20 +90,24 @@ def get_status(variation):
    else:
       return [0,variation]
 
-def print_finance(row):   
+def print_finance_(row):
    if isinstance(row, float):
-       row = round(row,2)
-       if row > 10 ** 9:
-           row = row / 10 ** 9 
-           row = '{} B'.format(row)
-       elif row > 10 ** 6:
-           row = row / 10 ** 6 
-           row = '{} M'.format(row)
-       elif row > 10 ** 3:
-           row = row / 10 ** 3
-           row = '{} k'.format(row)
-        
-   return row   
+      row = round(row,2)
+      if row > 10 ** 9:
+         row = row / 10 ** 9 
+         row = '{} B'.format(row)
+      elif row > 10 ** 6:
+         row = row / 10 ** 6 
+         row = '{} M'.format(row)
+      elif row > 10 ** 3:
+         row = row / 10 ** 3
+         row = '{} k'.format(row)
+      return row 
+
+def print_finance(finance):   
+    accum = print_finance_(finance[-2])
+    min = print_finance_(finance.diff()[-2])
+    return accum, min
 
 def cal_gross_value(type, lvl0, lvl100):
    if type == 'Short':
@@ -127,11 +133,11 @@ def sound_alert():
 def notify(index, name, type, lvl0, lvl100, variation, finance, ignore_restrictions=False):
    var = get_status(variation)
    if ignore_restrictions:
-      print(index,'********',name, '********', type, lvl0, variation, finance)
+      print(index,'********',name, '********', type, lvl0, variation, print_finance(finance)[0], print_finance(finance)[1])
       sound_alert()      
    elif ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long'))\
         or (var[0] == 1 and var[1] > 2.85 and var[1] < 4):      
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, print_finance(finance), cal_gross_value(type, lvl0, lvl100))
+      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, print_finance(finance)[0], print_finance(finance)[1], cal_gross_value(type, lvl0, lvl100))
       sound_alert()
 
 def handle_finance(row):   
@@ -230,7 +236,7 @@ def main():
         df['Mínimo'] = df['Mínimo']/100
         df['Abertura'] = df['Abertura']/100
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row))  
-
+        df['Financeiro'] = df['Financeiro'].astype(float) 
         df['Data/Hora'] = df['Data/Hora'].replace('-','00:00:00') 
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'])
 
@@ -266,7 +272,7 @@ def test():
         df = main_df.reset_index()
         df = df[df['Data/Hora'] < time1]        
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row)) 
-        
+        df['Financeiro'] = df['Financeiro'].astype(float)
         df.set_index('Data/Hora', inplace=True)
         df.sort_index(inplace=True)
          
