@@ -54,14 +54,16 @@ def verify_trends(main_df):
            df_ticket.set_index('Data/Hora',inplace=True)
            df_ticket.sort_index(inplace=True)
 
-           if name not in last_lvl and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
+           if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
+              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
               notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1],\
                      df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
            elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:
               last_lvl.pop(name)
 
-           if name not in last_lvl and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
+           if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
+              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
               last_lvl[name] = [df_ticket['Mínimo']['low'][-1], 'Bullish']
               notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1],\
                      df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
