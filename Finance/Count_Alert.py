@@ -130,9 +130,13 @@ def sound_alert():
    time.sleep(1)
    
 def notify(index, name, type, lvl0, lvl100, variation, finance, ignore_restrictions=False):
-   if name not in test_list:
+   var = get_status(variation)
+   accum = print_finance(finance)[0]
+   min = print_finance(finance)[1]
+   if name not in test_list and 'k' not in accum and ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long')\
+        or (var[0] == 1 and var[1] > 2.85 and var[1] < 4)):     
       var = get_status(variation)
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, print_finance(finance)[0], print_finance(finance)[1], cal_gross_value(type, lvl0, lvl100))
+      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, accum, min, cal_gross_value(type, lvl0, lvl100))
       lvl_100 = lvl0 + (lvl0 - lvl100)
       lvl200 = lvl100 - (lvl0 - lvl100)
       test_list[name] = [lvl_100, lvl200]

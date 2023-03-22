@@ -132,12 +132,14 @@ def sound_alert():
    
 def notify(index, name, type, lvl0, lvl100, variation, finance, ignore_restrictions=False):
    var = get_status(variation)
+   accum = print_finance(finance)[0]
+   min = print_finance(finance)[1]
    if ignore_restrictions:
-      print(index,'********',name, '********', type, lvl0, variation, print_finance(finance)[0], print_finance(finance)[1])
+      print(index,'********',name, '********', type, lvl0, variation, accum, min)
       sound_alert()      
-   elif ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long'))\
-        or (var[0] == 1 and var[1] > 2.85 and var[1] < 4):      
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, print_finance(finance)[0], print_finance(finance)[1], cal_gross_value(type, lvl0, lvl100))
+   elif 'k' not in accum and ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long')\
+        or (var[0] == 1 and var[1] > 2.85 and var[1] < 4)):      
+      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, accum, min, cal_gross_value(type, lvl0, lvl100))
       sound_alert()
 
 def handle_finance(row):   
