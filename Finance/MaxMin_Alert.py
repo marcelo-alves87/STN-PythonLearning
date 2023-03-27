@@ -21,7 +21,7 @@ import warnings
 MAIN_DF_FILE = 'main_df.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
-THRESHOLD = 0.98
+THRESHOLD = .98
 last_lvl = {}
 price_alert = {}
 black_list = []
@@ -45,38 +45,37 @@ def verify_trends(main_df):
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
-         df_ticket = groups.loc[name][::-1]
+           df_ticket = groups.loc[name][::-1]
          
-         if isinstance(df_ticket, pd.DataFrame) and len(df_ticket.index) > 2:
+           if isinstance(df_ticket, pd.DataFrame):
 
+              df_ticket.set_index('Data/Hora',inplace=True)
+              df_ticket.sort_index(inplace=True)
+              
+              if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
+                 and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
+                 last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
+                 notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1],\
+                        df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
+              elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:
+                 last_lvl.pop(name)
 
-           df_ticket.set_index('Data/Hora',inplace=True)
-           df_ticket.sort_index(inplace=True)
+              if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
+                 and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
+                 last_lvl[name] = [df_ticket['Mínimo']['low'][-1], 'Bullish']
+                 notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1],\
+                        df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
+              elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
+                 last_lvl.pop(name)
 
-           if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
-              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
-              last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
-              notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1],\
-                     df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-           elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:
-              last_lvl.pop(name)
-
-           if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
-              and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
-              last_lvl[name] = [df_ticket['Mínimo']['low'][-1], 'Bullish']
-              notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1],\
-                     df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-           elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
-              last_lvl.pop(name)
-
-           if name in price_alert and df_ticket['Último']['high'][-1] >= price_alert[name] \
-              and df_ticket['Último']['low'][-1] <= price_alert[name]:              
-              notify(df_ticket.index[-1], name, 'Alert', df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1],
-                     df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], ignore_restrictions=True)
-              price_alert.pop(name) 
-              with open(PRICE_ALERT, 'w') as f:
-                 json.dump(price_alert, f)
-              time.sleep(1)   
+              if name in price_alert and df_ticket['Último']['high'][-1] >= price_alert[name] \
+                 and df_ticket['Último']['low'][-1] <= price_alert[name]:              
+                 notify(df_ticket.index[-1], name, 'Alert', df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1],
+                        df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], ignore_restrictions=True)
+                 price_alert.pop(name) 
+                 with open(PRICE_ALERT, 'w') as f:
+                    json.dump(price_alert, f)
+                 time.sleep(1)   
 
               
 def get_status(variation):
@@ -104,9 +103,12 @@ def print_finance_(row):
          row = '{} k'.format(row)
       return row 
 
-def print_finance(finance):   
+def print_finance(finance):
     accum = print_finance_(finance[-2])
-    min = print_finance_(finance.diff()[-2])
+    if len(finance) > 2:
+      min = print_finance_(finance.diff()[-2])
+    else:
+      min = accum
     return accum, min
 
 def cal_gross_value(type, lvl0, lvl100):
@@ -294,7 +296,7 @@ def reset(reset_main):
    
       
 warnings.simplefilter(action='ignore', category=FutureWarning)
-reset(reset_main=True)
-main()
-#test()
+reset(reset_main=False)
+#main()
+test()
 
