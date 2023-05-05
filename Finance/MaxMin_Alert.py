@@ -68,14 +68,21 @@ def verify_trends(main_df):
               elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
                  last_lvl.pop(name)
 
-              if name in price_alert and df_ticket['Último']['high'][-1] >= price_alert[name] \
-                 and df_ticket['Último']['low'][-1] <= price_alert[name]:              
-                 notify(df_ticket.index[-1], name, 'Alert', df_ticket['Último']['close'][-1], df_ticket['Último']['close'][-1],
-                        df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], ignore_restrictions=True)
-                 price_alert.pop(name) 
-                 with open(PRICE_ALERT, 'w') as f:
-                    json.dump(price_alert, f)
-                 time.sleep(1)   
+              if name in price_alert:
+                 if isinstance(price_alert[name], float):
+                    price_alert[name] = [price_alert[name]]
+                 if isinstance(price_alert[name], list):
+                    for i in range(len(price_alert[name])):
+                       price = price_alert[name][i]
+                       if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
+                          notify(df_ticket.index[-1], name, 'Alert', price, df_ticket['Último']['close'][-1],\
+                             df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], ignore_restrictions=True)
+                          price_alert.pop(name) 
+                          with open(PRICE_ALERT, 'w') as f:
+                             json.dump(price_alert, f)
+                          time.sleep(1)   
+                          break   
+                             
 
               
 def get_status(variation):
@@ -220,6 +227,7 @@ def main():
     driver.get(URL) 
 
     input('Waiting ...')
+    #pdb.set_trace()
     driver.switch_to.window(driver.window_handles[1])
     print('Running ...')
     #insert_tickets(driver)
@@ -296,7 +304,7 @@ def reset(reset_main):
    
       
 warnings.simplefilter(action='ignore', category=FutureWarning)
-reset(reset_main=False)
+#reset(reset_main=True)
 #main()
 test()
 
