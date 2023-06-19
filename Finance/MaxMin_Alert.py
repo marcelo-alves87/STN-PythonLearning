@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 import pdb
 import time
 import datetime as dt
@@ -223,12 +224,19 @@ def main():
         
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
-    driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
+    ser = Service(r"Utils/chromedriver.exe")
+    driver = webdriver.Chrome(service=ser,options=options)
     driver.get(URL) 
 
     input('Waiting ...')
-    #pdb.set_trace()
-    driver.switch_to.window(driver.window_handles[1])
+    tabs_size = len(driver.window_handles)
+    for i in range(tabs_size):
+       driver.switch_to.window(driver.window_handles[i])
+       try:
+          driver.execute_script("document.getElementById('app-menu').click()")
+          break
+       except:
+          pass
     print('Running ...')
     #insert_tickets(driver)
     while(True):
@@ -243,14 +251,15 @@ def main():
 
         df = df.drop(df[df['Ativo'] == 'IBOV'].index)
 
-        df['Último'] = df['Último']/100
-        df['Máximo'] = df['Máximo']/100
-        df['Mínimo'] = df['Mínimo']/100
-        df['Abertura'] = df['Abertura']/100
+        
+        df['Último'] = df['Último'].astype(float)/100        
+        df['Máximo'] = df['Máximo'].astype(float)/100
+        df['Mínimo'] = df['Mínimo'].astype(float)/100
+        df['Abertura'] = df['Abertura'].astype(float)/100
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row))  
         df['Financeiro'] = df['Financeiro'].astype(float) 
         df['Data/Hora'] = df['Data/Hora'].replace('-','00:00:00') 
-        df['Data/Hora'] = pd.to_datetime(df['Data/Hora'])
+        df['Data/Hora'] = pd.to_datetime(df['Data/Hora'], dayfirst=True)
 
         start_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 10:00:00'
         end_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 18:00:00'
@@ -304,7 +313,7 @@ def reset(reset_main):
    
       
 warnings.simplefilter(action='ignore', category=FutureWarning)
-#reset(reset_main=True)
-#main()
-test()
+reset(reset_main=True)
+main()
+#test()
 
