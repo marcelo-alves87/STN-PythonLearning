@@ -22,11 +22,12 @@ import warnings
 MAIN_DF_FILE = 'main_df.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
-THRESHOLD = .98
+THRESHOLD = .987
 last_lvl = {}
 price_alert = {}
 black_list = []
 INVESTMENT = 200
+color = sys.stdout.shell
 
 def get_page_source(driver):
    try :
@@ -147,11 +148,15 @@ def notify(index, name, type, lvl0, lvl100, variation, finance, ignore_restricti
    if ignore_restrictions:
       print(index,'********',name, '********', type, lvl0, variation, accum, min)
       sound_alert()      
-   elif 'k' not in accum and ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long')\
-        or (var[0] == 1 and var[1] > 2.85 and var[1] < 4)):      
-      print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, accum, min, cal_gross_value(type, lvl0, lvl100))
-      sound_alert()
-
+   elif 'k' not in accum:
+      if ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long')\
+        or (var[0] == 1 and var[1] > 2.85 and var[1] < 4)):
+         str1 =  (index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, accum, min, cal_gross_value(type, lvl0, lvl100), '\n')
+         color.write(str1,"COMMENT")
+         sound_alert()
+      else:
+         print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, accum, min, cal_gross_value(type, lvl0, lvl100))
+   
 def handle_finance(row):   
    if isinstance(row, float):
       return row
@@ -316,4 +321,5 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 reset(reset_main=True)
 main()
 #test()
+
 
