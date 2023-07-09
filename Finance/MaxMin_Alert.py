@@ -23,10 +23,8 @@ MAIN_DF_FILE = 'main_df.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 THRESHOLD = .987
-last_lvl = {}
 price_alert = {}
 black_list = []
-INVESTMENT = 200
 color = sys.stdout.shell
 
 def get_page_source(driver):
@@ -39,7 +37,7 @@ def get_page_source(driver):
 def verify_trends(main_df):
     
     if not main_df.empty:
-        
+
         with open (PRICE_ALERT, 'rb') as f:
            price_alert = json.load(f)
         
@@ -53,23 +51,24 @@ def verify_trends(main_df):
 
               df_ticket.set_index('Data/Hora',inplace=True)
               df_ticket.sort_index(inplace=True)
+
+              min = df_ticket['Mínimo']['low'].min()
+              max = df_ticket['Máximo']['high'].max()
+              time_min = df_ticket[df_ticket['Mínimo']['low'] == min].index[0]
+              time_max = df_ticket[df_ticket['Máximo']['high'] == max].index[0]
               
-              if name not in last_lvl and df_ticket['Mínimo']['open'][-1] > df_ticket['Mínimo']['low'][-1] \
-                 and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
-                 last_lvl[name] = [df_ticket['Máximo']['high'][-1], 'Bearish'] 
-                 notify(df_ticket.index[-1], name, 'Short', df_ticket['Máximo']['high'][-1], df_ticket['Mínimo']['open'][-1],\
-                        df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-              elif name in last_lvl and last_lvl[name][1] == 'Bearish' and df_ticket['Último']['close'][-2] > last_lvl[name][0]:
-                 last_lvl.pop(name)
+              if name not in black_list and min/max < THRESHOLD:
+                 var = get_status(df_ticket['Variação']['close'][-1])
+                 if time_max > time_min and var[1] == -1:
+                    time_diff = (time_max - time_min).seconds//60
+                    notify(df_ticket.index[-1], name, time_diff, 'Bullish', df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
+                 if time_max < time_min and var[1] == 1:
+                    time_diff = (time_min - time_max).seconds//60
+                    notify(df_ticket.index[-1], name, time_diff, 'Bearish', df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])       
+                 
 
-              if name not in last_lvl and df_ticket['Máximo']['open'][-1] < df_ticket['Máximo']['high'][-1] \
-                 and df_ticket['Mínimo']['low'][-1]/df_ticket['Máximo']['high'][-1] < THRESHOLD:
-                 last_lvl[name] = [df_ticket['Mínimo']['low'][-1], 'Bullish']
-                 notify(df_ticket.index[-1], name, 'Long', df_ticket['Máximo']['open'][-1], df_ticket['Mínimo']['low'][-1],\
-                        df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-              elif name in last_lvl and last_lvl[name][1] == 'Bullish' and df_ticket['Último']['close'][-2] < last_lvl[name][0]:
-                 last_lvl.pop(name)
-
+                 
+              
               if name in price_alert:
                  if isinstance(price_alert[name], float):
                     price_alert[name] = [price_alert[name]]
@@ -77,7 +76,7 @@ def verify_trends(main_df):
                     for i in range(len(price_alert[name])):
                        price = price_alert[name][i]
                        if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                          notify(df_ticket.index[-1], name, 'Alert', price, df_ticket['Último']['close'][-1],\
+                          notify(df_ticket.index[-1], name, None, 'Alert', price, df_ticket['Último']['close'][-1],\
                              df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], ignore_restrictions=True)
                           price_alert.pop(name) 
                           with open(PRICE_ALERT, 'w') as f:
@@ -120,42 +119,22 @@ def print_finance(finance):
       min = accum
     return accum, min
 
-def cal_gross_value(type, lvl0, lvl100):
-   if type == 'Short':
-      lvlx = lvl100 - (lvl0 - lvl100)
-      price = lvl100
-   else:
-      lvlx = lvl0 + (lvl0 - lvl100)
-      price = lvl0
-         
-   leverage = INVESTMENT * 100
-   volume = int(leverage/price)
-
-   if type == 'Short':
-      gross_value = (price - lvlx) * volume
-   else:
-      gross_value = (lvlx - price) * volume
-   return round(gross_value,2)
-
 def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
-   
-def notify(index, name, type, lvl0, lvl100, variation, finance, ignore_restrictions=False):
-   var = get_status(variation)
+ 
+def notify(index, name, time_diff, type, variation, finance, ignore_restrictions=False):
+   black_list.append(name)
    accum = print_finance(finance)[0]
    min = print_finance(finance)[1]
    if ignore_restrictions:
-      print(index,'********',name, '********', type, lvl0, variation, accum, min)
+      print(index,'********',name, '********', type, variation, accum, min)
       sound_alert()      
-   elif 'k' not in accum:
-      if ((var[0] == 1 and type == 'Short') or (var[0] == -1 and type == 'Long')\
-        or (var[0] == 1 and var[1] > 2.85 and var[1] < 4)):
-         str1 =  (index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, accum, min, cal_gross_value(type, lvl0, lvl100), '\n')
-         color.write(str1,"COMMENT")
-         sound_alert()
-      else:
-         print(index,'********',name, '********', type, lvl0, lvl100, round(lvl100/lvl0,3), variation, accum, min, cal_gross_value(type, lvl0, lvl100))
+   else:
+      str1 =  (index,'********',name, '********', str(time_diff) + ' mins ', type, variation, accum, min, '\n')
+      color.write(str1,"COMMENT")
+      sound_alert()
+    
    
 def handle_finance(row):   
    if isinstance(row, float):
@@ -189,18 +168,20 @@ def insert_tickets(driver):
    time.sleep(5)
    tickets = get_tickets()
    for ticket in tickets:
-      time.sleep(1)
-      driver.execute_script("document.querySelector('.nelo-dialog-titlebar-buttons__button--cross-button').click()")
-      time.sleep(2)
-      typewrite(ticket)
-      time.sleep(2)
-      found = driver.execute_script("return document.querySelector('.tickerform-component-results').getElementsByTagName(\"li\").length")
-      if found > 0:
-         press('down')
+      if '11' not in ticket:
+         print('Inserting ' + ticket + ' ...\n')
          time.sleep(1)
-         press('enter')
-      else:   
-         press('esc')
+         driver.execute_script("document.querySelector('.nelo-dialog-titlebar-buttons__button').click()")
+         time.sleep(2)
+         typewrite(ticket)
+         time.sleep(2)
+         found = driver.execute_script("return document.querySelector('.tickerform-component-results').getElementsByTagName(\"li\").length")
+         if found > 0:
+            press('down')
+            time.sleep(1)
+            press('enter')
+         else:   
+            press('esc')
 
 def get_all_tickets_status(driver):
    main_df = None
@@ -211,15 +192,14 @@ def get_all_tickets_status(driver):
        tables = soup.find_all('table', class_='nelo-table-group') 
        df = pd.read_html(str(tables[0]))[0]
        df.dropna(inplace=True)
-       driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop += 100")
+       driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop += 50")
        if main_df is None:
           main_df = df
        else:
-          df2 = df[df['Ativo'].isin(main_df['Ativo']) == False]
-          if df2.empty:
-             has_next = False
-          else:
-             main_df = pd.concat([main_df, df2])
+          main_df = pd.concat([main_df, df])
+          df2 = df[df['Ativo'] == 'ZAMP3']
+          if not df2.empty:
+             has_next = False             
    return main_df
 
 def main():
@@ -246,8 +226,10 @@ def main():
     #insert_tickets(driver)
     while(True):
 
-        
-        driver.execute_script("document.getElementById('app-menu').click()")
+        try:
+           driver.execute_script("document.getElementById('app-menu').click()")
+        except:
+           input('Catched Exception ...')
         driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop = 0") 
         
         df = get_all_tickets_status(driver)
@@ -279,7 +261,13 @@ def main():
         if main_df.empty:
             main_df = df
         else:
+            
             main_df = pd.concat([main_df, df])
+            main_df.reset_index(inplace=True)
+            main_df.set_index(['Data/Hora', 'Ativo'], inplace=True)
+            main_df.drop_duplicates(inplace=True)
+            main_df.reset_index(inplace=True)
+            main_df.set_index('Data/Hora', inplace=True)            
             main_df.to_pickle(MAIN_DF_FILE)
 
     
@@ -321,5 +309,3 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 reset(reset_main=True)
 main()
 #test()
-
-
