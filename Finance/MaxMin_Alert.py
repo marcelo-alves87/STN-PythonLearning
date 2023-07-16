@@ -26,6 +26,7 @@ THRESHOLD = .987
 price_alert = {}
 black_list = []
 color = sys.stdout.shell
+last_date = None
 
 def get_page_source(driver):
    try :
@@ -59,10 +60,10 @@ def verify_trends(main_df):
               
               if name not in black_list and min/max < THRESHOLD:
                  var = get_status(df_ticket['Variação']['close'][-1])
-                 if time_max > time_min and var[1] == -1:
+                 if time_max > time_min and var[0] == -1:
                     time_diff = (time_max - time_min).seconds//60
                     notify(df_ticket.index[-1], name, time_diff, 'Bullish', df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-                 if time_max < time_min and var[1] == 1:
+                 if time_max < time_min and var[0] == 1:
                     time_diff = (time_min - time_max).seconds//60
                     notify(df_ticket.index[-1], name, time_diff, 'Bearish', df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])       
                  
@@ -76,8 +77,8 @@ def verify_trends(main_df):
                     for i in range(len(price_alert[name])):
                        price = price_alert[name][i]
                        if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                          notify(df_ticket.index[-1], name, None, 'Alert', price, df_ticket['Último']['close'][-1],\
-                             df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], ignore_restrictions=True)
+                          notify(df_ticket.index[-1], name, time_diff, 'Alert', df_ticket['Variação']['close'][-1],\
+                                 df_ticket['Financeiro']['close'], ignore_restrictions=True)
                           price_alert.pop(name) 
                           with open(PRICE_ALERT, 'w') as f:
                              json.dump(price_alert, f)
@@ -130,7 +131,7 @@ def notify(index, name, time_diff, type, variation, finance, ignore_restrictions
    if ignore_restrictions:
       print(index,'********',name, '********', type, variation, accum, min)
       sound_alert()      
-   else:
+   elif 'k' not in accum and 'k' not in min:
       str1 =  (index,'********',name, '********', str(time_diff) + ' mins ', type, variation, accum, min, '\n')
       color.write(str1,"COMMENT")
       sound_alert()
@@ -155,14 +156,12 @@ def handle_finance(row):
       return row
 
 def get_tickets():
-   data = []
-   f = open("Tickets.txt", "r")
-   for line in f:
-      data.append(f.readline().rstrip())
-   f.close()
+   data = []   
+   with open("Tickets.txt") as file:
+    for line in file:
+        data.append(line.rstrip())
    return data
-
-  
+     
 # You have to return to the browser quickly, and do nothing until the end of the inserting.   
 def insert_tickets(driver):
    time.sleep(5)
@@ -197,9 +196,21 @@ def get_all_tickets_status(driver):
           main_df = df
        else:
           main_df = pd.concat([main_df, df])
-          df2 = df[df['Ativo'] == 'ZAMP3']
+          df2 = df[df['Ativo'] == 'YDUQ3']
           if not df2.empty:
-             has_next = False             
+             has_next = False
+   
+   global last_date
+   now = dt.datetime.today()
+   if last_date is None:
+      print('Last reading at {}'.format(dt.datetime.today().strftime('%H:%M:%S')))
+   else:
+      secs = (now - last_date).seconds
+      if secs >= 60:
+         print('Last reading at {} after {} min {} secs'.format(dt.datetime.today().strftime('%H:%M:%S'),secs//60,secs%60))
+      else:
+         print('Last reading at {} after {} secs'.format(dt.datetime.today().strftime('%H:%M:%S'),secs))
+   last_date = dt.datetime.today()
    return main_df
 
 def main():
@@ -274,9 +285,15 @@ def main():
         verify_trends(main_df)
 
         time.sleep(1)
+
+def iterate():
+    for index,row in main_df.iterrows():
+       if row['Ativo'] == 'SOMA3':
+          print(index,row['Último'],row['Variação'])
+
   
 def test():
-    
+
     main_df = pd.read_pickle(MAIN_DF_FILE)
     time1 = main_df.index[0]
     last_time = main_df.index[-1]
@@ -294,8 +311,8 @@ def test():
 
         #time.sleep(1)
         time1 += dt.timedelta(minutes = 5)
-
-    
+##
+##    
 
 def reset(reset_main):
    empty_json = {}
@@ -309,3 +326,4 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 reset(reset_main=True)
 main()
 #test()
+
