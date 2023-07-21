@@ -59,17 +59,22 @@ def verify_trends(main_df):
               time_max = df_ticket[df_ticket['Máximo']['high'] == max].index[0]
               
               if name not in black_list and min/max < THRESHOLD:
-                 var = get_status(df_ticket['Variação']['close'][-1])
-                 if time_max > time_min and var[0] == -1:
+                 last_var = get_status(df_ticket['Variação']['close'][-1])                 
+                 if time_max > time_min:
                     time_diff = (time_max - time_min).seconds//60
-                    notify(df_ticket.index[-1], name, time_diff, 'Bullish', df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-                 if time_max < time_min and var[0] == 1:
+                    min_var = get_status(df_ticket.loc[time_min]['Variação']['close'])
+                    if last_var[0] == -1:
+                       notify(df_ticket.index[-1], name, time_diff, 'Bullish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
+                    elif min_var[0] == -1:                       
+                       notify(df_ticket.index[-1], name, time_diff, 'Bullish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'],  color_='STRING')
+                 if time_max < time_min:
                     time_diff = (time_min - time_max).seconds//60
-                    notify(df_ticket.index[-1], name, time_diff, 'Bearish', df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])       
-                 
-
-                 
-              
+                    max_var = get_status(df_ticket.loc[time_max]['Variação']['close'])
+                    if last_var[0] == 1:
+                       notify(df_ticket.index[-1], name, time_diff, 'Bearish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
+                    elif max_var[0] == 1:
+                       notify(df_ticket.index[-1], name, time_diff, 'Bearish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], color_='STRING')
+                    
               if name in price_alert:
                  if isinstance(price_alert[name], float):
                     price_alert[name] = [price_alert[name]]
@@ -77,7 +82,7 @@ def verify_trends(main_df):
                     for i in range(len(price_alert[name])):
                        price = price_alert[name][i]
                        if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                          notify(df_ticket.index[-1], name, time_diff, 'Alert', df_ticket['Variação']['close'][-1],\
+                          notify(df_ticket.index[-1], name, time_diff, 'Alert', None, df_ticket['Variação']['close'][-1],\
                                  df_ticket['Financeiro']['close'], ignore_restrictions=True)
                           price_alert.pop(name) 
                           with open(PRICE_ALERT, 'w') as f:
@@ -110,6 +115,8 @@ def print_finance_(row):
       elif row > 10 ** 3:
          row = row / 10 ** 3
          row = '{} k'.format(row)
+      else:
+         row = '{}'.format(row)
       return row 
 
 def print_finance(finance):
@@ -124,16 +131,17 @@ def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def notify(index, name, time_diff, type, variation, finance, ignore_restrictions=False):
+def notify(index, name, time_diff, type, ratio, variation, finance, ignore_restrictions=False, color_ = 'COMMENT'):
    black_list.append(name)
    accum = print_finance(finance)[0]
    min = print_finance(finance)[1]
+   var = get_status(variation)
    if ignore_restrictions:
       print(index,'********',name, '********', type, variation, accum, min)
-      sound_alert()      
-   elif 'k' not in accum and 'k' not in min:
-      str1 =  (index,'********',name, '********', str(time_diff) + ' mins ', type, variation, accum, min, '\n')
-      color.write(str1,"COMMENT")
+      sound_alert()
+   elif isinstance(accum, str) and 'M' in accum and 'M' in min and abs(var[1]) > 1:
+      str1 =  (index,'********',name, '********', str(time_diff) + ' mins ', type, round(ratio,3), variation, accum, min, '\n')
+      color.write(str1,color_)      
       sound_alert()
     
    
@@ -221,7 +229,8 @@ def main():
     options = webdriver.ChromeOptions()
     options.add_argument("--incognito")
     ser = Service(r"Utils/chromedriver.exe")
-    driver = webdriver.Chrome(service=ser,options=options)
+    driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
+    #driver = webdriver.Chrome(service=ser,options=options)
     driver.get(URL) 
 
     input('Waiting ...')
