@@ -96,12 +96,12 @@ def verify_trends(main_df):
                  if time_max > time_min and not has_red:                    
                     time_diff = (time_max - time_min).seconds//60
                     if time_diff >= TIME_THRESHOLD:
-                       notify(df_ticket.index[-1], name, time_diff, 'Bullish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close']) 
+                       notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Bullish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close']) 
                  elif time_max < time_min and not has_green:
                     
                     time_diff = (time_min - time_max).seconds//60
                     if time_diff >= TIME_THRESHOLD:
-                       notify(df_ticket.index[-1], name, time_diff, 'Bearish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])  
+                       notify(df_ticket.index[-1], name,  df_ticket['Último']['close'][-1], time_diff, 'Bearish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])  
 
               
                           
@@ -112,7 +112,7 @@ def verify_trends(main_df):
                     for i in range(len(price_alert[name])):
                        price = price_alert[name][i]
                        if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                          notify(df_ticket.index[-1], name, time_diff, 'Alert', None, df_ticket['Variação']['close'][-1],\
+                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Alert', None, df_ticket['Variação']['close'][-1],\
                                  df_ticket['Financeiro']['close'], ignore_restrictions=True)
                           price_alert.pop(name) 
                           with open(PRICE_ALERT, 'w') as f:
@@ -184,19 +184,23 @@ def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def notify(index, name, time_diff, type, ratio, variation, finance, ignore_restrictions=False, color_ = 'COMMENT'):
+def notify(index, name, price, time_diff, type, ratio, variation, finance, ignore_restrictions=False):
    black_list.append(name)
    accum = print_finance(finance)[0]
    min = print_finance(finance)[1]
    var = get_status(variation)
    if ignore_restrictions:
-      print(index,'********',name, '********', type, variation, accum, min)
+      print(index,'********',name, '********', price, type, variation, accum, min)
       sound_alert()
    #elif isinstance(accum, str) and 'M' in accum and 'M' in min and abs(var[1]) > 1:
+   elif isinstance(accum, str) and 'M' in accum and ((var[0] == 1 and type == 'Bearish') or (var[0] == -1 and type == 'Bullish')):
+      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), variation, accum, min, '\n')
+      color.write(str1,'COMMENT')
+      #sound_alert()
    elif isinstance(accum, str) and 'M' in accum:   
-      str1 =  (index,'********',name, '********', str(time_diff) + ' mins ', type, round(ratio,3), variation, accum, min, '\n')
-      color.write(str1,color_)      
-      sound_alert()
+      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), variation, accum, min, '\n')
+      color.write(str1,'STRING')
+      #sound_alert()
     
    
 def handle_finance(row):   
