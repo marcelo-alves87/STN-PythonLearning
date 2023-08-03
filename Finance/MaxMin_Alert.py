@@ -36,6 +36,14 @@ def get_page_source(driver):
        time.sleep(1)
        return get_page_source(driver)
 
+def get_page_df(driver):
+   html = get_page_source(driver)
+   soup = BeautifulSoup(html, features='lxml')
+   tables = soup.find_all('table', class_='nelo-table-group')
+   df = pd.read_html(str(tables[0]))[0]
+   df.dropna(inplace=True)
+   return df
+
 def verify_trends(main_df):
     
     if not main_df.empty:
@@ -225,7 +233,7 @@ def insert_tickets(driver):
       if '11' not in ticket:
          print('Inserting ' + ticket + ' ...\n')
          time.sleep(1)
-         driver.execute_script("document.querySelector('.nelo-dialog-titlebar-buttons__button').click()")
+         driver.execute_script("document.querySelector('.nelo-dialog-titlebar-buttons__button--add-button').click()")
          time.sleep(2)
          typewrite(ticket)
          time.sleep(2)
@@ -234,19 +242,26 @@ def insert_tickets(driver):
             press('down')
             time.sleep(1)
             press('enter')
+            time.sleep(1)
+            verify_ticket_finance(ticket, driver)
+            time.sleep(1)
          else:   
             press('esc')
 
+def verify_ticket_finance(ticket, driver):
+   df = get_page_df(driver)
+   df = df[df['Ativo'] == ticket]
+   if not df.empty and 'Financeiro' in df.columns:
+      str1 = df[df['Ativo'] == ticket]['Financeiro'].values[0]
+      if 'M' not in str1 and 'B' not in str1:         
+         driver.execute_script("document.querySelectorAll('[id^=Rectangle_983--19]')[" + str(df.index[0]) + "].parentNode.parentNode.click()")
+      
 def get_all_tickets_status(driver):
    main_df = None
    has_next = True
    while has_next:
-       html = get_page_source(driver)   
-       soup = BeautifulSoup(html, features='lxml')
-       tables = soup.find_all('table', class_='nelo-table-group') 
-       df = pd.read_html(str(tables[0]))[0]
-       df.dropna(inplace=True)
-       driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop += 1000")
+       df = get_page_df(driver)
+       driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop += 3000")
        if main_df is None:
           main_df = df
        else:
@@ -257,14 +272,21 @@ def get_all_tickets_status(driver):
    
    global last_date
    now = dt.datetime.today()
+
+   df_ativo = main_df['Ativo']
+   df_ativo = df_ativo.reset_index()
+   df_ativo = df_ativo.set_index('Ativo')
+   df_ativo = df_ativo.drop_duplicates()
+   
+   
    if last_date is None:
-      print('Last reading at {}'.format(dt.datetime.today().strftime('%H:%M:%S')))
+      print('Read {} tickets at {}'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S')))
    else:
       secs = (now - last_date).seconds
       if secs >= 60:
-         print('Last reading at {} after {} min {} secs'.format(dt.datetime.today().strftime('%H:%M:%S'),secs//60,secs%60))
+         print('Read {} tickets at {} after {} min {} secs'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S'),secs//60,secs%60))
       else:
-         print('Last reading at {} after {} secs'.format(dt.datetime.today().strftime('%H:%M:%S'),secs))
+         print('Read {} tickets at {} after {} secs'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S'),secs))
    last_date = dt.datetime.today()
    return main_df
 
@@ -324,7 +346,7 @@ def main():
         
         df.set_index('Data/Hora',inplace=True)
         df.sort_index(inplace=True)
-        
+
         if main_df.empty:
             main_df = df
         else:
@@ -335,7 +357,7 @@ def main():
             main_df.drop_duplicates(inplace=True)
             main_df.reset_index(inplace=True)
             main_df.set_index('Data/Hora', inplace=True)            
-            main_df.to_pickle(MAIN_DF_FILE)
+            main_df.to_pickle(MAIN_DF_FILE, protocol=2)
 
     
         verify_trends(main_df)
@@ -347,7 +369,6 @@ def iterate():
        if row['Ativo'] == 'SOMA3':
           print(index,row['Último'],row['Variação'])
 
-  
 def test():
 
     main_df = pd.read_pickle(MAIN_DF_FILE)
