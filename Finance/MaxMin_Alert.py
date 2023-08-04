@@ -23,7 +23,7 @@ MAIN_DF_FILE = 'main_df.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 THRESHOLD = 1
-TIME_THRESHOLD = 25
+TIME_THRESHOLD = 15
 price_alert = {}
 black_list = []
 color = sys.stdout.shell
@@ -62,48 +62,30 @@ def verify_trends(main_df):
               df_ticket.set_index('Data/Hora',inplace=True)
               df_ticket.sort_index(inplace=True)
 
-              min = df_ticket['Mínimo']['low'].min()
-              max = df_ticket['Máximo']['high'].max()
-              time_min = df_ticket[df_ticket['Mínimo']['low'] == min].index[0]
-              time_max = df_ticket[df_ticket['Máximo']['high'] == max].index[0]
+              #Strategy 1 - Wait for the pull-back
+              
+              min = df_ticket['Último']['close'].min()
+              max = df_ticket['Último']['close'].max()
+              time_min = df_ticket[df_ticket['Último']['close'] == min].index[0]
+              time_max = df_ticket[df_ticket['Último']['close'] == max].index[0]
 
 
-              #Strategy 1 - Highering/lowering prices for a long time
-              #has_bulish, has_bearish = it_has(name, df_ticket, time_min, time_max)
               has_red = df_ticket['Último'][df_ticket['Último']['open'] - df_ticket['Último']['close'] > 0.01].any().any()
               has_green = df_ticket['Último'][df_ticket['Último']['close'] - df_ticket['Último']['open'] > 0.01].any().any()
-              
 
+              
               if name not in black_list and min/max < THRESHOLD:
                  last_var = get_status(df_ticket['Variação']['close'][-1])
-                 
-                
-##                 if time_max > time_min:
-##                    time_diff = (time_max - time_min).seconds//60
-##                    min_var = get_status(df_ticket.loc[time_min]['Variação']['close'])
-##                    if last_var[0] == -1:
-##                       notify(df_ticket.index[-1], name, time_diff, 'Bullish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-##                    elif min_var[0] == -1:                       
-##                       notify(df_ticket.index[-1], name, time_diff, 'Bullish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'],  color_='STRING')
-##                 if time_max < time_min:
-##                    time_diff = (time_min - time_max).seconds//60
-##                    max_var = get_status(df_ticket.loc[time_max]['Variação']['close'])
-##                    if last_var[0] == 1:
-##                       notify(df_ticket.index[-1], name, time_diff, 'Bearish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])
-##                    elif max_var[0] == 1:
-##                       notify(df_ticket.index[-1], name, time_diff, 'Bearish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'], color_='STRING')
 
                  if time_max > time_min and not has_red:                    
-                    time_diff = (time_max - time_min).seconds//60
-                    if time_diff >= TIME_THRESHOLD:
-                       notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Bullish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close']) 
-                 elif time_max < time_min and not has_green:
-                    
+                    time_diff = (time_max - time_min).seconds//60                    
+                    if time_diff >= TIME_THRESHOLD:                       
+                       notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Bullish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])                                               
+                 elif time_max < time_min and not has_green:                    
                     time_diff = (time_min - time_max).seconds//60
                     if time_diff >= TIME_THRESHOLD:
-                       notify(df_ticket.index[-1], name,  df_ticket['Último']['close'][-1], time_diff, 'Bearish', min/max, df_ticket['Variação']['close'][-1], df_ticket['Financeiro']['close'])  
+                       notify(df_ticket.index[-1], name,  df_ticket['Último']['close'][-1], time_diff, 'Bearish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])  
 
-              
                           
               if name in price_alert:
                  if isinstance(price_alert[name], float):
@@ -112,37 +94,13 @@ def verify_trends(main_df):
                     for i in range(len(price_alert[name])):
                        price = price_alert[name][i]
                        if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Alert', None, df_ticket['Variação']['close'][-1],\
+                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Alert', None, df_ticket['Variação'],\
                                  df_ticket['Financeiro']['close'], ignore_restrictions=True)
                           price_alert.pop(name) 
                           with open(PRICE_ALERT, 'w') as f:
                              json.dump(price_alert, f)
                           time.sleep(1)   
                           break   
-
-def it_has(name, df_ticket, time_min, time_max):
-   has_bearish = False
-   has_bulish = False
-   df_ticket = df_ticket[df_ticket.index >= df_ticket.index[-1] - dt.timedelta(minutes=20)]
-   if len(df_ticket) == 5:
-      if time_max > time_min:
-         left = df_ticket[0:2]['Último']['high'].max()
-         right = df_ticket[3:5]['Último']['high'].max()
-         has_bearish = df_ticket['Último']['high'][2] > left and df_ticket['Último']['high'][2] > right
-         if name in bull_dict and has_bearish:
-            bull_dict.pop(name)
-         elif name not in bull_dict and not has_bearish:                          
-            bull_dict[name] = df_ticket.index[-1]
-
-      if time_max < time_min: 
-         left = df_ticket[0:2]['Último']['low'].min()
-         right = df_ticket[3:5]['Último']['low'].min()
-         has_bullish = df_ticket['Último']['low'][2] < left and df_ticket['Último']['low'][2] < right
-         if name in bear_dict and has_bullish:
-            bear_dict.pop(name)
-         elif name not in bear_dict and not has_bullish:
-            bear_dict[name] = df_ticket.index[-1]
-   return has_bulish, has_bearish
 
 
 def get_status(variation):
@@ -188,17 +146,17 @@ def notify(index, name, price, time_diff, type, ratio, variation, finance, ignor
    black_list.append(name)
    accum = print_finance(finance)[0]
    min = print_finance(finance)[1]
-   var = get_status(variation)
+   first_variation = get_status(variation.loc[variation.index[-1] - dt.timedelta(minutes = TIME_THRESHOLD)]['close'])
+   last_variation = variation.loc[variation.index[-1]]['close']
    if ignore_restrictions:
       print(index,'********',name, '********', price, type, variation, accum, min)
       sound_alert()
-   #elif isinstance(accum, str) and 'M' in accum and 'M' in min and abs(var[1]) > 1:
-   elif isinstance(accum, str) and 'M' in accum and ((var[0] == 1 and type == 'Bearish') or (var[0] == -1 and type == 'Bullish')):
-      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), variation, accum, min, '\n')
+   elif isinstance(accum, str) and 'M' in accum and ((first_variation[0] == 1 and type == 'Bearish') or (first_variation[0] == -1 and type == 'Bullish')):
+      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), last_variation, accum, min, '\n')
       color.write(str1,'COMMENT')
       #sound_alert()
    elif isinstance(accum, str) and 'M' in accum:   
-      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), variation, accum, min, '\n')
+      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), last_variation, accum, min, '\n')
       color.write(str1,'STRING')
       #sound_alert()
     
@@ -368,9 +326,10 @@ def main():
 
         time.sleep(1)
 
-def iterate():
+def iterate(ticket):
+    main_df = pd.read_pickle(MAIN_DF_FILE)
     for index,row in main_df.iterrows():
-       if row['Ativo'] == 'SOMA3':
+       if row['Ativo'] == ticket:
           print(index,row['Último'],row['Variação'])
 
 def test():
