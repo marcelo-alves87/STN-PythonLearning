@@ -94,7 +94,7 @@ def verify_trends(main_df):
                     for i in range(len(price_alert[name])):
                        price = price_alert[name][i]
                        if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Alert', None, df_ticket['Variação'],\
+                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Alert', 1, df_ticket['Variação'],\
                                  df_ticket['Financeiro']['close'], ignore_restrictions=True)
                           price_alert.pop(name) 
                           with open(PRICE_ALERT, 'w') as f:
@@ -146,19 +146,25 @@ def notify(index, name, price, time_diff, type, ratio, variation, finance, ignor
    black_list.append(name)
    accum = print_finance(finance)[0]
    min = print_finance(finance)[1]
-   first_variation = get_status(variation.loc[variation.index[-1] - dt.timedelta(minutes = TIME_THRESHOLD)]['close'])
    last_variation = variation.loc[variation.index[-1]]['close']
+   str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), last_variation, accum, min, '\n')
+   try:
+      var_index = variation.loc[variation.index[-1] - dt.timedelta(minutes = TIME_THRESHOLD)]      
+   except:
+      var_index = variation.iloc[0]     
+   first_variation = get_status(var_index['close'])
    if ignore_restrictions:
-      print(index,'********',name, '********', price, type, variation, accum, min)
+      color.write(str1,'DEFINITION')
       sound_alert()
-   elif isinstance(accum, str) and 'M' in accum and ((first_variation[0] == 1 and type == 'Bearish') or (first_variation[0] == -1 and type == 'Bullish')):
-      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), last_variation, accum, min, '\n')
+   elif isinstance(accum, str) and 'M' in accum and first_variation[0] == 1 and type == 'Bearish':      
       color.write(str1,'COMMENT')
-      #sound_alert()
-   elif isinstance(accum, str) and 'M' in accum:   
-      str1 =  (index,'********',name, '********', price, str(time_diff) + ' mins ', type, round(ratio,3), last_variation, accum, min, '\n')
+      sound_alert()
+   elif isinstance(accum, str) and 'M' in accum and type == 'Bearish':      
+      color.write(str1,'SYNC')
+      sound_alert()   
+   elif isinstance(accum, str) and 'M' in accum:         
       color.write(str1,'STRING')
-      #sound_alert()
+      
     
    
 def handle_finance(row):   
