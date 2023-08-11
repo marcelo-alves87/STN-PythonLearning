@@ -28,6 +28,7 @@ price_alert = {}
 black_list = []
 color = sys.stdout.shell
 last_date = None
+last_ibov_var = None
 
 def get_page_source(driver):
    try :
@@ -56,51 +57,56 @@ def verify_trends(main_df):
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
            df_ticket = groups.loc[name][::-1]
-         
-           if isinstance(df_ticket, pd.DataFrame):
 
+           if isinstance(df_ticket, pd.DataFrame):
+            
               df_ticket.set_index('Data/Hora',inplace=True)
               df_ticket.sort_index(inplace=True)
 
-              #Strategy 1 - Wait for the pull-back
-              
-              min = df_ticket['Último']['close'].min()
-              max = df_ticket['Último']['close'].max()
-              time_min = df_ticket[df_ticket['Último']['close'] == min].index[0]
-              time_max = df_ticket[df_ticket['Último']['close'] == max].index[0]
+              if name == 'IBOV':
+                 global last_ibov_var                 
+                 last_ibov_var = df_ticket['Variação']['close'][-1]                 
+              else:
+                    
+                 #Strategy 1 - Wait for the pull-back
+                 
+                 min = df_ticket['Último']['close'].min()
+                 max = df_ticket['Último']['close'].max()
+                 time_min = df_ticket[df_ticket['Último']['close'] == min].index[0]
+                 time_max = df_ticket[df_ticket['Último']['close'] == max].index[0]
 
 
-              has_red = df_ticket['Último'][df_ticket['Último']['open'] - df_ticket['Último']['close'] > 0.01].any().any()
-              has_green = df_ticket['Último'][df_ticket['Último']['close'] - df_ticket['Último']['open'] > 0.01].any().any()
+                 has_red = df_ticket['Último'][df_ticket['Último']['open'] - df_ticket['Último']['close'] > 0.01].any().any()
+                 has_green = df_ticket['Último'][df_ticket['Último']['close'] - df_ticket['Último']['open'] > 0.01].any().any()
 
-              
-              if name not in black_list and min/max < THRESHOLD:
-                 last_var = get_status(df_ticket['Variação']['close'][-1])
+                 
+                 if name not in black_list and min/max < THRESHOLD:
+                    last_var = get_status(df_ticket['Variação']['close'][-1])
 
-                 if time_max > time_min and not has_red:                    
-                    time_diff = (time_max - time_min).seconds//60                    
-                    if time_diff >= TIME_THRESHOLD:                       
-                       notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Bullish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])                                               
-                 elif time_max < time_min and not has_green:                    
-                    time_diff = (time_min - time_max).seconds//60
-                    if time_diff >= TIME_THRESHOLD:
-                       notify(df_ticket.index[-1], name,  df_ticket['Último']['close'][-1], time_diff, 'Bearish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])  
+                    if time_max > time_min and not has_red:                    
+                       time_diff = (time_max - time_min).seconds//60                    
+                       if time_diff >= TIME_THRESHOLD:                       
+                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Bullish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])                                               
+                    elif time_max < time_min and not has_green:                    
+                       time_diff = (time_min - time_max).seconds//60
+                       if time_diff >= TIME_THRESHOLD:
+                          notify(df_ticket.index[-1], name,  df_ticket['Último']['close'][-1], time_diff, 'Bearish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])  
 
-                          
-              if name in price_alert:
-                 if isinstance(price_alert[name], float):
-                    price_alert[name] = [price_alert[name]]
-                 if isinstance(price_alert[name], list):
-                    for i in range(len(price_alert[name])):
-                       price = price_alert[name][i]
-                       if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Alert', 1, df_ticket['Variação'],\
-                                 df_ticket['Financeiro']['close'], ignore_restrictions=True)
-                          price_alert.pop(name) 
-                          with open(PRICE_ALERT, 'w') as f:
-                             json.dump(price_alert, f)
-                          time.sleep(1)   
-                          break   
+                             
+                 if name in price_alert:
+                    if isinstance(price_alert[name], float):
+                       price_alert[name] = [price_alert[name]]
+                    if isinstance(price_alert[name], list):
+                       for i in range(len(price_alert[name])):
+                          price = price_alert[name][i]
+                          if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
+                             notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Alert', 1, df_ticket['Variação'],\
+                                    df_ticket['Financeiro']['close'], ignore_restrictions=True)
+                             price_alert.pop(name) 
+                             with open(PRICE_ALERT, 'w') as f:
+                                json.dump(price_alert, f)
+                             time.sleep(1)   
+                             break   
 
 
 def get_status(variation):
@@ -183,11 +189,16 @@ def handle_finance(row):
          row = row * 10**6
       elif 'B' in row:
          row = float(row.replace('B',''))
-         row = row * 10**9   
+         row = row * 10**9
+
+      if not isinstance(row, float):
+         row = 0
+         
       return row
 
 def get_tickets():
-   data = []   
+   data = []
+   data.append('IBOV')
    with open("Tickets.txt") as file:
     for line in file:
         data.append(line.rstrip())
@@ -238,7 +249,7 @@ def get_all_tickets_status(driver):
           if not df2.empty:
              has_next = False
    
-   global last_date
+   global last_date, last_ibov_var
    now = dt.datetime.today()
 
    df_ativo = main_df['Ativo']
@@ -248,13 +259,19 @@ def get_all_tickets_status(driver):
    
    
    if last_date is None:
-      print('Read {} tickets at {}'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S')))
+      print('Read {} tickets at {}.'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S')))
    else:
+      str1 = ''
+      if last_ibov_var is not None:
+         str1 = last_ibov_var
       secs = (now - last_date).seconds
       if secs >= 60:
-         print('Read {} tickets at {} after {} min {} secs'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S'),secs//60,secs%60))
+         print('Read {} tickets at {} after {} min {} secs. IBOV ({}).'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S'),secs//60,secs%60, str1))
       else:
-         print('Read {} tickets at {} after {} secs'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S'),secs))
+         print('Read {} tickets at {} after {} secs. IBOV ({}).'.format(len(df_ativo), dt.datetime.today().strftime('%H:%M:%S'),secs, str1))
+
+         
+
    last_date = dt.datetime.today()
    return main_df
 
@@ -293,9 +310,6 @@ def main():
         
         df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', 'Estado Atual']]
 
-        df = df.drop(df[df['Ativo'] == 'IBOV'].index)
-
-        
         df['Último'] = df['Último'].astype(float)/100        
         df['Máximo'] = df['Máximo'].astype(float)/100
         df['Mínimo'] = df['Mínimo'].astype(float)/100
