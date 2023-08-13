@@ -196,6 +196,20 @@ def handle_finance(row):
          
       return row
 
+def handle_price(row):
+   if isinstance(row, float):
+      row = str(row)
+   
+   if ',' in row:
+      row = row.replace('.','').replace(',','.')   
+   else:
+      if '.0' == row[-2:]:
+         row = row.replace('.0','')         
+      elif '.' in row:
+         row = row.replace('.','')         
+      row = row[:-2] + '.' + row[-2:]
+   return float(row)
+      
 def get_tickets():
    data = []
    data.append('IBOV')
@@ -309,11 +323,11 @@ def main():
         df = get_all_tickets_status(driver)
         
         df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', 'Estado Atual']]
-
-        df['Último'] = df['Último'].astype(float)/100        
-        df['Máximo'] = df['Máximo'].astype(float)/100
-        df['Mínimo'] = df['Mínimo'].astype(float)/100
-        df['Abertura'] = df['Abertura'].astype(float)/100
+        
+        df['Último'] = df['Último'].apply(lambda row : handle_price(row)) 
+        df['Máximo'] = df['Máximo'].apply(lambda row : handle_price(row)) 
+        df['Mínimo'] = df['Mínimo'].apply(lambda row : handle_price(row))    
+        df['Abertura'] = df['Abertura'].apply(lambda row : handle_price(row))    
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row))  
         df['Financeiro'] = df['Financeiro'].astype(float) 
         df['Data/Hora'] = df['Data/Hora'].replace('-','00:00:00') 
@@ -329,6 +343,7 @@ def main():
         df.set_index('Data/Hora',inplace=True)
         df.sort_index(inplace=True)
 
+        
         if main_df.empty:
             main_df = df
         else:
