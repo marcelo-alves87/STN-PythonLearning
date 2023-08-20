@@ -26,12 +26,9 @@ THRESHOLD = 1
 TIME_THRESHOLD = 15
 price_alert = {}
 black_list = []
-black_list_channel = []
 color = sys.stdout.shell
 last_date = None
 last_ibov_var = None
-CHANNEL_LEN = 22
-CHANNEL_OFFSET = 0.01
 
 def get_page_source(driver):
    try :
@@ -63,7 +60,6 @@ def verify_trends(main_df):
            verify_df(name, df_ticket) 
            
 def verify_df(name, df_ticket):
-   pdb.set_trace()
    if isinstance(df_ticket, pd.DataFrame):
             
         df_ticket.set_index('Data/Hora',inplace=True)
@@ -76,86 +72,29 @@ def verify_df(name, df_ticket):
               
            #Strategy 1 - Wait for the pull-back
            
-      ##                 min = df_ticket['Último']['close'].min()
-      ##                 max = df_ticket['Último']['close'].max()
-      ##                 time_min = df_ticket[df_ticket['Último']['close'] == min].index[0]
-      ##                 time_max = df_ticket[df_ticket['Último']['close'] == max].index[0]
-      ##
-      ##
-      ##                 has_red = df_ticket['Último'][df_ticket['Último']['open'] - df_ticket['Último']['close'] > 0.01].any().any()
-      ##                 has_green = df_ticket['Último'][df_ticket['Último']['close'] - df_ticket['Último']['open'] > 0.01].any().any()
-      ##
-      ##                 
-      ##                 if name not in black_list and min/max < THRESHOLD:
-      ##                    last_var = get_status(df_ticket['Variação']['close'][-1])
-      ##
-      ##                    if time_max > time_min and not has_red:                    
-      ##                       time_diff = (time_max - time_min).seconds//60                    
-      ##                       if time_diff >= TIME_THRESHOLD:                       
-      ##                          notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Bullish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])                                               
-      ##                    elif time_max < time_min and not has_green:                    
-      ##                       time_diff = (time_min - time_max).seconds//60
-      ##                       if time_diff >= TIME_THRESHOLD:
-      ##                          notify(df_ticket.index[-1], name,  df_ticket['Último']['close'][-1], time_diff, 'Bearish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])  
+           min = df_ticket['Último']['close'].min()
+           max = df_ticket['Último']['close'].max()
+           time_min = df_ticket[df_ticket['Último']['close'] == min].index[0]
+           time_max = df_ticket[df_ticket['Último']['close'] == max].index[0]
 
-           #Strategy 2 - x-axis channel
-           if name not in black_list_channel and len(df_ticket) >= CHANNEL_LEN:
-              is_channel = True 
-              df5 =  df_ticket[-CHANNEL_LEN:]
-              start_x = df5.index[0]
-              start_y = df5['Último']['close'][0]  
-              end_x = df5.index[-1]
-              end_y = df5['Último']['close'][-1]
-              time_diff = (end_x - start_x).seconds//60
-              tan_theta = abs(end_y - start_y)/time_diff   
-              theta = math.atan(tan_theta)
-              
-              _w = 2 * abs(round(df5['Último']['high'][0] - df5['Último']['low'][0],2))
-              if start_y >= df5['Último']['open'][0]:
-                 start_w = round(start_y + _w,2)
-              else:
-                 start_w = round(start_y - _w,2)
-                 
-              
 
-              if end_y >= start_y:
+           has_red = df_ticket['Último'][df_ticket['Último']['open'] - df_ticket['Último']['close'] > 0.01].any().any()
+           has_green = df_ticket['Último'][df_ticket['Último']['close'] - df_ticket['Último']['open'] > 0.01].any().any()
 
-                 for i in range(CHANNEL_LEN):
-                    if i > 0:
-                       _x = (df5.index[i]  - start_x).seconds//60
-                       
-                       _y = start_y + tan_theta * _x
-                       _w_y = start_w + tan_theta * _x
-                       
-                       if _y - CHANNEL_OFFSET <= min(df5['Último']['close'][i],df5['Último']['open'][i]) \
-                          and _w_y + CHANNEL_OFFSET >= max(df5['Último']['close'][i],df5['Último']['open'][i]):                             
-                          pass
-                       else:
-                          is_channel = False
-                          break
-                 
-                    
-              else:
+           
+           if name not in black_list and min/max < THRESHOLD:
+              last_var = get_status(df_ticket['Variação']['close'][-1])
 
-                 for i in range(CHANNEL_LEN):
-                    if i > 0:
-                       _x = (df5.index[i]  - start_x).seconds//60
-                       
-                       _y = start_y - tan_theta * _x
-                       _w_y = start_w - tan_theta * _x
-                       
-                       if _y + CHANNEL_OFFSET >= max(df5['Último']['close'][i],df5['Último']['open'][i]) \
-                          and _w_y - CHANNEL_OFFSET <= min(df5['Último']['close'][i],df5['Último']['open'][i]):                             
-                          pass
-                       else:
-                          is_channel = False
-                          break
+              if time_max > time_min and not has_red:                    
+                 time_diff = (time_max - time_min).seconds//60                    
+                 if time_diff >= TIME_THRESHOLD:                       
+                    notify(df_ticket.index[-1], name, df_ticket['Último']['close'][-1], time_diff, 'Bullish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])                                               
+              elif time_max < time_min and not has_green:                    
+                 time_diff = (time_min - time_max).seconds//60
+                 if time_diff >= TIME_THRESHOLD:
+                    notify(df_ticket.index[-1], name,  df_ticket['Último']['close'][-1], time_diff, 'Bearish', min/max, df_ticket['Variação'], df_ticket['Financeiro']['close'])  
 
-              if is_channel:
-                 
-                 black_list_channel.append(name)
-                 print(name, df_ticket.index[-1], math.degrees(theta))
-
+   
            # Price Alert            
            if name in price_alert:
               if isinstance(price_alert[name], float):
@@ -208,9 +147,8 @@ def print_finance(finance):
     return accum, min
 
 def sound_alert():
-   pass
-   #winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
-   #time.sleep(1)
+   winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
+   time.sleep(1)
  
 def notify(index, name, price, time_diff, type, ratio, variation, finance, ignore_restrictions=False):
    black_list.append(name)
@@ -375,10 +313,10 @@ def do_scraping():
        except:
           pass
     print('Running ...')
-    return driver
+    return main_df, driver
 
 def main():
-    driver = do_scraping()  
+    main_df, driver = do_scraping()  
     #insert_tickets(driver)
     while(True):
 
@@ -466,16 +404,19 @@ def test_ticket(ticket):
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
    groups.reset_index(['Data/Hora'],inplace=True)
    for name in groups.index.unique():
-      pdb.set_trace()
-      df_ticket = groups.loc[name][::-1]
-      #Falta colocar a hora que quer testar
-      verify_df(name, df_ticket) 
+      df_ticket = groups.loc[name][0::]
+      time1 = df_ticket['Data/Hora'][0]
+      last_time = df_ticket['Data/Hora'][-1]
+      while time1 <= last_time:
+         df = df_ticket[df_ticket['Data/Hora'] <= time1]
+         verify_df(name, df)
+         time1 += dt.timedelta(minutes = 5)
 
 def get_data(ticket):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
    #mydata = e
-   driver = do_scraping()
+   main_df, driver = do_scraping()
    input('Waiting for mydata ...')
    length = driver.execute_script("return mydata.length")
    data = []
@@ -500,7 +441,8 @@ def get_data(ticket):
       n_close = driver.execute_script("return mydata[" + str(i) +"].nClose")      
       date += dt.timedelta(minutes = 1)  
       data.append({'Último' : n_close, 'Data/Hora' : date})
-   df = pd.DataFrame(data)   
+   df = pd.DataFrame(data)
+   df['Data/Hora'] = df['Data/Hora'] - dt.timedelta(hours = 3)
    df.to_pickle(ticket + '.pickle', protocol=2)
       
    
@@ -513,9 +455,9 @@ def reset(reset_main):
    
       
 warnings.simplefilter(action='ignore', category=FutureWarning)
-#reset(reset_main=True)
-#main()
+reset(reset_main=True)
+main()
 #test()
 #iterate('PETZ3')
 #get_data('PETZ3')
-test_ticket('PETZ3')
+#test_ticket('PETZ3')
