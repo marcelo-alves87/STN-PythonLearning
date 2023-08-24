@@ -17,7 +17,10 @@ import winsound
 from pyautogui import press, typewrite
 import warnings
 import math
+import pandas_datareader.data as web
+import yfinance as yfin
 
+yfin.pdr_override()
 
 MAIN_DF_FILE = 'main_df.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
@@ -29,10 +32,15 @@ black_list = []
 color = sys.stdout.shell
 last_date = None
 last_ibov_var = None
-FIRST_EMA_LEN = 5
-SECOND_EMA_LEN = 10
-bull_status = {}
-bear_status = {}
+FIRST_EMA_LEN = 10
+SECOND_EMA_LEN = 30
+status_bull = {}
+status_bear = {}
+score_bull = {}
+score_bear = {}
+MIN_SCORE = 1
+EMA_DIFF = 0.15
+
 def get_page_source(driver):
    try :
        return driver.page_source       
@@ -47,6 +55,26 @@ def get_page_df(driver):
    df = pd.read_html(str(tables[0]))[0]
    df.dropna(inplace=True)
    return df
+
+def get_data_from_yahoo(ticket):
+   if not os.path.exists('stock_dfs'):
+      os.makedirs('stock_dfs')
+   now = dt.date.today()
+   start =  now - dt.timedelta(days=1)    
+   tomorrow = now + dt.timedelta(days=1)
+
+   if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
+      os.remove('stock_dfs/{}.csv'.format(ticket))
+    
+   # just in case your connection breaks, we'd like to save our progress!
+   if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
+      try:
+         df = web.get_data_yahoo(ticket + '.SA', start=start.strftime('%Y-%m-%d'), end=tomorrow.strftime('%Y-%m-%d'), interval="1m")
+         df.to_csv('stock_dfs/{}.csv'.format(ticket))           
+      except:
+         print(ticker,'not found')
+   else:
+      print('Already have {}'.format(ticket))
 
 
 def verify_trends(main_df):
@@ -96,9 +124,8 @@ def which_bar(row):
    else:
       return 'indecision'
    
-           
 def verify_df(name, df_ticket):
-   global last_ibov_var, bull_status, bear_status
+   global last_ibov_var, status_bull, status_bear, score_bull, score_bear
    if isinstance(df_ticket, pd.DataFrame):
             
         df_ticket.set_index('Data/Hora',inplace=True)
@@ -113,28 +140,44 @@ def verify_df(name, df_ticket):
            df['EMA_1'] = df['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
            df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-           if df['EMA_1'][-1] > df['EMA_2'][-1]:
+           df = df[df.index >= '2023-08-22']
+
+           if not df.empty:
+   
+              diff = abs(df['EMA_2'][-1] - df['EMA_1'][-1])
+
               bar = which_bar(df.iloc[-1])
-              if name not in bull_status and (bar is not 'bulish' or bar is not 'indecision bullish'):
-                 bull_status[name] = 'IDLE'
-              elif name in bull_status and bull_status == 'GO' and bar is 'bearish':   
-                 bull_status.pop(name)
-                 print('*****  {}  *******  Exit {}'.format(df.index[-1], name))
-              elif name in bull_status and bull_status == 'IDLE' and bar is 'bullish':
-                 bull_status[name] = 'GO'
-                 print('*****  {}  *******  Enter {}'.format(df.index[-1], name))   
-           elif df['EMA_1'][-1] < df['EMA_2'][-1]:
-              bar = which_bar(df.iloc[-1])
-              if name not in bear_status and (bar is not 'bearish' or bar is not 'indecision bearish'):
-                 bear_status[name] = 'IDLE'
-              elif name in bear_status and bear_status == 'GO' and bar is 'bullish':   
-                 bear_status.pop(name)
-                 print('*****  {}  *******  Exit {}'.format(df.index[-1], name))
-              elif name in bear_status and bear_status == 'IDLE' and bar is 'bearish':
-                 bear_status[name] = 'GO'
-                 print('*****  {}  *******  Enter {}'.format(df.index[-1], name))     
-          
-                     
+
+              
+              if df['EMA_1'][-1] >= df['EMA_2'][-1]:
+                 if name not in status_bear:
+                    status_bear[name] = []
+                 if name in status_bull and (bar == 'bearish' or bar == 'indecision bearish') and diff >= EMA_DIFF:
+                    if df.index[-1] not in status_bull[name]:
+                       status_bull[name].append(df.index[-1])
+                    
+                 
+              elif df['EMA_1'][-1] < df['EMA_2'][-1]:
+                  if name not in status_bull:
+                    status_bull[name] = []
+                  if name in status_bear and (bar == 'bullish' or bar == 'indecision bullish') and diff >= EMA_DIFF:
+                     if df.index[-1] not in status_bear[name]:
+                       status_bear[name].append(df.index[-1])
+                   
+                 
+              if name in status_bull and len(status_bull[name]) >= MIN_SCORE and name not in score_bull:
+                 score_bull[name] = len(status_bull[name])
+                 print(name, 'Bull', df.index[-1], len(status_bull[name]))
+              elif name in status_bull and len(status_bull[name]) >= MIN_SCORE and score_bull[name] < len(status_bull[name]):
+                 score_bull[name] = len(status_bull[name])
+                 print(name, 'Bull', df.index[-1], len(status_bull[name]))
+              elif name in status_bear and len(status_bear[name]) >= MIN_SCORE and name not in score_bear:
+                 score_bear[name] = len(status_bear[name])
+                 print(name, 'Bear', df.index[-1], len(status_bear[name]))
+              elif name in status_bear and len(status_bear[name]) >= MIN_SCORE and score_bear[name] < len(status_bear[name]):
+                 score_bear[name] = len(status_bear[name])
+                 print(name, 'Bear', df.index[-1], len(status_bear[name])) 
+              
 def get_status(variation):
    variation = variation.replace('%','')
    variation = variation.replace(',','.')
@@ -339,7 +382,7 @@ def do_scraping():
     print('Running ...')
     return main_df, driver
 
-def main():
+def main(update_tickets):
     main_df, driver = do_scraping()  
     #insert_tickets(driver)
     while(True):
@@ -373,8 +416,10 @@ def main():
         df.set_index('Data/Hora',inplace=True)
         df.sort_index(inplace=True)
 
-        
         if main_df.empty:
+            if update_tickets:
+               update(df)
+                  
             main_df = df
         else:
             
@@ -391,22 +436,34 @@ def main():
 
         time.sleep(1)
 
+def update(df):
+   df3 = df['Ativo'].drop_duplicates()
+   for i in range(len(df3)):
+      ticket = df3[i]
+      get_data_from_yahoo(ticket)
+      
+
 def iterate(ticket):
     main_df = pd.read_pickle(MAIN_DF_FILE)
     for index,row in main_df.iterrows():
        if row['Ativo'] == ticket:
           print(index,row['Último'],row['Variação'])
 
-def test():
+def test(update_tickets):
+    global status_bull, status_bear, score_bull, score_bear
 
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    time1 = main_df.index[0]
+    if update_tickets:
+       update(main_df)
+    pdb.set_trace()
+    df = pd.read_csv('data.csv')
+    time1 =  main_df[main_df.index >= '2023-08-22'].index[0]
     last_time = main_df.index[-1]
     
     while time1 < last_time:
-
+        
         df = main_df.reset_index()
-        df = df[df['Data/Hora'] < time1]        
+        df = df[df['Data/Hora'] <= time1]        
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row)) 
         df['Financeiro'] = df['Financeiro'].astype(float)
         df.set_index('Data/Hora', inplace=True)
@@ -416,9 +473,11 @@ def test():
 
         #time.sleep(1)
         time1 += dt.timedelta(minutes = 5)
-##
-##
 
+        if time1.strftime('%H:%M') == '18:00':
+           time1 -= dt.timedelta(hours = 8)
+           time1 += dt.timedelta(days = 1)
+           
 def test_ticket(ticket):
    df = pd.read_pickle(ticket + '.pickle')
    df['Ativo'] = ticket
@@ -480,8 +539,8 @@ def reset(reset_main):
       
 warnings.simplefilter(action='ignore')
 #reset(reset_main=True)
-#main()
-test()
+#main(update_tickets=True)
+test(update_tickets=False)
 #iterate('PETZ3')
 #get_data('PETZ3')
 #test_ticket('PETZ3')
