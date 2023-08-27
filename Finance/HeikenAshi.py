@@ -19,6 +19,7 @@ import warnings
 import math
 import pandas_datareader.data as web
 import yfinance as yfin
+import shutil
 
 yfin.pdr_override()
 
@@ -39,7 +40,10 @@ status_bear = {}
 score_bull = {}
 score_bear = {}
 MIN_SCORE = 1
-EMA_DIFF = 0.15
+EMA_DIFF = 0.01
+
+
+#IMPLEMENTAR MUDANÇA DE EMA +- em diferentes dias
 
 def get_page_source(driver):
    try :
@@ -56,23 +60,36 @@ def get_page_df(driver):
    df.dropna(inplace=True)
    return df
 
-def get_data_from_yahoo(ticket):
+def format_ticket(ticket):
+   ticket = ticket.split(' ')
+   if len(ticket) == 2:
+      ticket = ticket[1]
+   else:
+      ticket = ticket[0]
+   return ticket
+
+def format_date(row):
+   return row.replace('-03:00','')
+
+def get_data_from_yahoo(ticket, actual_date):
+   
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
-   now = dt.date.today()
-   start =  now - dt.timedelta(days=1)    
-   tomorrow = now + dt.timedelta(days=1)
-
-   if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
-      os.remove('stock_dfs/{}.csv'.format(ticket))
-    
+   start_date = actual_date - dt.timedelta(days=1)   
+   end_date = actual_date + dt.timedelta(days=1)   
    # just in case your connection breaks, we'd like to save our progress!
    if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
       try:
-         df = web.get_data_yahoo(ticket + '.SA', start=start.strftime('%Y-%m-%d'), end=tomorrow.strftime('%Y-%m-%d'), interval="1m")
+         ticket = format_ticket(ticket)
+         df = web.get_data_yahoo(ticket + '.SA', start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval="5m")
+         df.reset_index(inplace=True)
+         df['Datetime'] = df['Datetime'].astype(str)
+         df['Datetime'] = df['Datetime'].apply(lambda row : format_date(row))
+         df['Datetime'] = pd.to_datetime(df['Datetime'])
+         df = df[df['Datetime'] <= actual_date]
          df.to_csv('stock_dfs/{}.csv'.format(ticket))           
       except:
-         print(ticker,'not found')
+         print(ticket,'not found')
    else:
       print('Already have {}'.format(ticket))
 
@@ -115,11 +132,11 @@ def to_HA(df):
 def which_bar(row):
    if row['high'] > row['close'] and  row['low'] < row['open'] and row['close'] > row['open']:
       return 'indecision bullish'
-   elif row['high'] > row['close'] and row['close'] > row['open']:
+   elif row['high'] >= row['close'] and row['close'] > row['open']:
       return 'bullish'
    if row['low'] < row['close'] and row['high'] > row['open'] and row['close'] < row['open']:
       return 'indecision bearish'
-   elif row['low'] < row['close'] and row['close'] < row['open']:
+   elif row['low'] <= row['close'] and row['close'] < row['open']:
       return 'bearish'
    else:
       return 'indecision'
@@ -140,15 +157,14 @@ def verify_df(name, df_ticket):
            df['EMA_1'] = df['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
            df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-           df = df[df.index >= '2023-08-22']
+           df = df[df.index >= df.index[-1].strftime('%Y-%m-%d')]
 
            if not df.empty:
    
-              diff = abs(df['EMA_2'][-1] - df['EMA_1'][-1])
+              diff = round(abs(df['EMA_2'][-1] - df['EMA_1'][-1]),3)
 
               bar = which_bar(df.iloc[-1])
 
-              
               if df['EMA_1'][-1] >= df['EMA_2'][-1]:
                  if name not in status_bear:
                     status_bear[name] = []
@@ -167,16 +183,16 @@ def verify_df(name, df_ticket):
                  
               if name in status_bull and len(status_bull[name]) >= MIN_SCORE and name not in score_bull:
                  score_bull[name] = len(status_bull[name])
-                 print(name, 'Bull', df.index[-1], len(status_bull[name]))
+                 print(name, 'Bull', df.index[-1], len(status_bull[name]), diff)
               elif name in status_bull and len(status_bull[name]) >= MIN_SCORE and score_bull[name] < len(status_bull[name]):
                  score_bull[name] = len(status_bull[name])
-                 print(name, 'Bull', df.index[-1], len(status_bull[name]))
+                 print(name, 'Bull', df.index[-1], len(status_bull[name]), diff)
               elif name in status_bear and len(status_bear[name]) >= MIN_SCORE and name not in score_bear:
                  score_bear[name] = len(status_bear[name])
-                 print(name, 'Bear', df.index[-1], len(status_bear[name]))
+                 print(name, 'Bear', df.index[-1], len(status_bear[name]), diff)
               elif name in status_bear and len(status_bear[name]) >= MIN_SCORE and score_bear[name] < len(status_bear[name]):
                  score_bear[name] = len(status_bear[name])
-                 print(name, 'Bear', df.index[-1], len(status_bear[name])) 
+                 print(name, 'Bear', df.index[-1], len(status_bear[name]), diff) 
               
 def get_status(variation):
    variation = variation.replace('%','')
@@ -415,10 +431,11 @@ def main(update_tickets):
         
         df.set_index('Data/Hora',inplace=True)
         df.sort_index(inplace=True)
+        df = df[df.index >= dt.datetime.today().strftime('%Y-%m-%d')] 
 
         if main_df.empty:
             if update_tickets:
-               update(df)
+               df = update(df)
                   
             main_df = df
         else:
@@ -437,11 +454,34 @@ def main(update_tickets):
         time.sleep(1)
 
 def update(df):
+   data = []
    df3 = df['Ativo'].drop_duplicates()
    for i in range(len(df3)):
-      ticket = df3[i]
-      get_data_from_yahoo(ticket)
-      
+      ticket = format_ticket(df3[i])
+      get_data_from_yahoo(ticket, df[df['Ativo'] == df3[i]].index[0])      
+      if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
+         df4 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
+         for index,row in df4.iterrows():
+            date = dt.datetime.strptime(row['Datetime'], '%Y-%m-%d %H:%M:%S')
+            _data = {'Data/Hora' : date.strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
+                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'}
+            data.append(_data)
+            data.append({'Data/Hora' : (date - dt.timedelta(minutes = 1)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Low'],2),\
+                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
+            data.append({'Data/Hora' : (date - dt.timedelta(minutes = 2)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['High'],2),\
+                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
+            data.append({'Data/Hora' : (date - dt.timedelta(minutes = 3)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Open'],2),\
+                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
+   df4 =  pd.DataFrame(data)
+   df4['Data/Hora'] = pd.to_datetime(df4['Data/Hora'])
+   df4.set_index('Data/Hora', inplace=True)
+   df4.sort_index(inplace=True)
+   df = pd.concat([df4, df])
+   return df
 
 def iterate(ticket):
     main_df = pd.read_pickle(MAIN_DF_FILE)
@@ -451,17 +491,13 @@ def iterate(ticket):
 
 def test(update_tickets):
     global status_bull, status_bear, score_bull, score_bear
-
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    if update_tickets:
-       update(main_df)
-    pdb.set_trace()
-    df = pd.read_csv('data.csv')
-    time1 =  main_df[main_df.index >= '2023-08-22'].index[0]
+    time1 =  main_df.index[0]    
     last_time = main_df.index[-1]
+    if update_tickets:
+       main_df = update(main_df)
     
     while time1 < last_time:
-        
         df = main_df.reset_index()
         df = df[df['Data/Hora'] <= time1]        
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row)) 
@@ -474,8 +510,13 @@ def test(update_tickets):
         #time.sleep(1)
         time1 += dt.timedelta(minutes = 5)
 
-        if time1.strftime('%H:%M') == '18:00':
-           time1 -= dt.timedelta(hours = 8)
+        if time1.strftime('%H:%M') == '17:00':
+           print('changing day')
+           status_bull = {}
+           status_bear = {}
+           score_bull = {}
+           score_bear = {} 
+           time1 -= dt.timedelta(hours = 7)
            time1 += dt.timedelta(days = 1)
            
 def test_ticket(ticket):
@@ -532,7 +573,9 @@ def get_data(ticket):
 def reset(reset_main):
    empty_json = {}
    if reset_main and os.path.exists(MAIN_DF_FILE):
-      os.remove(MAIN_DF_FILE)
+      os.remove(MAIN_DF_FILE)   
+   if reset_main and os.path.exists('stock_dfs'):
+      shutil.rmtree('stock_dfs')
    with open(PRICE_ALERT, 'w') as f:
       json.dump(empty_json, f)
    
@@ -540,7 +583,7 @@ def reset(reset_main):
 warnings.simplefilter(action='ignore')
 #reset(reset_main=True)
 #main(update_tickets=True)
-test(update_tickets=False)
+test(update_tickets=True)
 #iterate('PETZ3')
 #get_data('PETZ3')
 #test_ticket('PETZ3')
