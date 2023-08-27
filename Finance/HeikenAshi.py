@@ -157,7 +157,7 @@ def verify_df(name, df_ticket):
            df['EMA_1'] = df['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
            df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-           df = df[df.index >= df.index[-1].strftime('%Y-%m-%d')]
+           df = df[df.index >= df.index[-1].strftime('%Y-%m-%d 10:00:00' )]
 
            if not df.empty:
    
@@ -491,6 +491,15 @@ def iterate(ticket):
 
 def test(update_tickets):
     global status_bull, status_bear, score_bull, score_bear
+    if not os.path.exists(MAIN_DF_FILE):
+       date1 = '2023-08-25'
+       tickets = get_tickets()
+       df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
+       df1.set_index('Data/Hora', inplace=True)
+       df1 = update(df1)
+       df1 = df1[df1.index >= date1 + ' 10:00:00']
+       df1.dropna(inplace=True)
+       df1.to_pickle(MAIN_DF_FILE, protocol=2)       
     main_df = pd.read_pickle(MAIN_DF_FILE)
     time1 =  main_df.index[0]    
     last_time = main_df.index[-1]
