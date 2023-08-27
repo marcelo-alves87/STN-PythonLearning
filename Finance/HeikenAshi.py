@@ -157,7 +157,7 @@ def verify_df(name, df_ticket):
            df['EMA_1'] = df['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
            df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-           df = df[df.index >= df.index[-1].strftime('%Y-%m-%d 10:00:00' )]
+           df = df[df.index >= df.index[-1].strftime('%Y-%m-%d 10:00:00')]
 
            if not df.empty:
    
@@ -184,15 +184,15 @@ def verify_df(name, df_ticket):
               if name in status_bull and len(status_bull[name]) >= MIN_SCORE and name not in score_bull:
                  score_bull[name] = len(status_bull[name])
                  print(name, 'Bull', df.index[-1], len(status_bull[name]), diff)
-              elif name in status_bull and len(status_bull[name]) >= MIN_SCORE and score_bull[name] < len(status_bull[name]):
-                 score_bull[name] = len(status_bull[name])
-                 print(name, 'Bull', df.index[-1], len(status_bull[name]), diff)
+              #elif name in status_bull and len(status_bull[name]) >= MIN_SCORE and score_bull[name] < len(status_bull[name]):
+              #   score_bull[name] = len(status_bull[name])
+              #   print(name, 'Bull', df.index[-1], len(status_bull[name]), diff)
               elif name in status_bear and len(status_bear[name]) >= MIN_SCORE and name not in score_bear:
                  score_bear[name] = len(status_bear[name])
                  print(name, 'Bear', df.index[-1], len(status_bear[name]), diff)
-              elif name in status_bear and len(status_bear[name]) >= MIN_SCORE and score_bear[name] < len(status_bear[name]):
-                 score_bear[name] = len(status_bear[name])
-                 print(name, 'Bear', df.index[-1], len(status_bear[name]), diff) 
+              #elif name in status_bear and len(status_bear[name]) >= MIN_SCORE and score_bear[name] < len(status_bear[name]):
+              #   score_bear[name] = len(status_bear[name])
+              #    print(name, 'Bear', df.index[-1], len(status_bear[name]), diff) 
               
 def get_status(variation):
    variation = variation.replace('%','')
@@ -480,7 +480,10 @@ def update(df):
    df4['Data/Hora'] = pd.to_datetime(df4['Data/Hora'])
    df4.set_index('Data/Hora', inplace=True)
    df4.sort_index(inplace=True)
-   df = pd.concat([df4, df])
+   df4 = df4[df4.index > df4.index[0].strftime('%Y-%m-%d 10:00:00')]
+   df3 = df4[df4.index < df4.index[0].strftime('%Y-%m-%d 18:00:00')]
+   df5 = df4[df4.index > df4.index[-1].strftime('%Y-%m-%d 10:00:00')]
+   df = pd.concat([df3, df5, df])
    return df
 
 def iterate(ticket):
@@ -497,7 +500,7 @@ def test(update_tickets):
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
        df1.set_index('Data/Hora', inplace=True)
        df1 = update(df1)
-       df1 = df1[df1.index >= date1 + ' 10:00:00']
+       df1 = df1[df1.index > date1]
        df1.dropna(inplace=True)
        df1.to_pickle(MAIN_DF_FILE, protocol=2)       
     main_df = pd.read_pickle(MAIN_DF_FILE)
