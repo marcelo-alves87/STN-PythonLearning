@@ -42,6 +42,7 @@ score_bear = {}
 MIN_SCORE = 1
 EMA_DIFF = 0.01
 
+# Media exponencial está mudando
 
 #IMPLEMENTAR MUDANÇA DE EMA +- em diferentes dias
 
@@ -100,14 +101,14 @@ def verify_trends(main_df):
 
         with open (PRICE_ALERT, 'rb') as f:
            price_alert = json.load(f)
-        
+               
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
            df_ticket = groups.loc[name][::-1]
-           verify_df(name, df_ticket) 
-
+           verify_df(name, df_ticket)
+           
 def to_HA(df):
     df_HA = df
     df_HA['close']=round((df['open']+ df['high']+ df['low']+df['close'])/4,2)
@@ -154,6 +155,7 @@ def verify_df(name, df_ticket):
         elif len(df_ticket) >= SECOND_EMA_LEN:
               
            df = to_HA(df_ticket['Último'])
+           
            df['EMA_1'] = df['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
            df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
@@ -163,8 +165,11 @@ def verify_df(name, df_ticket):
    
               diff = round(abs(df['EMA_2'][-1] - df['EMA_1'][-1]),3)
 
-              bar = which_bar(df.iloc[-1])
-
+              if len(df) > 1: 
+                 bar = which_bar(df.iloc[-2])      
+              else:
+                 bar = which_bar(df.iloc[-1])
+                 
               if df['EMA_1'][-1] >= df['EMA_2'][-1]:
                  if name not in status_bear:
                     status_bear[name] = []
@@ -261,6 +266,8 @@ def notify(index, name, price, time_diff, type, ratio, variation, finance, ignor
 def handle_finance(row):   
    if isinstance(row, float):
       return row
+   elif isinstance(row, int):
+      return float(row)
    else:
       row = row.replace('.','')
       row = row.replace(',','')
@@ -463,18 +470,18 @@ def update(df):
          df4 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
          for index,row in df4.iterrows():
             date = dt.datetime.strptime(row['Datetime'], '%Y-%m-%d %H:%M:%S')
-            _data = {'Data/Hora' : date.strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
+            _data = {'Data/Hora' : (date - dt.timedelta(minutes = 0)).strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Open'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'}
             data.append(_data)
-            data.append({'Data/Hora' : (date - dt.timedelta(minutes = 1)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+            data.append({'Data/Hora' : (date + dt.timedelta(minutes = 1)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
                          'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Low'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
-            data.append({'Data/Hora' : (date - dt.timedelta(minutes = 2)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+            data.append({'Data/Hora' : (date + dt.timedelta(minutes = 2)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
                          'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['High'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
-            data.append({'Data/Hora' : (date - dt.timedelta(minutes = 3)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Open'],2),\
+            data.append({'Data/Hora' : (date + dt.timedelta(minutes = 3)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
    df4 =  pd.DataFrame(data)
    df4['Data/Hora'] = pd.to_datetime(df4['Data/Hora'])
@@ -483,8 +490,8 @@ def update(df):
    df4 = df4[df4.index > df4.index[0].strftime('%Y-%m-%d 10:00:00')]
    df3 = df4[df4.index < df4.index[0].strftime('%Y-%m-%d 18:00:00')]
    df5 = df4[df4.index > df4.index[-1].strftime('%Y-%m-%d 10:00:00')]
-   df = pd.concat([df3, df5, df])
-   return df
+   df = pd.concat([df3, df5])
+   return df4
 
 def iterate(ticket):
     main_df = pd.read_pickle(MAIN_DF_FILE)
@@ -495,7 +502,7 @@ def iterate(ticket):
 def test(update_tickets):
     global status_bull, status_bear, score_bull, score_bear
     if not os.path.exists(MAIN_DF_FILE):
-       date1 = '2023-08-25'
+       date1 = '2023-08-31'
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
        df1.set_index('Data/Hora', inplace=True)
@@ -504,12 +511,13 @@ def test(update_tickets):
        df1.dropna(inplace=True)
        df1.to_pickle(MAIN_DF_FILE, protocol=2)       
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    time1 =  main_df.index[0]    
+    time1 =  dt.datetime.strptime(main_df.index[0].strftime('%Y-%m-%d') + ' 10:05:00', '%Y-%m-%d %H:%M:%S')
     last_time = main_df.index[-1]
     if update_tickets:
        main_df = update(main_df)
     
     while time1 < last_time:
+        
         df = main_df.reset_index()
         df = df[df['Data/Hora'] <= time1]        
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row)) 
@@ -593,7 +601,7 @@ def reset(reset_main):
    
       
 warnings.simplefilter(action='ignore')
-#reset(reset_main=True)
+reset(reset_main=False)
 #main(update_tickets=True)
 test(update_tickets=True)
 #iterate('PETZ3')
