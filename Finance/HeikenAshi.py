@@ -74,7 +74,7 @@ def get_data_from_yahoo(ticket, actual_date):
    
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
-   start_date = actual_date - dt.timedelta(days=3)   
+   start_date = actual_date - dt.timedelta(days=2)   
    end_date = actual_date + dt.timedelta(days=1)   
    # just in case your connection breaks, we'd like to save our progress!
    if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
@@ -141,7 +141,39 @@ def which_bar(row):
    else:
       return 'indecision'
 
-#MA Continuous
+#Bullish MA Continuous
+def strategy_3(name, df_ticket):
+  global last_ibov_var
+  df_ticket.set_index('Data/Hora',inplace=True)
+  df_ticket.sort_index(inplace=True)
+
+  if name == 'IBOV':
+                      
+     last_ibov_var = df_ticket['Variação']['close'][-1]                 
+  elif len(df_ticket) >= SECOND_EMA_LEN:
+        
+     df = to_HA(df_ticket['Último'])
+     
+     df['EMA_1'] = df['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+     df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+
+     yesterday_start = dt.datetime.strptime(dt.datetime.strftime(df.index[-1],'%Y-%m-%d')\
+                        + ' 10:00:00','%Y-%m-%d %H:%M:%S') - dt.timedelta(days = 1) #ontem
+     yesterday_end = yesterday_start + dt.timedelta(hours = 8)
+ 
+     df5 = df[df.index >= yesterday_start]
+     df5 = df5[df5.index <= yesterday_end]
+     
+     if not df5[df5['EMA_1'] > df5['EMA_2']].empty and\
+        not df5[df5['EMA_1'] < df5['EMA_2']].empty:
+        df5 = df[df.index > yesterday_end]
+        diff = round(df['EMA_1'][-1] - df['EMA_1'][-2],3)
+        if df5[df5['EMA_1'] < df5['EMA_2']].empty and diff > 0.03:
+           print(df.index[-1], name, 'Bullish', diff)
+
+   
+
+#Bearish MA Continuous
 def strategy_2(name, df_ticket):
   global last_ibov_var
   df_ticket.set_index('Data/Hora',inplace=True)
@@ -158,15 +190,12 @@ def strategy_2(name, df_ticket):
      df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
      df5 = df[df.index < df.index[0] + dt.timedelta(days = 1)] #anteontem
-
      if not df5[df5['EMA_1'] > df5['EMA_2']].empty and\
         not df5[df5['EMA_1'] < df5['EMA_2']].empty:
         df5 = df[df.index >= df.index[0] + dt.timedelta(days = 1)]
         if df5[df5['EMA_1'] > df5['EMA_2']].empty:
            print(df.index[-1], name, 'Bearish')
-        elif df5[df5['EMA_1'] < df5['EMA_2']].empty:
-           print(df.index[-1], name, 'Bullish')
-
+       
 
 #MA Cross
 def strategy_1(name, df_ticket):
@@ -231,6 +260,7 @@ def verify_df(name, df_ticket):
    if isinstance(df_ticket, pd.DataFrame):
       #strategy_1(name, df_ticket)
       strategy_2(name, df_ticket)
+      #strategy_3(name, df_ticket)
                       
 def get_status(variation):
    variation = variation.replace('%','')
@@ -536,7 +566,7 @@ def iterate(ticket):
 
 def test(update_tickets):
     global status_bull, status_bear, score_bull, score_bear
-    date1 = '2023-09-08'
+    date1 = '2023-09-15'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
