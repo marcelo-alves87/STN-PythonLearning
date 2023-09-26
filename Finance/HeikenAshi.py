@@ -74,7 +74,7 @@ def get_data_from_yahoo(ticket, actual_date):
    
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
-   start_date = actual_date - dt.timedelta(days=2)   
+   start_date = actual_date - dt.timedelta(days=4)   
    end_date = actual_date + dt.timedelta(days=1)   
    # just in case your connection breaks, we'd like to save our progress!
    if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
@@ -140,6 +140,29 @@ def which_bar(row):
       return 'bearish'
    else:
       return 'indecision'
+
+def strategy_4(name, df_ticket):
+  global last_ibov_var
+  df_ticket.set_index('Data/Hora',inplace=True)
+  df_ticket.sort_index(inplace=True)
+
+  if name == 'IBOV':
+     last_ibov_var = df_ticket['Variação']['close'][-1]                 
+  else:
+
+     df = df_ticket['Último']
+     
+     df['EMA_1'] = df['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+     df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+
+     diff_days = (df.index[-1] - df.index[0]).days
+     if diff_days == 4 and len(df_ticket) > 240:
+        df = df[df.index >= dt.datetime.strftime(df.index[0] + dt.timedelta(days = 4),'%Y-%m-%d')]
+        #df = df[df.index < dt.datetime.strftime(df.index[-1],'%Y-%m-%d')]
+        
+        if df[df['EMA_1'] > df['EMA_2']].empty or\
+           df[df['EMA_1'] < df['EMA_2']].empty:
+              print(name, len(df_ticket))
 
 #Bullish MA Continuous
 def strategy_3(name, df_ticket):
@@ -259,9 +282,12 @@ def verify_df(name, df_ticket):
    
    if isinstance(df_ticket, pd.DataFrame):
       #strategy_1(name, df_ticket)
-      strategy_2(name, df_ticket)
+      #strategy_2(name, df_ticket)
       #strategy_3(name, df_ticket)
-                      
+      strategy_4(name, df_ticket)
+
+
+      
 def get_status(variation):
    variation = variation.replace('%','')
    variation = variation.replace(',','.')
@@ -566,17 +592,18 @@ def iterate(ticket):
 
 def test(update_tickets):
     global status_bull, status_bear, score_bull, score_bear
-    date1 = '2023-09-15'
+    date1 = '2023-09-26'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
        df1.set_index('Data/Hora', inplace=True)
        df1 = update(df1)
-       df1 = df1[df1.index > date1]
+       #df1 = df1[df1.index > date1]
        df1.dropna(inplace=True)
-       df1.to_pickle(MAIN_DF_FILE, protocol=2)       
+       df1.to_pickle(MAIN_DF_FILE, protocol=2)
+       
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    main_df = main_df[main_df.index <= dt.datetime.strptime(date1 + ' 12:30:00', '%Y-%m-%d %H:%M:%S')]
+    #main_df = main_df[main_df.index <= dt.datetime.strptime(date1 + ' 17:30:00', '%Y-%m-%d %H:%M:%S')]
     #time1 =  dt.datetime.strptime(main_df.index[0].strftime('%Y-%m-%d') + ' 10:05:00', '%Y-%m-%d %H:%M:%S')
     time1 = main_df.index[-1]
     last_time = main_df.index[-1]
@@ -668,7 +695,7 @@ def reset(reset_main):
    
       
 warnings.simplefilter(action='ignore')
-reset(reset_main=True)
+reset(reset_main=False)
 #main(update_tickets=True)
 test(update_tickets=True)
 #iterate('PETZ3')
