@@ -74,7 +74,7 @@ def get_data_from_yahoo(ticket, actual_date):
    
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
-   start_date = actual_date - dt.timedelta(days=4)   
+   start_date = actual_date - dt.timedelta(days=6)   
    end_date = actual_date + dt.timedelta(days=1)   
    # just in case your connection breaks, we'd like to save our progress!
    if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
@@ -156,13 +156,15 @@ def strategy_4(name, df_ticket):
      df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
      diff_days = (df.index[-1] - df.index[0]).days
-     if diff_days == 4 and len(df_ticket) > 240:
-        df = df[df.index >= dt.datetime.strftime(df.index[0] + dt.timedelta(days = 4),'%Y-%m-%d')]
+     if diff_days == 6:
+        df = df[df.index >= dt.datetime.strftime(df.index[0] + dt.timedelta(days = 5),'%Y-%m-%d')]
         #df = df[df.index < dt.datetime.strftime(df.index[-1],'%Y-%m-%d')]
         
-        if df[df['EMA_1'] > df['EMA_2']].empty or\
-           df[df['EMA_1'] < df['EMA_2']].empty:
-              print(name, len(df_ticket))
+        if df[df['EMA_1'] > df['EMA_2']].empty:
+           print(name, 'Bearish', len(df_ticket))      
+           
+        elif df[df['EMA_1'] < df['EMA_2']].empty:
+              print(name, 'Bullish', len(df_ticket))
 
 #Bullish MA Continuous
 def strategy_3(name, df_ticket):
@@ -592,7 +594,7 @@ def iterate(ticket):
 
 def test(update_tickets):
     global status_bull, status_bear, score_bull, score_bear
-    date1 = '2023-09-26'
+    date1 = '2023-10-03'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
