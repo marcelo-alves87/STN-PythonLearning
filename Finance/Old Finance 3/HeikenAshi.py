@@ -74,7 +74,7 @@ def get_data_from_yahoo(ticket, actual_date):
    
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
-   start_date = actual_date - dt.timedelta(days=6)   
+   start_date = actual_date - dt.timedelta(days=16)   
    end_date = actual_date + dt.timedelta(days=1)   
    # just in case your connection breaks, we'd like to save our progress!
    if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
@@ -156,8 +156,10 @@ def strategy_4(name, df_ticket):
      df['EMA_2'] = df['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
      diff_days = (df.index[-1] - df.index[0]).days
-     if diff_days == 6:
-        df = df[df.index >= dt.datetime.strftime(df.index[0] + dt.timedelta(days = 5),'%Y-%m-%d')]
+
+     if diff_days == 8:
+        df = df[df.index >= dt.datetime.strftime(df.index[0] + dt.timedelta(days = 7),'%Y-%m-%d')]
+        #df = df[df.index >= dt.datetime.strftime(df.index[0] + dt.timedelta(days = 6),'%Y-%m-%d 11:00:00')]
         #df = df[df.index < dt.datetime.strftime(df.index[-1],'%Y-%m-%d')]
         
         if df[df['EMA_1'] > df['EMA_2']].empty:
@@ -594,7 +596,7 @@ def iterate(ticket):
 
 def test(update_tickets):
     global status_bull, status_bear, score_bull, score_bear
-    date1 = '2023-10-03'
+    date1 = '2023-10-04'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
@@ -605,7 +607,7 @@ def test(update_tickets):
        df1.to_pickle(MAIN_DF_FILE, protocol=2)
        
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    #main_df = main_df[main_df.index <= dt.datetime.strptime(date1 + ' 17:30:00', '%Y-%m-%d %H:%M:%S')]
+    main_df = main_df[main_df.index < dt.datetime.strptime(date1, '%Y-%m-%d')]
     #time1 =  dt.datetime.strptime(main_df.index[0].strftime('%Y-%m-%d') + ' 10:05:00', '%Y-%m-%d %H:%M:%S')
     time1 = main_df.index[-1]
     last_time = main_df.index[-1]
