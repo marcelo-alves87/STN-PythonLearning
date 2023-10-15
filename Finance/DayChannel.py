@@ -75,7 +75,7 @@ def update(df):
          for index,row in df4.iterrows():
             date = dt.datetime.strptime(row['Date'], '%Y-%m-%d')
             _data = {'Data/Hora' : date.strftime('%Y-%m-%d'), 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Open'],2),\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : row['Volume'], 'Estado Atual' : 'Aberto'}
             data.append(_data)            
    df4 =  pd.DataFrame(data)
@@ -96,14 +96,14 @@ def strategy(name, df_ticket):
      df['EMA_1'] = df['Último']['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
      df['EMA_2'] = df['Último']['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-     df = df[df.index >= dt.datetime.strftime(df.index[-1] - dt.timedelta(days = 120),'%Y-%m-%d')]
+     df = df[df.index >= dt.datetime.strftime(df.index[-1] - dt.timedelta(days = 10),'%Y-%m-%d')]
         
      if df[df['EMA_1'] > df['EMA_2']].empty:
-        if df['Último']['close'][-1] >= df['EMA_1'][-1]:            
+        if df['Último']['close'][-1] >= df['EMA_2'][-1]:
             print(name, 'Bearish', format_volume(df['Financeiro']['close'][-1]))      
            
      elif df[df['EMA_1'] < df['EMA_2']].empty:
-         if df['Último']['close'][-1] <= df['EMA_1'][-1]:                
+         if df['Último']['close'][-1] <= df['EMA_2'][-1]:
             print(name, 'Bullish', format_volume(df['Financeiro']['close'][-1]))
 
 def get_tickets():
@@ -117,7 +117,7 @@ def get_tickets():
    return data
 
 def test(update_tickets=True):
-    date1 = '2023-10-11'
+    date1 = '2023-10-13'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
