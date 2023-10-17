@@ -20,14 +20,10 @@ SECOND_EMA_LEN = 30
 
 def verify_trends(main_df):    
     if not main_df.empty:
-
-        groups = main_df.groupby([pd.Grouper(freq='1d'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
-                    .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-        groups.reset_index('Data/Hora',inplace=True)
-        for name in groups.index.unique():
-           df_ticket = groups.loc[name][::-1]
-           strategy(name, df_ticket)
-
+       df = main_df['Ativo'].drop_duplicates()
+       for index,row in df.items():
+           strategy(row, main_df[main_df['Ativo'] == row])
+            
 def get_data_from_yahoo(ticket, actual_date):
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
@@ -85,27 +81,19 @@ def update(df):
    return df4      
 
 def strategy(name, df_ticket):
-  df_ticket.set_index('Data/Hora',inplace=True)
-  df_ticket.sort_index(inplace=True)
+  
+  if name != 'IBOV':
+     df_ticket.sort_index(inplace=True)    
+     df_ticket['EMA_1'] = df_ticket['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+     df_ticket['EMA_2'] = df_ticket['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-  if name == 'IBOV':
-     pass
-  else:     
-     df = df_ticket[['Último', 'Financeiro']]
+     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 10),'%Y-%m-%d')]
+
+     if df_ticket[df_ticket['Abertura'] > df_ticket['Último']].empty:
+         print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
+     elif df_ticket[df_ticket['Abertura'] < df_ticket['Último']].empty:
+         print(name, 'Bearish', format_volume(df_ticket['Financeiro'][-1]))
      
-     df['EMA_1'] = df['Último']['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-     df['EMA_2'] = df['Último']['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
-
-     df = df[df.index >= dt.datetime.strftime(df.index[-1] - dt.timedelta(days = 10),'%Y-%m-%d')]
-        
-     if df[df['EMA_1'] > df['EMA_2']].empty:
-        if df['Último']['close'][-1] >= df['EMA_2'][-1]:
-            print(name, 'Bearish', format_volume(df['Financeiro']['close'][-1]))      
-           
-     elif df[df['EMA_1'] < df['EMA_2']].empty:
-         if df['Último']['close'][-1] <= df['EMA_2'][-1]:
-            print(name, 'Bullish', format_volume(df['Financeiro']['close'][-1]))
-
 def get_tickets():
    data = []
    data.append('IBOV')
@@ -117,7 +105,7 @@ def get_tickets():
    return data
 
 def test(update_tickets=True):
-    date1 = '2023-10-13'
+    date1 = '2023-10-16'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
