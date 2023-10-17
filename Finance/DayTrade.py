@@ -22,7 +22,11 @@ def verify_trends(main_df):
     if not main_df.empty:
        df = main_df['Ativo'].drop_duplicates()
        for index,row in df.items():
-           strategy(row, main_df[main_df['Ativo'] == row])
+           if row != 'IBOV':
+               df_ticket = main_df[main_df['Ativo'] == row]
+               df_ticket.sort_index(inplace=True)
+               #strategy_candles(row, df_ticket)
+               strategy_ma(row, df_ticket)
             
 def get_data_from_yahoo(ticket, actual_date):
    if not os.path.exists('stock_dfs'):
@@ -80,14 +84,22 @@ def update(df):
    df4.sort_index(inplace=True)
    return df4      
 
-def strategy(name, df_ticket):
+def strategy_ma(name, df_ticket):
   
-  if name != 'IBOV':
-     df_ticket.sort_index(inplace=True)    
      df_ticket['EMA_1'] = df_ticket['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
      df_ticket['EMA_2'] = df_ticket['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 10),'%Y-%m-%d')]
+     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 100),'%Y-%m-%d')]
+
+     if df_ticket[df_ticket['EMA_1'] > df_ticket['EMA_2']].empty:
+         print(name, 'Bearish', format_volume(df_ticket['Financeiro'][-1]))
+     elif df_ticket[df_ticket['EMA_1'] < df_ticket['EMA_2']].empty:
+         print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
+
+
+def strategy_candles(name, df_ticket):
+  
+     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 12),'%Y-%m-%d')]
 
      if df_ticket[df_ticket['Abertura'] > df_ticket['Último']].empty:
          print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
@@ -105,7 +117,7 @@ def get_tickets():
    return data
 
 def test(update_tickets=True):
-    date1 = '2023-10-16'
+    date1 = '2023-10-17'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
