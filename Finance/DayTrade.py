@@ -17,6 +17,8 @@ yfin.pdr_override()
 MAIN_DF_FILE = 'main_df.pickle'
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
+count_bull = 0
+count_bear = 0
 
 def verify_trends(main_df):    
     if not main_df.empty:
@@ -54,6 +56,12 @@ def format_ticket(ticket):
       ticket = ticket[0]
    return ticket
 
+def has_great_volume(vol):
+    if vol >= 10**6:
+        return True
+    else:
+        return False
+
 def format_volume(vol):
     if vol / 10**9 >= 1:
         return str(round(vol / 10**9,3)) + ' B'
@@ -85,27 +93,35 @@ def update(df):
    return df4      
 
 def strategy_ma(name, df_ticket):
+     global count_bull, count_bear
   
      df_ticket['EMA_1'] = df_ticket['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
      df_ticket['EMA_2'] = df_ticket['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 100),'%Y-%m-%d')]
+     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 115),'%Y-%m-%d')]
 
-     if df_ticket[df_ticket['EMA_1'] > df_ticket['EMA_2']].empty:
-         print(name, 'Bearish', format_volume(df_ticket['Financeiro'][-1]))
-     elif df_ticket[df_ticket['EMA_1'] < df_ticket['EMA_2']].empty:
-         print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
+     if has_great_volume(df_ticket['Financeiro'][-1]): 
+         if df_ticket[df_ticket['EMA_1'] > df_ticket['EMA_2']].empty:
+             print(name, 'Bearish', format_volume(df_ticket['Financeiro'][-1]))
+             count_bear += 1
+         elif df_ticket[df_ticket['EMA_1'] < df_ticket['EMA_2']].empty:
+             print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
+             count_bull += 1
 
 
 def strategy_candles(name, df_ticket):
-  
-     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 12),'%Y-%m-%d')]
-
-     if df_ticket[df_ticket['Abertura'] > df_ticket['Último']].empty:
-         print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
-     elif df_ticket[df_ticket['Abertura'] < df_ticket['Último']].empty:
-         print(name, 'Bearish', format_volume(df_ticket['Financeiro'][-1]))
+     global count_bull, count_bear
      
+     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 8),'%Y-%m-%d')]
+
+     if has_great_volume(df_ticket['Financeiro'][-1]):
+         if df_ticket[df_ticket['Abertura'] > df_ticket['Último']].empty:
+             print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
+             count_bull += 1
+         elif df_ticket[df_ticket['Abertura'] < df_ticket['Último']].empty:
+             print(name, 'Bearish', format_volume(df_ticket['Financeiro'][-1]))
+             count_bear += 1
+         
 def get_tickets():
    data = []
    data.append('IBOV')
@@ -117,7 +133,8 @@ def get_tickets():
    return data
 
 def test(update_tickets=True):
-    date1 = '2023-10-17'
+    global count
+    date1 = '2023-10-19'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
@@ -132,7 +149,7 @@ def test(update_tickets=True):
        main_df = update(main_df)
     
     verify_trends(main_df)
-        
+    print("Bull {}, Bear {}".format(count_bull, count_bear))    
         
 
 def reset(reset_main):
