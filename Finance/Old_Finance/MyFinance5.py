@@ -13,6 +13,7 @@ def compile_data(start_date = None, end_date = None):
         
         print(ticker)
         try:
+            
             df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
 
             df.set_index('Date', inplace=True)
@@ -24,10 +25,8 @@ def compile_data(start_date = None, end_date = None):
                 df = df.loc[:end_date]    
 
             df.rename(columns={'Adj Close': ticker}, inplace=True)
-            if 'Volume' in df.columns:
-                df.drop(['Volume'], 1, inplace=True)
-            if 'Open' in df.columns:
-                df.drop(['Open', 'High', 'Low', 'Close'], 1, inplace=True)
+
+            df = df[[ticker]]
 
             if main_df.empty:
                 main_df = df
