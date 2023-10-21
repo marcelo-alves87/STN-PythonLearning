@@ -132,7 +132,7 @@ def get_tickets():
            data.append(ticket)
    return data
 
-def test(update_tickets=True):
+def main(update_tickets=True):
     global count
     date1 = '2023-10-19'
     if not os.path.exists(MAIN_DF_FILE):
@@ -141,7 +141,7 @@ def test(update_tickets=True):
        df1.set_index('Data/Hora', inplace=True)
        df1 = update(df1)
        df1.dropna(inplace=True)
-       df1.to_pickle(MAIN_DF_FILE, protocol=2)
+       df1.to_pickle(MAIN_DF_FILE)
        
     main_df = pd.read_pickle(MAIN_DF_FILE)
     main_df = main_df[main_df.index < dt.datetime.strptime(date1, '%Y-%m-%d')]
@@ -161,4 +161,4 @@ def reset(reset_main):
 
 warnings.simplefilter(action='ignore')
 reset(reset_main=False)
-test()
+main()
