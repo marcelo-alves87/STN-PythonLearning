@@ -103,7 +103,8 @@ def sound_alert():
    time.sleep(1)
  
 def notify(index, name):
-   color.write(index + ' ' + name,'DEFINITION')
+   color.write(str(index) + ' ' + name,'DEFINITION')
+   print('\n')
    sound_alert()
    
    
@@ -369,15 +370,52 @@ def update(df):
    df = pd.concat([df3, df5])
    return df4
 
+def get_data():
+   #addPriceSerieEntityByDataSerieHistory
+   # 5 min
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-10-23'));
+   
+   main_df, driver = do_scraping()
+   main_df = get_all_tickets_status(driver)
+   tickets = main_df['Ativo'].values
+   for ticket in tickets:
+      if ticket != 'IBOV':
+         input('Waiting for mydata of {} ...'.format(ticket))
+         length = driver.execute_script("return mydata.length")
+         data = []
+         for i in range(length):
+            print(i)
+            
+            date_str = driver.execute_script("return mydata[" + str(i) +"].dtDateTime.toLocaleString()")
+            date = dt.datetime.strptime(date_str, '%d/%m/%Y, %H:%M:%S')
+
+            n_open = driver.execute_script("return mydata[" + str(i) +"].nOpen")
+           
+            n_max = driver.execute_script("return mydata[" + str(i) +"].nMax")
+           
+            n_min = driver.execute_script("return mydata[" + str(i) +"].nMin")
+            
+            n_close = driver.execute_script("return mydata[" + str(i) +"].nClose")
+
+            n_quantity = driver.execute_script("return mydata[" + str(i) +"].nQuantity")
+           
+            data.append({'Datetime' : date, 'Open' : n_open, 'High' : n_max, 'Low' : n_min, 'Close' : n_close, 'Adj Close' : n_close, 'Volume' : n_quantity })
+         df = pd.DataFrame(data)
+         df['Datetime'] = df['Datetime'] - dt.timedelta(hours = 3)
+         if not os.path.exists('stock_dfs'):
+            os.makedirs('stock_dfs')
+         df.to_csv('stock_dfs/{}.csv'.format(ticket))           
+
 def reset(reset_main):
    empty_json = {}
    if reset_main and os.path.exists(MAIN_DF_FILE):
       os.remove(MAIN_DF_FILE)
    if reset_main and os.path.exists(STATUS_FILE):   
       os.remove(STATUS_FILE)
-   if reset_main and os.path.exists('stock_dfs'):
-      shutil.rmtree('stock_dfs')
+   #if reset_main and os.path.exists('stock_dfs'):
+    #  shutil.rmtree('stock_dfs')
       
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
 main(update_tickets=True)
+#get_data()

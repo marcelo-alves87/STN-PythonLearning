@@ -27,8 +27,8 @@ def verify_trends(main_df):
            if row != 'IBOV':
                df_ticket = main_df[main_df['Ativo'] == row]
                df_ticket.sort_index(inplace=True)
-               #strategy_candles(row, df_ticket)
-               strategy_ma(row, df_ticket)
+               strategy_candles(row, df_ticket)
+               #strategy_ma(row, df_ticket)
             
 def get_data_from_yahoo(ticket, actual_date):
    if not os.path.exists('stock_dfs'):
@@ -112,7 +112,7 @@ def strategy_ma(name, df_ticket):
 def strategy_candles(name, df_ticket):
      global count_bull, count_bear
      
-     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 9),'%Y-%m-%d')]
+     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 6),'%Y-%m-%d')]
 
      if has_great_volume(df_ticket['Financeiro'][-1]):
          if df_ticket[df_ticket['Abertura'] > df_ticket['Último']].empty:
@@ -134,7 +134,7 @@ def get_tickets():
 
 def main(update_tickets=True):
     global count
-    date1 = '2023-10-20'
+    date1 = '2023-10-24'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
