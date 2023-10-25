@@ -23,6 +23,7 @@ yfin.pdr_override()
 
 MAIN_DF_FILE = 'main_df.pickle'
 STATUS_FILE = 'status.pickle'
+PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 color = sys.stdout.shell
 last_date = None
@@ -46,21 +47,28 @@ def get_page_df(driver):
    df.dropna(inplace=True)
    return df
 
-def strategy(main_df):
-    global status
+def strategy():
+    global main_df, status
     if not main_df.empty:
         if os.path.exists(STATUS_FILE): 
            with open(STATUS_FILE, 'rb') as handle:
               status = pickle.load(handle)
-               
+        if os.path.exists(PRICE_ALERT):       
+           with open (PRICE_ALERT, 'rb') as f:
+              price_alert = json.load(f)
+              
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
            df_ticket = groups.loc[name][::-1]
-           verify_ma(name, df_ticket, status)
+           if name != 'IBOV' and isinstance(df_ticket, pd.Series):
+              df = update(name)
+              main_df = pd.concat([df, main_df])
+           else:
+              verify_ma(name, df_ticket, status, price_alert)
            
-def verify_ma(name, df_ticket, status):
+def verify_ma(name, df_ticket, status, price_alert):
    global last_ibov_var
    if isinstance(df_ticket, pd.DataFrame):
       df_ticket.set_index('Data/Hora',inplace=True)
@@ -68,7 +76,21 @@ def verify_ma(name, df_ticket, status):
 
       if name == 'IBOV':
         last_ibov_var = df_ticket['Variação']['close'][-1]   
-           
+      # if name in price alert it won't be verified the ma cross.
+      elif name in price_alert:
+         if isinstance(price_alert[name], float):
+            price_alert[name] = [price_alert[name]]
+         if isinstance(price_alert[name], list):
+            for i in range(len(price_alert[name])):
+               price = price_alert[name][i]
+               if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
+                    notify(df_ticket.index[-1], name, 'Alert')
+                    price_alert.pop(name) 
+                    with open(PRICE_ALERT, 'w') as f:
+                       json.dump(price_alert, f)
+                    time.sleep(1)   
+                    break   
+        
       else:
          df1 = df_ticket['Último']
          df1['EMA_1'] = df1['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
@@ -84,12 +106,12 @@ def verify_ma(name, df_ticket, status):
             save_status()
          elif df1['EMA_1'][-1] > df1['EMA_2'][-1] and\
             status[name] == 'Bearish':
-            notify(df1.index[-1], name)
+            notify(df1.index[-1], name, 'Bullish')
             status[name] = 'Bullish'
             save_status()
          elif df1['EMA_1'][-1] < df1['EMA_2'][-1] and\
             status[name] == 'Bullish':
-            notify(df1.index[-1], name)
+            notify(df1.index[-1], name, 'Bearish')
             status[name] = 'Bearish'   
             save_status()
          
@@ -102,9 +124,10 @@ def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def notify(index, name):
-   color.write(str(index) + ' ' + name,'DEFINITION')
-   print('\n')
+def notify(index, name, type):
+   print('************\n')
+   color.write(str(index) + ' ' + name + ' ' + type,'STRING')
+   print('************\n')
    sound_alert()
    
    
@@ -258,7 +281,8 @@ def do_scraping():
     print('Running ...')
     return main_df, driver
 
-def main(update_tickets):
+def main():
+    global main_df
     main_df, driver = do_scraping()  
     #insert_tickets(driver)
     while(True):
@@ -294,8 +318,6 @@ def main(update_tickets):
         df = df[df.index >= dt.datetime.today().strftime('%Y-%m-%d')] 
       
         if main_df.empty:
-           if not df.empty and update_tickets:
-               df = update(df)                  
            main_df = df      
         else:
            main_df = pd.concat([main_df, df])
@@ -306,7 +328,7 @@ def main(update_tickets):
            main_df.set_index('Data/Hora', inplace=True)            
            main_df.to_pickle(MAIN_DF_FILE)
            
-           strategy(main_df)
+           strategy()
 
         time.sleep(1)
 
@@ -336,30 +358,26 @@ def get_data_from_yahoo(ticket, actual_date):
    else:
       print('Already have {}'.format(ticket))
 
-def update(df):
+def update(ticket):
    
    data = []
-   df3 = df['Ativo'].drop_duplicates()
-   for i in range(len(df3)):
-      ticket = format_ticket(df3[i])
-      get_data_from_yahoo(ticket, df[df['Ativo'] == df3[i]].index[0])      
-      if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
-         df4 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
-         for index,row in df4.iterrows():
-            date = dt.datetime.strptime(row['Datetime'], '%Y-%m-%d %H:%M:%S')
-            _data = {'Data/Hora' : (date - dt.timedelta(minutes = 0)).strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Open'],2),\
-                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'}
-            data.append(_data)
-            data.append({'Data/Hora' : (date + dt.timedelta(minutes = 1)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Low'],2),\
-                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
-            data.append({'Data/Hora' : (date + dt.timedelta(minutes = 2)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['High'],2),\
-                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
-            data.append({'Data/Hora' : (date + dt.timedelta(minutes = 3)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
-                         'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
+   if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
+      df4 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
+      for index,row in df4.iterrows():
+         date = dt.datetime.strptime(row['Datetime'], '%Y-%m-%d %H:%M:%S')
+         _data = {'Data/Hora' : (date - dt.timedelta(minutes = 0)).strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
+                      'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Open'],2),\
+                      'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'}
+         data.append(_data)
+         data.append({'Data/Hora' : (date + dt.timedelta(minutes = 1)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+                      'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Low'],2),\
+                      'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
+         data.append({'Data/Hora' : (date + dt.timedelta(minutes = 2)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+                      'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['High'],2),\
+                      'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
+         data.append({'Data/Hora' : (date + dt.timedelta(minutes = 3)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
+                      'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
+                      'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
    df4 =  pd.DataFrame(data)
    df4['Data/Hora'] = pd.to_datetime(df4['Data/Hora'])
    df4.set_index('Data/Hora', inplace=True)
@@ -374,7 +392,11 @@ def get_data():
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
    # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-10-23'));
-   
+
+   if os.path.exists('stock_dfs'):
+      shutil.rmtree('stock_dfs')      
+      time.sleep(1)
+      os.makedirs('stock_dfs')   
    main_df, driver = do_scraping()
    main_df = get_all_tickets_status(driver)
    tickets = main_df['Ativo'].values
@@ -408,14 +430,16 @@ def get_data():
 
 def reset(reset_main):
    empty_json = {}
-   if reset_main and os.path.exists(MAIN_DF_FILE):
-      os.remove(MAIN_DF_FILE)
-   if reset_main and os.path.exists(STATUS_FILE):   
-      os.remove(STATUS_FILE)
-   #if reset_main and os.path.exists('stock_dfs'):
-    #  shutil.rmtree('stock_dfs')
-      
+   if reset_main:
+      if os.path.exists(MAIN_DF_FILE):
+         os.remove(MAIN_DF_FILE)
+      if os.path.exists(STATUS_FILE):   
+         os.remove(STATUS_FILE)
+      with open(PRICE_ALERT, 'w') as f:
+         json.dump(empty_json, f)   
+   
+    
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
-main(update_tickets=True)
+main()
 #get_data()
