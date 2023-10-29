@@ -99,15 +99,11 @@ def ret_data_moving_avarages(tickers):
     for ticker in tickers:
         try:
             df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
-            df.set_index('Date', inplace=True)
-            last_volume = df['Volume'][-2]
-            df['SMA'] = df['Adj Close'].rolling(window=40, min_periods=0).mean()
-            df['EMA'] = df['Adj Close'].ewm(span=9, adjust=False).mean()
-            diff = (df['EMA'][-1] - df['Adj Close'][-1])/df['EMA'][-1]
-            
-            if last_volume > 10**6 and last_volume < 10**7:           
-               if df['EMA'][-1] > df['SMA'][-1] and df['Adj Close'][-1] > df['SMA'][-1]:
-                   data.append([ticker, diff])
+            df.set_index('Datetime', inplace=True)
+            df = df[df.index > '2023-10-27']
+            volume = (df['Volume'] * df['Adj Close']).sum()
+            if volume > 10 ** 8:
+                data.append([ticker, volume])
         except:
             pass
     return data
@@ -116,17 +112,20 @@ with open("ibovespatickers.pickle", "rb") as f:
     tickers = pickle.load(f)        
 
 
-#data = ret_data_moving_avarages(tickers)
+data = ret_data_moving_avarages(tickers)
 #data = ret_bearish_avarages(tickers)
 #data = ret_bullish_avarages(tickers)
 #data = ret_data_moving_avarages_(tickers)
 #data = biggest_highs(tickers)
 #data = sorted(data, key=lambda x: x[1])
-data = ret_bullish_bearish_avarages(tickers)
-data.sort(key=sort_)
+#data = ret_bullish_bearish_avarages(tickers)
+#data.sort(key=sort_)
 #print(data)
-for row in data:
-    #plt.scatter(row[0], row[1])
-    print(row)
+#for row in data:
+#    plt.scatter(row[0], row[1])
+#    print(row)
 
-plt.show()
+#plt.show()
+print(len(data))
+for i in data:
+    print("{} has volume: {}".format(i[0], i[1]))
