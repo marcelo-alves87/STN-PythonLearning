@@ -114,7 +114,8 @@ def verify_ma(name, df_ticket, status, price_alert):
             notify(df1.index[-1], name, 'Bearish')
             status[name] = 'Bearish'   
             save_status()
-         
+         else:
+            notify(df1.index[-1], name, 'Bullish' if df1['EMA_1'][-1] > df1['EMA_2'][-1] else 'Bearish', 0)
 def save_status():
    with open(STATUS_FILE, 'wb') as handle:
          pickle.dump(status, handle)
@@ -124,12 +125,19 @@ def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def notify(index, name, type):
-   print('************\n')
-   color.write(str(index) + ' ' + name + ' ' + type,'STRING')
-   print('************\n')
-   sound_alert()
-   
+def notify(index, name, type, mode=1):
+   if mode == 1:
+      print('************\n')
+      if type == 'Bullish':
+         color.write(str(index) + ' ' + name + ' ' + type,'STRING')
+      elif type == 'Bearish':
+         color.write(str(index) + ' ' + name + ' ' + type,'COMMENT')
+      elif type == 'Alert':
+         color.write(str(index) + ' ' + name + ' ' + type,'KEYWORD')   
+      print('\n************')
+      sound_alert()
+   else:
+      print("{} -> {} is {}".format(index, name, type))
    
 def handle_finance(row):   
    if isinstance(row, float):
@@ -440,6 +448,6 @@ def reset(reset_main):
    
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=True)
+reset(reset_main=False)
 main()
 #get_data()
