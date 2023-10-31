@@ -127,7 +127,7 @@ def sound_alert():
  
 def notify(index, name, type, mode=1):
    if mode == 1:
-      print('************\n')
+      print('************')
       if type == 'Bullish':
          color.write(str(index) + ' ' + name + ' ' + type,'STRING')
       elif type == 'Bearish':
@@ -399,7 +399,7 @@ def update(ticket):
 def get_data():
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-10-23'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-10-27'));
 
    if os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -448,6 +448,6 @@ def reset(reset_main):
    
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=False)
+reset(reset_main=True)
 main()
 #get_data()
