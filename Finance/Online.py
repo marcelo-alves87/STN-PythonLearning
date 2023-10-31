@@ -396,12 +396,12 @@ def update(ticket):
    df = pd.concat([df3, df5])
    return df4
 
-def get_data():
+def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-10-27'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-10-29'));
 
-   if os.path.exists('stock_dfs'):
+   if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
       time.sleep(1)
       os.makedirs('stock_dfs')   
@@ -409,7 +409,7 @@ def get_data():
    main_df = get_all_tickets_status(driver)
    tickets = main_df['Ativo'].values
    for ticket in tickets:
-      if ticket != 'IBOV':
+      if ticket != 'IBOV' and not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
          input('Waiting for mydata of {} ...'.format(ticket))
          length = driver.execute_script("return mydata.length")
          data = []
@@ -449,5 +449,5 @@ def reset(reset_main):
     
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
-main()
-#get_data()
+#main()
+get_data(reset=False)
