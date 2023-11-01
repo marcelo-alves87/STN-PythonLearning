@@ -19,6 +19,7 @@ FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 count_bull = 0
 count_bear = 0
+tickets_corr = []
 
 def verify_trends(main_df):    
     if not main_df.empty:
@@ -116,11 +117,30 @@ def strategy_candles(name, df_ticket):
 
      if has_great_volume(df_ticket['Financeiro'][-1]):
          if df_ticket[df_ticket['Abertura'] > df_ticket['Último']].empty:
+             tickets_corr.append(name)
              print(name, 'Bullish', format_volume(df_ticket['Financeiro'][-1]))
              count_bull += 1
          elif df_ticket[df_ticket['Abertura'] < df_ticket['Último']].empty:
+             tickets_corr.append(name)
              print(name, 'Bearish', format_volume(df_ticket['Financeiro'][-1]))
              count_bear += 1
+
+def correlation(main_df):
+    main_df.reset_index(inplace=True)
+    df = pd.DataFrame(main_df['Data/Hora'])
+    df.drop_duplicates(inplace=True)
+    for i in range(len(tickets_corr)):
+        df1 = main_df[main_df['Ativo'] == tickets_corr[i]][['Data/Hora', 'Último']]
+        df1.rename(columns={'Último': tickets_corr[i]}, inplace=True)
+        df = df.merge(df1, on='Data/Hora', how='left')
+    df = df[df['Data/Hora'] > df['Data/Hora'].iloc[-7]]
+    df_corr = df.corr()
+    for index, data in df_corr.iteritems():
+        for index1, data1 in data.iteritems():
+            if abs(data1) >= 0.99 and index != index1:
+                print(('{} e {} fator de correlação: {}').format(index, index1, data1))
+
+    
          
 def get_tickets():
    data = []
@@ -134,7 +154,7 @@ def get_tickets():
 
 def main(update_tickets=True):
     global count
-    date1 = '2023-10-24'
+    date1 = '2023-10-31'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
@@ -147,8 +167,9 @@ def main(update_tickets=True):
     main_df = main_df[main_df.index < dt.datetime.strptime(date1, '%Y-%m-%d')]
     if update_tickets:
        main_df = update(main_df)
-    
+    main_df.dropna(inplace=True)
     verify_trends(main_df)
+    correlation(main_df)
     print("Bull {}, Bear {}".format(count_bull, count_bear))    
         
 
