@@ -84,7 +84,7 @@ def update(df):
          for index,row in df4.iterrows():
             date = dt.datetime.strptime(row['Date'], '%Y-%m-%d')
             _data = {'Data/Hora' : date.strftime('%Y-%m-%d'), 'Ativo' : ticket, 'Variação' : '0,00%',\
-                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
+                         'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Close'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : row['Volume'], 'Estado Atual' : 'Aberto'}
             data.append(_data)            
    df4 =  pd.DataFrame(data)
@@ -137,7 +137,7 @@ def correlation(main_df):
     df_corr = df.corr()
     for index, data in df_corr.iteritems():
         for index1, data1 in data.iteritems():
-            if abs(data1) >= 0.99 and index != index1:
+            if abs(data1) >= 0.992 and index != index1:
                 print(('{} e {} fator de correlação: {}').format(index, index1, data1))
 
     
@@ -154,7 +154,7 @@ def get_tickets():
 
 def main(update_tickets=True):
     global count
-    date1 = '2023-10-31'
+    date1 = '2023-11-06'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
