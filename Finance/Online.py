@@ -95,6 +95,7 @@ def verify_ma(name, df_ticket, status, price_alert):
          df1 = df_ticket['Último']
          df1['EMA_1'] = df1['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
          df1['EMA_2'] = df1['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+         var = df_ticket['Variação']['close'][-1]
 
          if df1['EMA_1'][-1] > df1['EMA_2'][-1] and\
             name not in status:
@@ -106,16 +107,17 @@ def verify_ma(name, df_ticket, status, price_alert):
             save_status()
          elif df1['EMA_1'][-1] > df1['EMA_2'][-1] and\
             status[name] == 'Bearish':
-            notify(df1.index[-1], name, 'Bullish')
+            notify(df1.index[-1], name, 'Bullish', var)
             status[name] = 'Bullish'
             save_status()
          elif df1['EMA_1'][-1] < df1['EMA_2'][-1] and\
             status[name] == 'Bullish':
-            notify(df1.index[-1], name, 'Bearish')
+            notify(df1.index[-1], name, 'Bearish', var)
             status[name] = 'Bearish'   
             save_status()
          else:
-            notify(df1.index[-1], name, 'Bullish' if df1['EMA_1'][-1] > df1['EMA_2'][-1] else 'Bearish', 0)
+            notify(df1.index[-1], name, 'Bullish' if df1['EMA_1'][-1] > df1['EMA_2'][-1] else 'Bearish',\
+                  var, 0)
 def save_status():
    with open(STATUS_FILE, 'wb') as handle:
          pickle.dump(status, handle)
@@ -125,19 +127,19 @@ def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def notify(index, name, type, mode=1):
+def notify(index, name, type, var, mode=1):
    if mode == 1:
       print('************')
       if type == 'Bullish':
-         color.write(str(index) + ' ' + name + ' ' + type,'STRING')
+         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'STRING')
       elif type == 'Bearish':
-         color.write(str(index) + ' ' + name + ' ' + type,'COMMENT')
+         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'COMMENT')
       elif type == 'Alert':
-         color.write(str(index) + ' ' + name + ' ' + type,'KEYWORD')   
+         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'KEYWORD')   
       print('\n************')
       sound_alert()
    else:
-      print("{} -> {} is {}".format(index, name, type))
+      print("{} -> {} ({}) is {}".format(index, name, var, type))
    
 def handle_finance(row):   
    if isinstance(row, float):
@@ -298,7 +300,9 @@ def main():
         try:
            driver.execute_script("document.getElementById('app-menu').click()")
         except:
-           input('Catched Exception ...')
+           print('Catched Exception ...')
+           time.sleep(3)
+           
         driver.execute_script("document.getElementsByClassName('sector-list-table')[0].scrollTop = 0") 
         
         df = get_all_tickets_status(driver)
@@ -387,19 +391,20 @@ def update(ticket):
                       'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
                       'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
    df4 =  pd.DataFrame(data)
-   df4['Data/Hora'] = pd.to_datetime(df4['Data/Hora'])
-   df4.set_index('Data/Hora', inplace=True)
-   df4.sort_index(inplace=True)
-   df4 = df4[df4.index > df4.index[0].strftime('%Y-%m-%d 10:00:00')]
-   df3 = df4[df4.index < df4.index[0].strftime('%Y-%m-%d 18:00:00')]
-   df5 = df4[df4.index > df4.index[-1].strftime('%Y-%m-%d 10:00:00')]
-   df = pd.concat([df3, df5])
+   if not df4.empty:
+      df4['Data/Hora'] = pd.to_datetime(df4['Data/Hora'])
+      df4.set_index('Data/Hora', inplace=True)
+      df4.sort_index(inplace=True)
+      df4 = df4[df4.index > df4.index[0].strftime('%Y-%m-%d 10:00:00')]
+      df3 = df4[df4.index < df4.index[0].strftime('%Y-%m-%d 18:00:00')]
+      df5 = df4[df4.index > df4.index[-1].strftime('%Y-%m-%d 10:00:00')]
+      df = pd.concat([df3, df5])
    return df4
 
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-10-29'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-01'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -448,6 +453,6 @@ def reset(reset_main):
    
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=True)
-#main()
-get_data(reset=False)
+reset(reset_main=False)
+main()
+#get_data(reset=True)
