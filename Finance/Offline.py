@@ -15,6 +15,7 @@ import shutil
 yfin.pdr_override()
 
 MAIN_DF_FILE = 'main_df.pickle'
+DATA_FILE = 'data.pickle'
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 count_bull = 0
@@ -82,8 +83,8 @@ def update(df):
       if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
          df4 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
          for index,row in df4.iterrows():
-            date = dt.datetime.strptime(row['Date'], '%Y-%m-%d')
-            _data = {'Data/Hora' : date.strftime('%Y-%m-%d'), 'Ativo' : ticket, 'Variação' : '0,00%',\
+            date = dt.datetime.strptime(row['Datetime'][:-6], '%Y-%m-%d %H:%M:%S')
+            _data = {'Data/Hora' : date.strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
                          'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Close'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : row['Volume'], 'Estado Atual' : 'Aberto'}
             data.append(_data)            
@@ -152,9 +153,74 @@ def get_tickets():
            data.append(ticket)
    return data
 
-def main(update_tickets=True):
+def remove(list, item):
+    try:
+        list.remove(item)
+    except:
+        pass
+
+def process_data_corr(main_df):
+    data = {}
+    tickers = main_df['Ativo']
+    tickers.drop_duplicates(inplace=True)
+    
+    for i,ticker in tickers.items():
+        
+        date1 = main_df.index[0]
+        last_date = main_df.index[-1]
+        bullish = []
+        bearish = []
+
+        df2 = main_df[main_df['Ativo'] == ticker]
+        df2 = df2[df2.index > df2.index[-1].strftime('%Y-%m-%d')]
+        volume = (df2['Financeiro'] * df2['Último']).sum()
+        if has_great_volume(volume):
+            while date1 < last_date:
+
+                df1 = main_df[main_df['Ativo'] == ticker]
+                date1_str = dt.datetime.strftime(date1,'%Y-%m-%d')
+                if date1_str not in data:
+                    data[date1_str] = {}
+                
+                df1['EMA_1'] = df1['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+                df1['EMA_2'] = df1['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+
+                df1 = df1[df1.index > date1]
+                df1 = df1[df1.index < date1 + dt.timedelta(days = 1)]
+
+                #processa os dados de hoje junto com os dados de ontem
+                if ticker in bullish and not df1[df1['EMA_1'] < df1['EMA_2']].empty:
+                    first_index = df1[df1['EMA_1'] < df1['EMA_2']].index[0]
+                    index_str = dt.datetime.strftime(first_index,'%H:%M:%S')
+                    if index_str in data[date1_str]:
+                        data[date1_str][index_str] += [ticker, 'Bearish']
+                    else:
+                        data[date1_str][index_str] = [ticker, 'Bearish']                
+                   
+                elif ticker in bearish and not df1[df1['EMA_1'] > df1['EMA_2']].empty:
+                    first_index = df1[df1['EMA_1'] > df1['EMA_2']].index[0]
+                    index_str = dt.datetime.strftime(first_index,'%H:%M:%S')
+                    if index_str in data[date1_str]:
+                        data[date1_str][index_str] += [ticker, 'Bullish']
+                    else:
+                        data[date1_str][index_str] = [ticker, 'Bullish']                
+                   
+
+                remove(bullish,ticker)
+                remove(bearish,ticker)
+                    
+                # armazena dados de hoje
+                if df1[df1['EMA_1'] > df1['EMA_2']].empty:
+                    bearish.append(ticker)                
+                elif df1[df1['EMA_1'] < df1['EMA_2']].empty:
+                    bullish.append(ticker)
+                    
+                date1 += dt.timedelta(days = 1)
+    return data    
+
+def main(update_tickets=False):
     global count
-    date1 = '2023-11-06'
+    date1 = '2023-11-01'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
@@ -168,15 +234,31 @@ def main(update_tickets=True):
     if update_tickets:
        main_df = update(main_df)
     main_df.dropna(inplace=True)
-    verify_trends(main_df)
-    correlation(main_df)
-    print("Bull {}, Bear {}".format(count_bull, count_bear))    
-        
+    #verify_trends(main_df)
+    #correlation(main_df)
 
+    if os.path.exists(DATA_FILE):
+        df  = pd.read_pickle(DATA_FILE)
+    else:    
+        data = process_data_corr(main_df)         
+        df = pd.DataFrame(data)
+        df.sort_index(inplace=True)
+        df.to_pickle(DATA_FILE)
+        
+    for column in range(len(df.columns)):
+        print('-------------')
+        print(df.columns[column])
+        print('-------------')
+        for i,row in df.iterrows():
+           if isinstance(row[column], list):
+               print(i,row[column])
+            
 def reset(reset_main):
    empty_json = {}
    if reset_main and os.path.exists(MAIN_DF_FILE):
-      os.remove(MAIN_DF_FILE)   
+      os.remove(MAIN_DF_FILE)
+   if reset_main and os.path.exists(DATA_FILE):
+      os.remove(DATA_FILE)      
    if reset_main and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')           
 
