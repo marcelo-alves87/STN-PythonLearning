@@ -11,7 +11,7 @@ import pickle
 import pandas_datareader.data as web
 import yfinance as yfin
 import shutil
-import pytz
+import mplfinance as mpf
 
 yfin.pdr_override()
 
@@ -21,8 +21,7 @@ SECOND_EMA_LEN = 30
 count_bull = 0
 count_bear = 0
 tickets_corr = []
-CORR_THRESHOLD = 0
-TZ = pytz.timezone('America/Sao_Paulo')
+CORR_THRESHOLD = 10
 
 #fazer correlação com 30 min ou 15 min e verificar movimentos em 5-min
 
@@ -87,9 +86,7 @@ def update(df):
       if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
          df4 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
          for index,row in df4.iterrows():
-            date = dt.datetime.strptime(row['Datetime'], '%Y-%m-%d %H:%M:%S%z')
-            date = date.astimezone(TZ)
-            _data = {'Data/Hora' : date.strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
+            _data = {'Data/Hora' : to_timezone(row['Datetime']), 'Ativo' : ticket, 'Variação' : '0,00%',\
                          'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Close'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : row['Volume'], 'Estado Atual' : 'Aberto'}
             data.append(_data)            
@@ -187,9 +184,6 @@ def process_data_corr(main_df, verbose=False):
                 
                 date1_str = dt.datetime.strftime(date1,'%Y-%m-%d')
 
-                if ticker == 'SIMH3':
-                    pdb.set_trace()
-                
                 df2 = df1[df1.index > date1_str]
                 
                 df2 = df2[df2.index <  dt.datetime.strptime(\
@@ -274,7 +268,49 @@ def process_hits(main_df):
     #df[df[2] > 4]
     #df[df[0] == 'FLRY3 BBSE3']
     #print_hit(df[df[2] > 4])
-    pdb.set_trace()   
+    pdb.set_trace()
+
+def to_timezone(row):
+    delta = 0
+    if '-02:00' in row:
+        delta = 1
+    row = dt.datetime.strptime(row, '%Y-%m-%d %H:%M:%S%z')
+    row -= dt.timedelta(hours=delta)   
+    return row.strftime('%Y-%m-%d %H:%M:%S')
+
+def plot(tickers):
+    fig = mpf.figure(style='charles',figsize=(7,8))
+    ax1 = fig.add_subplot(2,1,1)
+    ax2 = fig.add_subplot(3,1,3, sharex=ax1)
+
+    for i in range(len(tickers)):
+        if os.path.exists('stock_dfs/{}.csv'.format(tickers[i])):
+         df = pd.read_csv('stock_dfs/{}.csv'.format(tickers[i]))
+         df.reset_index(inplace=True)
+         df['Datetime'] = df['Datetime'].apply(lambda row: to_timezone(row))
+         
+         df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+         df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+
+         df = df[df['Datetime'] > '2023-11-06']
+         df = df[df['Datetime'] < '2023-11-07']
+         
+         #df = df[['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume']]
+         df.index = pd.DatetimeIndex(df['Datetime'])
+         
+
+         if i == 0:
+             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax1, color='blue')
+             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax1, color='darkblue')
+             mpf.plot(df,ax=ax1, ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2])
+         else:
+             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax2, color='blue')
+             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax2, color='darkblue')
+             apd = mpf.make_addplot(df[['EMA_1', 'EMA_2']],type='line', ax=ax2)
+             mpf.plot(df,ax=ax2,ylabel=tickers[i], type='candle',addplot=[apd_1,apd_2])
+         
+
+    mpf.show()
 
 def main(update_tickets=False):
     global count
@@ -295,6 +331,8 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     process_hits(main_df)
+    #plot(['MRFG3', 'B3SA3'])
+    
     
 def reset(reset_main):
    empty_json = {}
