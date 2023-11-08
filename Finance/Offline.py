@@ -15,12 +15,12 @@ import shutil
 yfin.pdr_override()
 
 MAIN_DF_FILE = 'main_df.pickle'
-DATA_FILE = 'data.pickle'
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 count_bull = 0
 count_bear = 0
 tickets_corr = []
+CORR_THRESHOLD = 0
 
 def verify_trends(main_df):    
     if not main_df.empty:
@@ -181,17 +181,21 @@ def process_data_corr(main_df, verbose=False):
             while date1 < last_date:
 
                 date1_str = dt.datetime.strftime(date1,'%Y-%m-%d')
+
+                df2 = df1[df1.index > date1_str]
                 
-                df2 = df1[df1.index > date1]
-                df2 = df2[df2.index < date1 + dt.timedelta(days = 1)]
+                df2 = df2[df2.index <  dt.datetime.strptime(\
+                    date1_str, '%Y-%m-%d') + dt.timedelta(days = 1)]
 
                 if not df2.empty:
-                    if df2[df2['EMA_1'] > df2['EMA_2']].empty:
+                    df3 = df2[df2['EMA_1'] > df2['EMA_2']]
+                    df4 = df2[df2['EMA_1'] < df2['EMA_2']]
+                    if len(df3) <= CORR_THRESHOLD:
                         if date1_str in data:
                             data[date1_str]['Bearish'].append(ticker) 
                         else:
                             data[date1_str] = {'Bearish' : [ticker], 'Bullish' : []}                         
-                    elif df2[df2['EMA_1'] < df2['EMA_2']].empty:
+                    elif len(df4) <= CORR_THRESHOLD:
                         if date1_str in data:
                             data[date1_str]['Bullish'].append(ticker) 
                         else:
@@ -201,8 +205,7 @@ def process_data_corr(main_df, verbose=False):
     df = pd.DataFrame(data)
     df = df.transpose()
     df.sort_index(inplace=True)
-    df.to_pickle(DATA_FILE)
-
+    
     if verbose:
         for i,row in df.iterrows():
             print('----------------')
@@ -222,28 +225,31 @@ def process_hit_corr(hit, tickets, df):
             for j in range(len(tickets)):
                 if i > j:
                     index = tickets[i] + ' ' + tickets[j]
-                    if (tickets[i] in row['Bullish'] and tickets[j] in row['Bullish'] ) or\
-                        (tickets[i] in row['Bearish'] and tickets[j] in row['Bearish']):
+                    if (tickets[i] in row['Bearish'] and tickets[j] in row['Bullish'] ) or\
+                        (tickets[i] in row['Bullish'] and tickets[j] in row['Bearish']):
                         if index in hit:
-                            hit[index] += 1
+                            hit[index][0] += [k]
                         else:
-                            hit[index] = 1
+                            hit[index][0] = [k]
 
 def process_hit(hit, tickets, df):
     for k,row in df.iterrows():
         for i in range(len(tickets)):
-            if tickets[i] in row['Bearish']:
+            if tickets[i] in row['Bullish']:
                 if tickets[i] in hit:
-                    hit[tickets[i]] += 1
+                    hit[tickets[i]] += [k]
                 else:
-                    hit[tickets[i]] = 1
-        
+                    hit[tickets[i]] = [k]
+def print_hit(df):
+    for i,row in df.iterrows():
+        print('----------------')
+        print(row[0], row[2])
+        for j in range(row[2]):
+            print(row[1][j])
+        print('----------------')    
 
 def process_hits(main_df):
-    if os.path.exists(DATA_FILE):
-        df  = pd.read_pickle(DATA_FILE)
-    else:    
-        df = process_data_corr(main_df, verbose=True)        
+    df = process_data_corr(main_df, verbose=False)        
     tickets = get_tickets()
     hit = {}
     #process_hit_corr(hit, tickets, df)
@@ -255,9 +261,10 @@ def process_hits(main_df):
     #    hit = pickle.load(handle)
 
     df = pd.DataFrame(hit.items())
-    df = df.sort_values(1, ascending=False)
-    #df.to_pickle('hit_df.pickle')
-    #df[df[1] > 13]
+    df[2] = df[1].apply(lambda row : len(row))
+    df = df.sort_values(2, ascending=False)
+    #df[df[2] > 4]
+    #print_hit(df[df[2] > 4])
     pdb.set_trace()   
 
 def main(update_tickets=False):
@@ -284,8 +291,6 @@ def reset(reset_main):
    empty_json = {}
    if reset_main and os.path.exists(MAIN_DF_FILE):
       os.remove(MAIN_DF_FILE)
-   if reset_main and os.path.exists(DATA_FILE):
-      os.remove(DATA_FILE)      
    if reset_main and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')           
 
