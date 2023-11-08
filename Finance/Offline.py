@@ -228,14 +228,14 @@ def process_hit_corr(hit, tickets, df):
                     if (tickets[i] in row['Bearish'] and tickets[j] in row['Bullish'] ) or\
                         (tickets[i] in row['Bullish'] and tickets[j] in row['Bearish']):
                         if index in hit:
-                            hit[index][0] += [k]
+                            hit[index] += [k]
                         else:
-                            hit[index][0] = [k]
+                            hit[index] = [k]
 
 def process_hit(hit, tickets, df):
     for k,row in df.iterrows():
         for i in range(len(tickets)):
-            if tickets[i] in row['Bullish']:
+            if tickets[i] in row['Bearish']:
                 if tickets[i] in hit:
                     hit[tickets[i]] += [k]
                 else:
@@ -252,8 +252,8 @@ def process_hits(main_df):
     df = process_data_corr(main_df, verbose=False)        
     tickets = get_tickets()
     hit = {}
-    #process_hit_corr(hit, tickets, df)
-    process_hit(hit, tickets, df)
+    process_hit_corr(hit, tickets, df)
+    #process_hit(hit, tickets, df)
                               
     #with open('hit.pickle', 'wb') as handle:
     #     pickle.dump(hit, handle)
