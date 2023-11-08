@@ -59,7 +59,7 @@ def format_ticket(ticket):
    return ticket
 
 def has_great_volume(vol):
-    if vol >= 10**8:
+    if vol >= 10**6:
         return True
     else:
         return False
@@ -145,12 +145,11 @@ def correlation(main_df):
          
 def get_tickets():
    data = []
-   data.append('IBOV')
+   #data.append('IBOV')
    with open("Tickets.txt") as file:
     for line in file:
         ticket = line.rstrip() 
-        if '11' not in ticket:
-           data.append(ticket)
+        data.append(ticket)
    return data
 
 def remove(list, item):
@@ -159,48 +158,111 @@ def remove(list, item):
     except:
         pass
 
-def process_data_corr(main_df):
+def process_data_corr(main_df, verbose=False):
     data = {}
     tickers = main_df['Ativo']
     tickers.drop_duplicates(inplace=True)
     
     for i,ticker in tickers.items():
+
         
-        date1 = main_df.index[0]
-        last_date = main_df.index[-1]
         
-        df2 = main_df[main_df['Ativo'] == ticker]
-        df2 = df2[df2.index > df2.index[-1].strftime('%Y-%m-%d')]
+        df1 = main_df[main_df['Ativo'] == ticker]
+        date1 = df1.index[0]
+        last_date = df1.index[-1]
+        df1['EMA_1'] = df1['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+        df1['EMA_2'] = df1['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+
+
+        df2 = df1[df1.index > df1.index[-1].strftime('%Y-%m-%d')]
         volume = (df2['Financeiro'] * df2['Último']).sum()
+
         if has_great_volume(volume):
             while date1 < last_date:
 
-                df1 = main_df[main_df['Ativo'] == ticker]
                 date1_str = dt.datetime.strftime(date1,'%Y-%m-%d')
                 
-                df1['EMA_1'] = df1['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-                df1['EMA_2'] = df1['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+                df2 = df1[df1.index > date1]
+                df2 = df2[df2.index < date1 + dt.timedelta(days = 1)]
 
-                df1 = df1[df1.index > date1]
-                df1 = df1[df1.index < date1 + dt.timedelta(days = 1)]
-
-                if df1[df1['EMA_1'] > df1['EMA_2']].empty:
-                    if date1_str in data:
-                        data[date1_str]['Bearish'].append(ticker) 
-                    else:
-                        data[date1_str] = {'Bearish' : [ticker], 'Bullish' : []}                         
-                elif df1[df1['EMA_1'] < df1['EMA_2']].empty:
-                    if date1_str in data:
-                        data[date1_str]['Bullish'].append(ticker) 
-                    else:
-                        data[date1_str] = {'Bullish' : [ticker], 'Bearish' : []}        
-                    
+                if not df2.empty:
+                    if df2[df2['EMA_1'] > df2['EMA_2']].empty:
+                        if date1_str in data:
+                            data[date1_str]['Bearish'].append(ticker) 
+                        else:
+                            data[date1_str] = {'Bearish' : [ticker], 'Bullish' : []}                         
+                    elif df2[df2['EMA_1'] < df2['EMA_2']].empty:
+                        if date1_str in data:
+                            data[date1_str]['Bullish'].append(ticker) 
+                        else:
+                            data[date1_str] = {'Bullish' : [ticker], 'Bearish' : []}        
+                        
                 date1 += dt.timedelta(days = 1)
-    return data    
+    df = pd.DataFrame(data)
+    df = df.transpose()
+    df.sort_index(inplace=True)
+    df.to_pickle(DATA_FILE)
+
+    if verbose:
+        for i,row in df.iterrows():
+            print('----------------')
+            print(i)
+            print('----------------')
+            print('Bullish:')
+            print(row['Bullish'])
+            print('----------------')
+            print('Bearish:')
+            print(row['Bearish'])
+            print('----------------')
+    return df
+
+def process_hit_corr(hit, tickets, df):
+    for k,row in df.iterrows():
+        for i in range(len(tickets)):
+            for j in range(len(tickets)):
+                if i > j:
+                    index = tickets[i] + ' ' + tickets[j]
+                    if (tickets[i] in row['Bullish'] and tickets[j] in row['Bullish'] ) or\
+                        (tickets[i] in row['Bearish'] and tickets[j] in row['Bearish']):
+                        if index in hit:
+                            hit[index] += 1
+                        else:
+                            hit[index] = 1
+
+def process_hit(hit, tickets, df):
+    for k,row in df.iterrows():
+        for i in range(len(tickets)):
+            if tickets[i] in row['Bearish']:
+                if tickets[i] in hit:
+                    hit[tickets[i]] += 1
+                else:
+                    hit[tickets[i]] = 1
+        
+
+def process_hits(main_df):
+    if os.path.exists(DATA_FILE):
+        df  = pd.read_pickle(DATA_FILE)
+    else:    
+        df = process_data_corr(main_df, verbose=True)        
+    tickets = get_tickets()
+    hit = {}
+    #process_hit_corr(hit, tickets, df)
+    process_hit(hit, tickets, df)
+                              
+    #with open('hit.pickle', 'wb') as handle:
+    #     pickle.dump(hit, handle)
+    #with open('hit.pickle', 'rb') as handle:
+    #    hit = pickle.load(handle)
+
+    df = pd.DataFrame(hit.items())
+    df = df.sort_values(1, ascending=False)
+    #df.to_pickle('hit_df.pickle')
+    #df[df[1] > 13]
+    pdb.set_trace()   
 
 def main(update_tickets=False):
     global count
-    date1 = '2023-11-07'
+    date1 = '2023-11-08'
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
@@ -216,41 +278,8 @@ def main(update_tickets=False):
     main_df.dropna(inplace=True)
     #verify_trends(main_df)
     #correlation(main_df)
-
-    if os.path.exists(DATA_FILE):
-        df  = pd.read_pickle(DATA_FILE)
-    else:    
-        data = process_data_corr(main_df)
-        df = pd.DataFrame(data)
-        df = df.transpose()
-        df.sort_index(inplace=True)
-        df.to_pickle(DATA_FILE)
-    tickets = get_tickets()
-    hit = {}
-    for k,row in df.iterrows():
-        for i in range(len(tickets)):
-            for j in range(len(tickets)):
-                if i > j:
-                    index = tickets[i] + ' ' + tickets[j]
-                    if tickets[i] in row['Bullish'] and tickets[j] in row['Bullish']:
-                        if index in hit:
-                            hit[index] += 1
-                        else:
-                            hit[index] = 1
-                    elif tickets[i] in row['Bearish'] and tickets[j] in row['Bearish']:
-                        if index in hit:
-                            hit[index] += 1
-                        else:
-                            hit[index] = 1
-    with open('hit.pickle', 'wb') as handle:
-         pickle.dump(hit, handle)
-    #with open('hit.pickle', 'rb') as handle:
-    #    hit = pickle.load(handle)
-    #df = pd.DataFrame(hit.items())
-    #df = df.sort_values(1, ascending=False)
-    #df.to_pickle('hit_df.pickle')
-    #df[df[1] > 13]
-    pdb.set_trace()   
+    process_hits(main_df)
+    
 def reset(reset_main):
    empty_json = {}
    if reset_main and os.path.exists(MAIN_DF_FILE):
