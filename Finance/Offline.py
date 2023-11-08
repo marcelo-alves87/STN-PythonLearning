@@ -11,6 +11,7 @@ import pickle
 import pandas_datareader.data as web
 import yfinance as yfin
 import shutil
+import pytz
 
 yfin.pdr_override()
 
@@ -21,6 +22,9 @@ count_bull = 0
 count_bear = 0
 tickets_corr = []
 CORR_THRESHOLD = 0
+TZ = pytz.timezone('America/Sao_Paulo')
+
+#fazer correlação com 30 min ou 15 min e verificar movimentos em 5-min
 
 def verify_trends(main_df):    
     if not main_df.empty:
@@ -83,7 +87,8 @@ def update(df):
       if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
          df4 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
          for index,row in df4.iterrows():
-            date = dt.datetime.strptime(row['Datetime'][:-6], '%Y-%m-%d %H:%M:%S')
+            date = dt.datetime.strptime(row['Datetime'], '%Y-%m-%d %H:%M:%S%z')
+            date = date.astimezone(TZ)
             _data = {'Data/Hora' : date.strftime('%Y-%m-%d %H:%M:%S'), 'Ativo' : ticket, 'Variação' : '0,00%',\
                          'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Close'],2),\
                          'Abertura' : round(row['Open'],2), 'Financeiro' : row['Volume'], 'Estado Atual' : 'Aberto'}
@@ -179,9 +184,12 @@ def process_data_corr(main_df, verbose=False):
 
         if has_great_volume(volume):
             while date1 < last_date:
-
+                
                 date1_str = dt.datetime.strftime(date1,'%Y-%m-%d')
 
+                if ticker == 'SIMH3':
+                    pdb.set_trace()
+                
                 df2 = df1[df1.index > date1_str]
                 
                 df2 = df2[df2.index <  dt.datetime.strptime(\
@@ -225,8 +233,8 @@ def process_hit_corr(hit, tickets, df):
             for j in range(len(tickets)):
                 if i > j:
                     index = tickets[i] + ' ' + tickets[j]
-                    if (tickets[i] in row['Bearish'] and tickets[j] in row['Bullish'] ) or\
-                        (tickets[i] in row['Bullish'] and tickets[j] in row['Bearish']):
+                    if (tickets[i] in row['Bearish'] and tickets[j] in row['Bearish'] ) or\
+                        (tickets[i] in row['Bullish'] and tickets[j] in row['Bullish']):
                         if index in hit:
                             hit[index] += [k]
                         else:
@@ -264,6 +272,7 @@ def process_hits(main_df):
     df[2] = df[1].apply(lambda row : len(row))
     df = df.sort_values(2, ascending=False)
     #df[df[2] > 4]
+    #df[df[0] == 'FLRY3 BBSE3']
     #print_hit(df[df[2] > 4])
     pdb.set_trace()   
 
