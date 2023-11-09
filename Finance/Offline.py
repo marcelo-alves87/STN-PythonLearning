@@ -326,23 +326,19 @@ def plot(tickers):
             df = main_df[main_df['Ativo'] == tickers[i]]
             df = df[df.index > last_date.strftime('%Y-%m-%d')]
             df = df[df.index < (last_date + dt.timedelta(days = 1)).strftime('%Y-%m-%d')]
-
+    
             axis[i].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
 
-            
-            
-            
             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=axis[i], color='darkblue')
 
             mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2], show_nontrading=True)
             
-            
-
-
-        last_date -= dt.timedelta(days = 1)
-        fig.savefig('figure_1.png')
-        input('Waiting ..')
+        if not df.empty:
+            fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
+        last_date -= dt.timedelta(days = 1)        
+        time.sleep(1)
+        
     #mpf.show()
 
 def main(update_tickets=False):
