@@ -279,9 +279,11 @@ def to_timezone(row):
     return row.strftime('%Y-%m-%d %H:%M:%S')
 
 def plot(tickers):
-    fig = mpf.figure(style='charles',figsize=(7,8))
-    ax1 = fig.add_subplot(2,1,1)
-    ax2 = fig.add_subplot(3,1,3, sharex=ax1)
+    fig = mpf.figure(style='charles',figsize=(12,9))
+    ax1 = fig.add_subplot(4,1,1)
+    ax2 = fig.add_subplot(4,1,2, sharex=ax1)
+    ax3 = fig.add_subplot(4,1,3, sharex=ax1)
+    ax4 = fig.add_subplot(4,1,4, sharex=ax1)
 
     for i in range(len(tickers)):
         if os.path.exists('stock_dfs/{}.csv'.format(tickers[i])):
@@ -292,8 +294,8 @@ def plot(tickers):
          df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
          df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-         df = df[df['Datetime'] > '2023-11-06']
-         df = df[df['Datetime'] < '2023-11-07']
+         #df = df[df['Datetime'] > '2023-10-30']
+         #df = df[df['Datetime'] < '2023-10-31']
          
          #df = df[['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume']]
          df.index = pd.DatetimeIndex(df['Datetime'])
@@ -303,11 +305,18 @@ def plot(tickers):
              apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax1, color='blue')
              apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax1, color='darkblue')
              mpf.plot(df,ax=ax1, ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2])
-         else:
+         elif i == 1:
              apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax2, color='blue')
              apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax2, color='darkblue')
-             apd = mpf.make_addplot(df[['EMA_1', 'EMA_2']],type='line', ax=ax2)
-             mpf.plot(df,ax=ax2,ylabel=tickers[i], type='candle',addplot=[apd_1,apd_2])
+             mpf.plot(df,ax=ax2, ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2])
+         elif i == 2:
+             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax3, color='blue')
+             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax3, color='darkblue')
+             mpf.plot(df,ax=ax3,ylabel=tickers[i], type='candle',addplot=[apd_1,apd_2])    
+         else:
+             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax4, color='blue')
+             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax4, color='darkblue')
+             mpf.plot(df,ax=ax4,ylabel=tickers[i], type='candle',addplot=[apd_1,apd_2])
          
 
     mpf.show()
@@ -330,8 +339,8 @@ def main(update_tickets=False):
     main_df.dropna(inplace=True)
     #verify_trends(main_df)
     #correlation(main_df)
-    process_hits(main_df)
-    #plot(['MRFG3', 'B3SA3'])
+    #process_hits(main_df)
+    plot(['ELET3', 'B3SA3', 'MRFG3', 'CPLE6'])
     
     
 def reset(reset_main):
