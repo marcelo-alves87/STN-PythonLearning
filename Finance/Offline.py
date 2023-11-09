@@ -12,6 +12,7 @@ import pandas_datareader.data as web
 import yfinance as yfin
 import shutil
 import mplfinance as mpf
+import matplotlib.dates as mdates
 
 yfin.pdr_override()
 
@@ -279,47 +280,70 @@ def to_timezone(row):
     return row.strftime('%Y-%m-%d %H:%M:%S')
 
 def plot(tickers):
-    fig = mpf.figure(style='charles',figsize=(12,9))
-    ax1 = fig.add_subplot(4,1,1)
-    ax2 = fig.add_subplot(4,1,2, sharex=ax1)
-    ax3 = fig.add_subplot(4,1,3, sharex=ax1)
-    ax4 = fig.add_subplot(4,1,4, sharex=ax1)
-
-    for i in range(len(tickers)):
+    s  = mpf.make_mpf_style(base_mpf_style='charles',gridaxis='both',y_on_right=False)
+    fig = mpf.figure(figsize=(12,9), style=s)
+    l = len(tickers)
+    axis = {}
+    main_df = pd.DataFrame()
+    for i in range(l):        
         if os.path.exists('stock_dfs/{}.csv'.format(tickers[i])):
-         df = pd.read_csv('stock_dfs/{}.csv'.format(tickers[i]))
-         df.reset_index(inplace=True)
-         df['Datetime'] = df['Datetime'].apply(lambda row: to_timezone(row))
-         
-         df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-         df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+            df = pd.read_csv('stock_dfs/{}.csv'.format(tickers[i]))
+            df.reset_index(inplace=True)
+            df['Datetime'] = df['Datetime'].apply(lambda row: to_timezone(row))
+            df['Ativo'] = tickers[i] 
+            df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+            df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-         #df = df[df['Datetime'] > '2023-10-30']
-         #df = df[df['Datetime'] < '2023-10-31']
+            #df = df[df['Datetime'] > '2023-10-30']
+            #df = df[df['Datetime'] < '2023-10-31']
          
-         #df = df[['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume']]
-         df.index = pd.DatetimeIndex(df['Datetime'])
-         
+            df = df[['Ativo','Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume', 'EMA_1', 'EMA_2']]
 
-         if i == 0:
-             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax1, color='blue')
-             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax1, color='darkblue')
-             mpf.plot(df,ax=ax1, ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2])
-         elif i == 1:
-             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax2, color='blue')
-             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax2, color='darkblue')
-             mpf.plot(df,ax=ax2, ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2])
-         elif i == 2:
-             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax3, color='blue')
-             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax3, color='darkblue')
-             mpf.plot(df,ax=ax3,ylabel=tickers[i], type='candle',addplot=[apd_1,apd_2])    
-         else:
-             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=ax4, color='blue')
-             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=ax4, color='darkblue')
-             mpf.plot(df,ax=ax4,ylabel=tickers[i], type='candle',addplot=[apd_1,apd_2])
-         
+            df.index = pd.DatetimeIndex(df['Datetime'])
 
-    mpf.show()
+            if main_df.empty:
+                main_df = df
+            else:
+                main_df = pd.concat([main_df, df])
+   
+    first_date =  main_df.index[0]
+    last_date = main_df.index[-1]
+    for i in range(l):
+        if i == 0:
+            axis[i] = fig.add_subplot(l,1,i + 1)
+        else:
+            axis[i] = fig.add_subplot(l,1,i + 1, sharex=axis[0])
+    
+    while last_date > first_date:
+      
+        for i in range(l): 
+            axis[i].clear()
+            if i == 0:
+                axis[i].set_title(last_date.strftime('%Y-%m-%d'))
+            if i != l - 1:
+                axis[i].get_xaxis().set_visible(False)
+            
+            df = main_df[main_df['Ativo'] == tickers[i]]
+            df = df[df.index > last_date.strftime('%Y-%m-%d')]
+            df = df[df.index < (last_date + dt.timedelta(days = 1)).strftime('%Y-%m-%d')]
+
+            axis[i].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
+
+            
+            
+            
+            apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
+            apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=axis[i], color='darkblue')
+
+            mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2], show_nontrading=True)
+            
+            
+
+
+        last_date -= dt.timedelta(days = 1)
+        fig.savefig('figure_1.png')
+        input('Waiting ..')
+    #mpf.show()
 
 def main(update_tickets=False):
     global count
