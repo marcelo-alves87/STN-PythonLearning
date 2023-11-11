@@ -13,6 +13,7 @@ import yfinance as yfin
 import shutil
 import mplfinance as mpf
 import matplotlib.dates as mdates
+import matplotlib.animation as animation
 
 yfin.pdr_override()
 
@@ -25,7 +26,7 @@ tickets_corr = []
 CORR_THRESHOLD = 10
 
 #fazer correlação com 30 min ou 15 min e verificar movimentos em 5-min
-
+# most effective 5min ma cross
 def verify_trends(main_df):    
     if not main_df.empty:
        df = main_df['Ativo'].drop_duplicates()
@@ -37,9 +38,10 @@ def verify_trends(main_df):
                #strategy_ma(row, df_ticket)
             
 def get_data_from_yahoo(ticket, actual_date):
+   
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
-   start_date = actual_date - dt.timedelta(days=30)   
+   start_date = actual_date - dt.timedelta(days=50)   
    end_date = actual_date + dt.timedelta(days=1)   
    # just in case your connection breaks, we'd like to save our progress!
    if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
@@ -268,7 +270,7 @@ def process_hits(main_df):
     df = df.sort_values(2, ascending=False)
     #df[df[2] > 4]
     #df[df[0] == 'FLRY3 BBSE3']
-    #print_hit(df[df[2] > 4])
+    #print_hit(df[df[2] > 6])
     pdb.set_trace()
 
 def to_timezone(row):
@@ -326,7 +328,7 @@ def plot(tickers):
             df = main_df[main_df['Ativo'] == tickers[i]]
             df = df[df.index > last_date.strftime('%Y-%m-%d')]
             df = df[df.index < (last_date + dt.timedelta(days = 1)).strftime('%Y-%m-%d')]
-    
+
             axis[i].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
 
             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
@@ -341,9 +343,71 @@ def plot(tickers):
         
     #mpf.show()
 
+
+def day_trade(tickers):
+    global main_df
+    s  = mpf.make_mpf_style(base_mpf_style='charles',gridaxis='both',y_on_right=False)
+    fig = mpf.figure(figsize=(5,9), style=s)
+    l = len(tickers)
+    axis = {}
+    main_df = pd.DataFrame()
+    for i in range(l):        
+        if os.path.exists('stock_dfs/{}.csv'.format(tickers[i])):
+            df = pd.read_csv('stock_dfs/{}.csv'.format(tickers[i]))
+            df.reset_index(inplace=True)
+            df['Datetime'] = df['Datetime'].apply(lambda row: to_timezone(row))
+            df['Ativo'] = tickers[i] 
+            df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+            df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+
+            df = df[df['Datetime'] > '2023-10-19']
+            df = df[df['Datetime'] < '2023-10-20']
+         
+            df = df[['Ativo','Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume', 'EMA_1', 'EMA_2']]
+
+            df.index = pd.DatetimeIndex(df['Datetime'])
+
+            if main_df.empty:
+                main_df = df
+            else:
+                main_df = pd.concat([main_df, df])
+   
+    first_date =  main_df.index[0]
+    last_date = main_df.index[-1]
+    for i in range(l):
+        if i == 0:
+            axis[i] = fig.add_subplot(l,1,i + 1)
+        else:
+            axis[i] = fig.add_subplot(l,1,i + 1, sharex=axis[0])
+    
+    def animate(ival):
+        if ival > 0:
+            print(ival)
+            for i in range(l): 
+                axis[i].clear()
+                if i != l - 1:
+                    axis[i].get_xaxis().set_visible(False)
+            
+            
+                df = main_df[main_df['Ativo'] == tickers[i]]
+                index = df.index[0] + dt.timedelta(minutes = 5*ival)
+                df = df[df.index <= index]
+
+                apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
+                apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=axis[i], color='darkblue')
+
+                mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2], show_nontrading=True)
+            
+            input(index)
+            
+            
+    ani = animation.FuncAnimation(fig, animate, interval=250)     
+    
+    mpf.show()
+
 def main(update_tickets=False):
     global count
-    date1 = '2023-11-08'
+    date1 = dt.datetime.now().strftime('%Y-%m-%d')
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
@@ -360,8 +424,8 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    plot(['ELET3', 'B3SA3', 'MRFG3', 'CPLE6'])
-    
+    #plot(['CMIG4','ELET3'])
+    day_trade(['CMIG4','ELET3'])
     
 def reset(reset_main):
    empty_json = {}

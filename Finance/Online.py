@@ -21,6 +21,8 @@ import yfinance as yfin
 
 yfin.pdr_override()
 
+# inter ma alert
+
 MAIN_DF_FILE = 'main_df.pickle'
 STATUS_FILE = 'status.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
