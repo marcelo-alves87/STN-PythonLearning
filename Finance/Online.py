@@ -1,7 +1,7 @@
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 import pdb
 import time
 import datetime as dt
@@ -276,9 +276,11 @@ def do_scraping():
     if os.path.exists(MAIN_DF_FILE):
        main_df = pd.read_pickle(MAIN_DF_FILE)    
         
-    options = webdriver.ChromeOptions()
-    options.add_argument("--incognito")
-    driver = webdriver.Chrome(executable_path=r"Utils/chromedriver.exe",options=options)
+    options_ = webdriver.ChromeOptions()
+    options_.add_argument("--incognito")
+    options_.add_argument("--disable-blink-features=AutomationControlled")
+    service = Service(executable_path=r"Utils/chromedriver.exe")
+    driver = webdriver.Chrome(service=service,options=options_)
     driver.get(URL) 
 
     input('Waiting ...')
@@ -455,6 +457,6 @@ def reset(reset_main):
    
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=False)
-main()
-#get_data(reset=True)
+reset(reset_main=True)
+#main()
+get_data(reset=True)
