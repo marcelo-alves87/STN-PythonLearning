@@ -21,8 +21,6 @@ import yfinance as yfin
 
 yfin.pdr_override()
 
-# inter ma alert
-
 MAIN_DF_FILE = 'main_df.pickle'
 STATUS_FILE = 'status.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
@@ -99,27 +97,34 @@ def verify_ma(name, df_ticket, status, price_alert):
          df1['EMA_2'] = df1['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
          var = df_ticket['Variação']['close'][-1]
 
-         if df1['EMA_1'][-1] > df1['EMA_2'][-1] and\
-            name not in status:
-            status[name] = 'Bullish'
-            save_status()
-         elif df1['EMA_1'][-1] < df1['EMA_2'][-1] and\
-            name not in status:
-            status[name] = 'Bearish'
-            save_status()
-         elif df1['EMA_1'][-1] > df1['EMA_2'][-1] and\
-            status[name] == 'Bearish':
-            notify(df1.index[-1], name, 'Bullish', var)
-            status[name] = 'Bullish'
-            save_status()
-         elif df1['EMA_1'][-1] < df1['EMA_2'][-1] and\
-            status[name] == 'Bullish':
-            notify(df1.index[-1], name, 'Bearish', var)
-            status[name] = 'Bearish'   
+
+         if name not in status:
+            if df1['EMA_1'][-1] > df1['EMA_2'][-1]:
+               status[name] = 'Bullish'               
+            elif df1['EMA_1'][-1] < df1['EMA_2'][-1]:
+               status[name] = 'Bearish'
+            else:
+               status[name] = 'Equal'
             save_status()
          else:
-            notify(df1.index[-1], name, 'Bullish' if df1['EMA_1'][-1] > df1['EMA_2'][-1] else 'Bearish',\
-                  var, 0)
+            if df1['EMA_1'][-1] > df1['EMA_2'][-1] and\
+               status[name] != 'Bullish':
+               notify(df1.index[-1], name, 'Bullish', var)
+               status[name] = 'Bullish'
+               save_status()
+            elif df1['EMA_1'][-1] < df1['EMA_2'][-1] and\
+               status[name] != 'Bearish':
+               notify(df1.index[-1], name, 'Bearish', var)
+               status[name] = 'Bearish'   
+               save_status()
+            elif df1['EMA_1'][-1] == df1['EMA_2'][-1] and\
+               status[name] != 'Equal':
+               notify(df1.index[-1], name, 'Equal', var)
+               status[name] = 'Equal'   
+               save_status()   
+            else:
+               notify(df1.index[-1], name, 'Bullish' if df1['EMA_1'][-1] > df1['EMA_2'][-1] else 'Bearish'\
+                      if df1['EMA_1'][-1] < df1['EMA_2'][-1] else 'Equal', var, 0)
 def save_status():
    with open(STATUS_FILE, 'wb') as handle:
          pickle.dump(status, handle)
@@ -130,6 +135,7 @@ def sound_alert():
    time.sleep(1)
  
 def notify(index, name, type, var, mode=1):
+   
    if mode == 1:
       print('************')
       if type == 'Bullish':
@@ -137,7 +143,9 @@ def notify(index, name, type, var, mode=1):
       elif type == 'Bearish':
          color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'COMMENT')
       elif type == 'Alert':
-         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'KEYWORD')   
+         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'KEYWORD')
+      elif type == 'Equal':
+         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'BUILTIN')         
       print('\n************')
       sound_alert()
    else:
@@ -349,6 +357,7 @@ def main():
         time.sleep(1)
 
 def format_date(row):
+   #todo: -02:00
    return row.replace('-03:00','')
 
 def get_data_from_yahoo(ticket, actual_date):
@@ -408,7 +417,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-01'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-14'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -460,3 +469,4 @@ warnings.simplefilter(action='ignore')
 reset(reset_main=True)
 #main()
 get_data(reset=True)
+
