@@ -48,7 +48,7 @@ def get_data_from_yahoo(ticket, actual_date):
       try:
          ticket = format_ticket(ticket)
          print('{}'.format(ticket))
-         df = web.get_data_yahoo(ticket + '.SA', start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval = '5m')
+         df = web.get_data_yahoo(ticket + '.SA', start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval= '30m')
          df.reset_index(inplace=True)
          df.to_csv('stock_dfs/{}.csv'.format(ticket))           
       except:
@@ -118,9 +118,9 @@ def strategy_ma(name, df_ticket):
 
 def strategy_candles(name, df_ticket):
      global count_bull, count_bear
-     
-     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 6),'%Y-%m-%d')]
 
+     df_ticket = df_ticket[df_ticket.index >= dt.datetime.strftime(df_ticket.index[-1] - dt.timedelta(days = 8),'%Y-%m-%d')]
+     
      if has_great_volume(df_ticket['Financeiro'][-1]):
          if df_ticket[df_ticket['Abertura'] > df_ticket['Último']].empty:
              tickets_corr.append(name)
@@ -173,40 +173,45 @@ def process_data_corr(main_df, verbose=False):
         
         
         df1 = main_df[main_df['Ativo'] == ticker]
-        date1 = df1.index[0]
-        last_date = df1.index[-1]
+        
+        
         df1['EMA_1'] = df1['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
         df1['EMA_2'] = df1['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
+        df1 = df1[df1.index > '2023-11-01']
 
-        df2 = df1[df1.index > df1.index[-1].strftime('%Y-%m-%d')]
-        volume = (df2['Financeiro'] * df2['Último']).sum()
+        if not df1.empty:
+            date1 = df1.index[0]
+            last_date = df1.index[-1]
+            
+            df2 = df1[df1.index > df1.index[-1].strftime('%Y-%m-%d')]
+            volume = (df2['Financeiro'] * df2['Último']).sum()
 
-        if has_great_volume(volume):
-            while date1 < last_date:
-                
-                date1_str = dt.datetime.strftime(date1,'%Y-%m-%d')
+            if has_great_volume(volume):
+                while date1 < last_date:
+                    
+                    date1_str = dt.datetime.strftime(date1,'%Y-%m-%d')
 
-                df2 = df1[df1.index > date1_str]
-                
-                df2 = df2[df2.index <  dt.datetime.strptime(\
-                    date1_str, '%Y-%m-%d') + dt.timedelta(days = 1)]
+                    df2 = df1[df1.index > date1_str]
+                    
+                    df2 = df2[df2.index <  dt.datetime.strptime(\
+                        date1_str, '%Y-%m-%d') + dt.timedelta(days = 1)]
 
-                if not df2.empty:
-                    df3 = df2[df2['EMA_1'] > df2['EMA_2']]
-                    df4 = df2[df2['EMA_1'] < df2['EMA_2']]
-                    if len(df3) <= CORR_THRESHOLD:
-                        if date1_str in data:
-                            data[date1_str]['Bearish'].append(ticker) 
-                        else:
-                            data[date1_str] = {'Bearish' : [ticker], 'Bullish' : []}                         
-                    elif len(df4) <= CORR_THRESHOLD:
-                        if date1_str in data:
-                            data[date1_str]['Bullish'].append(ticker) 
-                        else:
-                            data[date1_str] = {'Bullish' : [ticker], 'Bearish' : []}        
-                        
-                date1 += dt.timedelta(days = 1)
+                    if not df2.empty:
+                        df3 = df2[df2['EMA_1'] > df2['EMA_2']]
+                        df4 = df2[df2['EMA_1'] < df2['EMA_2']]
+                        if len(df3) <= CORR_THRESHOLD:
+                            if date1_str in data:
+                                data[date1_str]['Bearish'].append(ticker) 
+                            else:
+                                data[date1_str] = {'Bearish' : [ticker], 'Bullish' : []}                         
+                        elif len(df4) <= CORR_THRESHOLD:
+                            if date1_str in data:
+                                data[date1_str]['Bullish'].append(ticker) 
+                            else:
+                                data[date1_str] = {'Bullish' : [ticker], 'Bearish' : []}        
+                            
+                    date1 += dt.timedelta(days = 1)
     df = pd.DataFrame(data)
     df = df.transpose()
     df.sort_index(inplace=True)
@@ -275,13 +280,17 @@ def process_hits(main_df):
 
 def to_timezone(row):
     delta = 0
-    if '-02:00' in row:
-        delta = 1
-    row = dt.datetime.strptime(row, '%Y-%m-%d %H:%M:%S%z')
-    row -= dt.timedelta(hours=delta)   
-    return row.strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        dt.datetime.strptime(row, '%Y-%m-%d')
+        return row
+    except:        
+        if '-02:00' in row:
+            delta = 1
+        row = dt.datetime.strptime(row, '%Y-%m-%d %H:%M:%S%z')
+        row -= dt.timedelta(hours=delta)   
+        return row.strftime('%Y-%m-%d %H:%M:%S')
 
-def plot(tickers):
+def plot(tickers, verbose=True):
     s  = mpf.make_mpf_style(base_mpf_style='charles',gridaxis='both',y_on_right=False)
     fig = mpf.figure(figsize=(12,9), style=s)
     l = len(tickers)
@@ -307,7 +316,7 @@ def plot(tickers):
                 main_df = df
             else:
                 main_df = pd.concat([main_df, df])
-   
+    
     first_date =  main_df.index[0]
     last_date = main_df.index[-1]
     for i in range(l):
@@ -322,13 +331,22 @@ def plot(tickers):
             axis[i].clear()
             if i == 0:
                 axis[i].set_title(last_date.strftime('%Y-%m-%d'))
+                df2 = pd.DataFrame()
             if i != l - 1:
                 axis[i].get_xaxis().set_visible(False)
             
             df = main_df[main_df['Ativo'] == tickers[i]]
             df = df[df.index > last_date.strftime('%Y-%m-%d')]
             df = df[df.index < (last_date + dt.timedelta(days = 1)).strftime('%Y-%m-%d')]
-
+            
+            
+            if df2.empty:
+                df2 = df.rename(columns={'Close': tickers[i]})
+                df2 = df2[[tickers[i]]]
+            else:
+                df2 = pd.concat([df2,df[['Close']]], axis=1)
+                df2 = df2.rename(columns={'Close': tickers[i]})
+            
             axis[i].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
 
             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
@@ -338,6 +356,15 @@ def plot(tickers):
             
         if not df.empty:
             fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
+            if verbose:
+                print('**************************')
+                print(df2.index[-1].strftime('%Y-%m-%d'))
+                print('**************************')
+                df2['Sub'] = df2[tickers].max(axis=1) - df2[tickers].min(axis=1)
+                for i,row in df2.iterrows():
+                    df3 = df2[df2.index <= i]
+                    mean = df3['Sub'].sum()/len(df3)
+                    print('{} : {}'.format(i.strftime('%H:%M'), round( mean - (row[tickers].max() - row[tickers].min()) , 3 )))
         last_date -= dt.timedelta(days = 1)        
         time.sleep(1)
         
@@ -360,8 +387,8 @@ def day_trade(tickers):
             df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
             df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-            df = df[df['Datetime'] > '2023-10-19']
-            df = df[df['Datetime'] < '2023-10-20']
+            df = df[df['Datetime'] > '2023-11-10']
+            df = df[df['Datetime'] < '2023-11-11']
          
             df = df[['Ativo','Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume', 'EMA_1', 'EMA_2']]
 
@@ -405,9 +432,42 @@ def day_trade(tickers):
     
     mpf.show()
 
+def long_short(df, tickets):
+    
+    df1 = df[df['Ativo'] == tickets[0]]
+    df2 = df[df['Ativo'] == tickets[1]]
+    df1['EMA_1'] = df1['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+    df1['EMA_2'] = df1['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+    df2['EMA_1_'] = df2['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+    df2['EMA_2_'] = df2['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+    df3 = df2['Último'] / df1['Último']
+    dates = df1.reset_index()['Data/Hora'].dt.date
+    dates = dates.drop_duplicates()
+    df4 = pd.concat([df1[['EMA_1', 'EMA_2']], df2[['EMA_1_', 'EMA_2_']]], axis=1)
+    for i,row in dates.items():
+        print('***************')
+        print(row)
+        print('----------------')
+        df1 = df4[df4.index.date == row]
+        df1 = df1[(df1['EMA_1'] > df1['EMA_2']) & (df1['EMA_1_'] < df1['EMA_2_']) | (df1['EMA_1'] < df1['EMA_2']) & (df1['EMA_1_'] > df1['EMA_2_'])]
+        df1 = df3[df3.index.isin(df1.index)]
+        print(df1)
+        print(len(df1))
+##    for i,row in dates.items():
+##        print('***************')
+##        print(row)
+##        print('----------------')
+##        df2 = df3[df3.index.date == row]
+##        mean = df2.mean()
+##        for i,row in df2.items():
+##            if abs(row - mean) > 0.002:
+##                print(i, abs(row - mean))
+            
+        
 def main(update_tickets=False):
     global count
-    date1 = dt.datetime.now().strftime('%Y-%m-%d')
+    #date1 = dt.datetime.now().strftime('%Y-%m-%d')
+    date1 = '2023-11-10' 
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
@@ -417,15 +477,16 @@ def main(update_tickets=False):
        df1.to_pickle(MAIN_DF_FILE)
        
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    main_df = main_df[main_df.index < dt.datetime.strptime(date1, '%Y-%m-%d')]
+    main_df = main_df[main_df.index <= dt.datetime.strptime(date1, '%Y-%m-%d')]
     if update_tickets:
        main_df = update(main_df)
     main_df.dropna(inplace=True)
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    #plot(['CMIG4','ELET3'])
-    day_trade(['CMIG4','ELET3'])
+    plot(['PETR4','PETR3'])
+    #day_trade(['PETR4','PETR3'])
+    #long_short(main_df,['GGBR4', 'GOAU4'])
     
 def reset(reset_main):
    empty_json = {}
