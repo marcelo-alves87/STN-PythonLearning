@@ -24,6 +24,7 @@ count_bull = 0
 count_bear = 0
 tickets_corr = []
 CORR_THRESHOLD = 10
+LEVELS = [0, 0.236, 0.382, 0.618, 0.786, 1]
 
 #fazer correlação com 30 min ou 15 min e verificar movimentos em 5-min
 # most effective 5min ma cross
@@ -352,7 +353,16 @@ def plot(tickers, verbose=True):
             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=axis[i], color='darkblue')
 
-            mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2], show_nontrading=True)
+            lvls = []
+            for j in range(len(LEVELS)):
+               lvl =  df['Close'].max() - df['Close'].min()
+               lvl = LEVELS[j]*lvl +  df['Close'].min()
+               lvls.append(lvl)
+            
+            mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2],\
+                                  hlines=dict(hlines=lvls,\
+                                              colors=['blue','brown', 'y', 'orange','purple','olive'],\
+                                              alpha=0.8,linestyle='--'),    show_nontrading=True)
             
         if not df.empty:
             fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
@@ -484,7 +494,7 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    plot(['PETR4','PETR3'])
+    plot(['BBDC4','BBDC3'], verbose=False)
     #day_trade(['PETR4','PETR3'])
     #long_short(main_df,['GGBR4', 'GOAU4'])
     
