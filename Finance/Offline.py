@@ -313,6 +313,8 @@ def plot(tickers, verbose=True):
 
             df.index = pd.DatetimeIndex(df['Datetime'])
 
+            df = df[['Ativo', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume', 'EMA_1', 'EMA_2']]
+
             if main_df.empty:
                 main_df = df
             else:
@@ -364,30 +366,31 @@ def plot(tickers, verbose=True):
             
         if not df.empty:
             fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
+
+            def count_groups(df):
+                group = []
+                if not df.empty:
+                    s1 = df.index - pd.Series(df.index).shift()
+                    indexes = s1[s1 != 1].index
+                    for i in range(len(indexes) - 1):
+                        group.append(indexes[i + 1] - indexes[i])                        
+                    group.append(len(df) - sum(group))
+                return group
+                
+            
             if verbose:
                 print('***************')
                 print(df2.index[-1].strftime('%Y-%m-%d'))
                 print('***************')
 
-                df3 = pd.merge(df2[((df2['Ativo'] == tickers[-1]) &  (df2['EMA_1'] > df2['EMA_2'])\
-                                & (df2['Low'] > df2['EMA_1']))], df2[((df2['Ativo'] == tickers[0]) \
-                                    & (df2['EMA_1'] < df2['EMA_2']))], left_index=True, right_index=True)
-                if not df3.empty:
-                    for i,row in df3.iterrows():
-                        if abs(round(row['EMA_1_y'] - row['EMA_2_y'],2)) >= 0.01 \
-                            and abs(round(row['EMA_1_x'] - row['EMA_2_x'],2)) >= 0.01:
-                            print(row.name.strftime('%H:%M'))
-               
-                df3 = pd.merge(df2[((df2['Ativo'] == tickers[0]) &  (df2['EMA_1'] > df2['EMA_2'])\
-                                & (df2['Low'] > df2['EMA_1']))], df2[((df2['Ativo'] == tickers[-1]) \
-                                    & (df2['EMA_1'] < df2['EMA_2']))], left_index=True, right_index=True)
-                if not df3.empty:
-                    for i,row in df3.iterrows():
-                        if abs(round(row['EMA_1_y'] - row['EMA_2_y'],2)) >= 0.01 \
-                            and abs(round(row['EMA_1_x'] - row['EMA_2_x'],2)) >= 0.01:
-                            print(row.name.strftime('%H:%M'))
-                            
-                        
+                for j in range(l):
+
+                    df4 = df2.reset_index()
+
+                    print(count_groups(df4[(df4['Ativo'] == tickers[j]) & (df4['EMA_1'] > df4['EMA_2'])]))
+                    print(count_groups(df4[(df4['Ativo'] == tickers[j]) & (df4['EMA_1'] < df4['EMA_2'])]))
+
+                
         last_date -= dt.timedelta(days = 1)        
         #time.sleep(1)
         
@@ -507,7 +510,7 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    plot(['GOAU4','GGBR4'])
+    plot(['PETR4','PETR3'])
     #day_trade(['PETR4','PETR3'])
     #long_short(main_df,['GGBR4', 'GOAU4'])
     
