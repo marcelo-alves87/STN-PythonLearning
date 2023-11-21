@@ -325,7 +325,8 @@ def plot(tickers, verbose=True):
             axis[i] = fig.add_subplot(l,1,i + 1)
         else:
             axis[i] = fig.add_subplot(l,1,i + 1, sharex=axis[0])
-    
+
+    dfs = {}    
     while last_date > first_date:
       
         for i in range(l): 
@@ -339,14 +340,11 @@ def plot(tickers, verbose=True):
             df = main_df[main_df['Ativo'] == tickers[i]]
             df = df[df.index > last_date.strftime('%Y-%m-%d')]
             df = df[df.index < (last_date + dt.timedelta(days = 1)).strftime('%Y-%m-%d')]
-            
-            
+
             if df2.empty:
-                df2 = df.rename(columns={'Close': tickers[i]})
-                df2 = df2[[tickers[i]]]
+                df2 = df
             else:
-                df2 = pd.concat([df2,df[['Close']]], axis=1)
-                df2 = df2.rename(columns={'Close': tickers[i]})
+                df2 = pd.concat([df2, df])
             
             axis[i].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
 
@@ -367,16 +365,31 @@ def plot(tickers, verbose=True):
         if not df.empty:
             fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
             if verbose:
-                print('**************************')
+                print('***************')
                 print(df2.index[-1].strftime('%Y-%m-%d'))
-                print('**************************')
-                df2['Sub'] = df2[tickers].max(axis=1) - df2[tickers].min(axis=1)
-                for i,row in df2.iterrows():
-                    df3 = df2[df2.index <= i]
-                    mean = df3['Sub'].sum()/len(df3)
-                    print('{} : {}'.format(i.strftime('%H:%M'), round( mean - (row[tickers].max() - row[tickers].min()) , 3 )))
+                print('***************')
+
+                df3 = pd.merge(df2[((df2['Ativo'] == tickers[-1]) &  (df2['EMA_1'] > df2['EMA_2'])\
+                                & (df2['Low'] > df2['EMA_1']))], df2[((df2['Ativo'] == tickers[0]) \
+                                    & (df2['EMA_1'] < df2['EMA_2']))], left_index=True, right_index=True)
+                if not df3.empty:
+                    for i,row in df3.iterrows():
+                        if abs(round(row['EMA_1_y'] - row['EMA_2_y'],2)) >= 0.01 \
+                            and abs(round(row['EMA_1_x'] - row['EMA_2_x'],2)) >= 0.01:
+                            print(row.name.strftime('%H:%M'))
+               
+                df3 = pd.merge(df2[((df2['Ativo'] == tickers[0]) &  (df2['EMA_1'] > df2['EMA_2'])\
+                                & (df2['Low'] > df2['EMA_1']))], df2[((df2['Ativo'] == tickers[-1]) \
+                                    & (df2['EMA_1'] < df2['EMA_2']))], left_index=True, right_index=True)
+                if not df3.empty:
+                    for i,row in df3.iterrows():
+                        if abs(round(row['EMA_1_y'] - row['EMA_2_y'],2)) >= 0.01 \
+                            and abs(round(row['EMA_1_x'] - row['EMA_2_x'],2)) >= 0.01:
+                            print(row.name.strftime('%H:%M'))
+                            
+                        
         last_date -= dt.timedelta(days = 1)        
-        time.sleep(1)
+        #time.sleep(1)
         
     #mpf.show()
 
@@ -494,7 +507,7 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    plot(['BBDC4','BBDC3'], verbose=False)
+    plot(['GOAU4','GGBR4'])
     #day_trade(['PETR4','PETR3'])
     #long_short(main_df,['GGBR4', 'GOAU4'])
     
