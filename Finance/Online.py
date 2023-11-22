@@ -64,7 +64,6 @@ def strategy():
         if os.path.exists(PRICE_ALERT):       
            with open (PRICE_ALERT, 'rb') as f:
               price_alert = json.load(f)
-              
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
@@ -76,6 +75,7 @@ def strategy():
               main_df = pd.concat([df, main_df])
            else:
               verify_ma(name, df_ticket, price_alert, data)
+        data.sort()    
         print(tabulate(data, headers=['Ativo', 'EMA_1 > EMA_2', 'EMA_1 < EMA_2']))
            
 def verify_ma(name, df_ticket, price_alert, data):
@@ -429,7 +429,7 @@ def reset(reset_main):
    
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=True)
+reset(reset_main=False)
 main()
 #get_data(reset=True)
 
