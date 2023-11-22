@@ -18,11 +18,11 @@ import warnings
 import pandas_datareader.data as web
 import shutil
 import yfinance as yfin
+from tabulate import tabulate
 
 yfin.pdr_override()
 
 MAIN_DF_FILE = 'main_df.pickle'
-STATUS_FILE = 'status.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 color = sys.stdout.shell
@@ -30,7 +30,8 @@ last_date = None
 last_ibov_var = None
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
-status = {}
+
+#todo: print prices in tabular form with deviation of the mean
 
 def get_page_source(driver):
    try :
@@ -47,12 +48,19 @@ def get_page_df(driver):
    df.dropna(inplace=True)
    return df
 
+def count_groups(df):
+   group = []
+   if not df.empty:
+     s1 = df.index - pd.Series(df.index).shift()
+     indexes = s1[s1 != 1].index
+     for i in range(len(indexes) - 1):
+         group.append(indexes[i + 1] - indexes[i])                        
+     group.append(len(df) - sum(group))
+   return group
+
 def strategy():
-    global main_df, status
+    global main_df
     if not main_df.empty:
-        if os.path.exists(STATUS_FILE): 
-           with open(STATUS_FILE, 'rb') as handle:
-              status = pickle.load(handle)
         if os.path.exists(PRICE_ALERT):       
            with open (PRICE_ALERT, 'rb') as f:
               price_alert = json.load(f)
@@ -60,15 +68,17 @@ def strategy():
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
+        data = []
         for name in groups.index.unique():
            df_ticket = groups.loc[name][::-1]
            if name != 'IBOV' and isinstance(df_ticket, pd.Series):
               df = update(name)
               main_df = pd.concat([df, main_df])
            else:
-              verify_ma(name, df_ticket, status, price_alert)
+              verify_ma(name, df_ticket, price_alert, data)
+        print(tabulate(data, headers=['Ativo', 'EMA_1 > EMA_2', 'EMA_1 < EMA_2']))
            
-def verify_ma(name, df_ticket, status, price_alert):
+def verify_ma(name, df_ticket, price_alert, data):
    global last_ibov_var
    if isinstance(df_ticket, pd.DataFrame):
       df_ticket.set_index('Data/Hora',inplace=True)
@@ -92,65 +102,20 @@ def verify_ma(name, df_ticket, status, price_alert):
                     break   
         
       else:
+
          df1 = df_ticket['Último']
          df1['EMA_1'] = df1['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
          df1['EMA_2'] = df1['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
          var = df_ticket['Variação']['close'][-1]
-
-
-         if name not in status:
-            if df1['EMA_1'][-1] > df1['EMA_2'][-1]:
-               status[name] = 'Bullish'               
-            elif df1['EMA_1'][-1] < df1['EMA_2'][-1]:
-               status[name] = 'Bearish'
-            else:
-               status[name] = 'Equal'
-            save_status()
-         else:
-            if df1['EMA_1'][-1] > df1['EMA_2'][-1] and\
-               status[name] != 'Bullish':
-               notify(df1.index[-1], name, 'Bullish', var)
-               status[name] = 'Bullish'
-               save_status()
-            elif df1['EMA_1'][-1] < df1['EMA_2'][-1] and\
-               status[name] != 'Bearish':
-               notify(df1.index[-1], name, 'Bearish', var)
-               status[name] = 'Bearish'   
-               save_status()
-            elif df1['EMA_1'][-1] == df1['EMA_2'][-1] and\
-               status[name] != 'Equal':
-               notify(df1.index[-1], name, 'Equal', var)
-               status[name] = 'Equal'   
-               save_status()   
-            else:
-               notify(df1.index[-1], name, 'Bullish' if df1['EMA_1'][-1] > df1['EMA_2'][-1] else 'Bearish'\
-                      if df1['EMA_1'][-1] < df1['EMA_2'][-1] else 'Equal', var, 0)
-def save_status():
-   with open(STATUS_FILE, 'wb') as handle:
-         pickle.dump(status, handle)
-   time.sleep(1)
-   
+         df1.reset_index(inplace=True)
+         data.append([name, count_groups(df1[df1['EMA_1'] > df1['EMA_2']]), count_groups(df1[df1['EMA_1'] < df1['EMA_2']])])
+         
+         
+                  
 def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def notify(index, name, type, var, mode=1):
-   
-   if mode == 1:
-      print('************')
-      if type == 'Bullish':
-         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'STRING')
-      elif type == 'Bearish':
-         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'COMMENT')
-      elif type == 'Alert':
-         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'KEYWORD')
-      elif type == 'Equal':
-         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'BUILTIN')         
-      print('\n************')
-      sound_alert()
-   else:
-      print("{} -> {} ({}) is {}".format(index, name, var, type))
-   
 def handle_finance(row):   
    if isinstance(row, float):
       return row
@@ -417,7 +382,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-14'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-22'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -459,14 +424,12 @@ def reset(reset_main):
    if reset_main:
       if os.path.exists(MAIN_DF_FILE):
          os.remove(MAIN_DF_FILE)
-      if os.path.exists(STATUS_FILE):   
-         os.remove(STATUS_FILE)
       with open(PRICE_ALERT, 'w') as f:
          json.dump(empty_json, f)   
    
     
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
-#main()
-get_data(reset=True)
+main()
+#get_data(reset=True)
 
