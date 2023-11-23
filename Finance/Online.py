@@ -107,6 +107,7 @@ def verify_ma(name, df_ticket, price_alert, data):
          df1['EMA_1'] = df1['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
          df1['EMA_2'] = df1['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
          var = df_ticket['Variação']['close'][-1]
+         df1 = df1[df1.index > dt.datetime.today().strftime('%Y-%m-%d')]
          df1.reset_index(inplace=True)
          data.append([name, count_groups(df1[df1['EMA_1'] > df1['EMA_2']]), count_groups(df1[df1['EMA_1'] < df1['EMA_2']])])
          
