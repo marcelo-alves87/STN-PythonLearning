@@ -42,14 +42,14 @@ def get_data_from_yahoo(ticket, actual_date):
    
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
-   start_date = actual_date - dt.timedelta(days=50)   
+   start_date = actual_date - dt.timedelta(days=55)   
    end_date = actual_date + dt.timedelta(days=1)   
    # just in case your connection breaks, we'd like to save our progress!
    if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
       try:
          ticket = format_ticket(ticket)
          print('{}'.format(ticket))
-         df = web.get_data_yahoo(ticket + '.SA', start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval= '30m')
+         df = web.get_data_yahoo(ticket + '.SA', start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval= '5m')
          df.reset_index(inplace=True)
          df.to_csv('stock_dfs/{}.csv'.format(ticket))           
       except:
@@ -291,7 +291,28 @@ def to_timezone(row):
         row -= dt.timedelta(hours=delta)   
         return row.strftime('%Y-%m-%d %H:%M:%S')
 
-def plot(tickers, verbose=True):
+
+def make_fibonnaci(name, df, last_date):
+    
+    lvls = []
+    df = df[df['Ativo'] == name]
+    
+    df_today = df[(df.index >= last_date.strftime('%Y-%m-%d 10:00:00')) & (df.index <= last_date.strftime('%Y-%m-%d 18:00:00'))]    
+    df_last = df[df.index <= (last_date - dt.timedelta(days = 1)).strftime('%Y-%m-%d 18:00:00')]
+
+    if not df_last.empty:
+        df_last = df_last[df_last.index > df_last.index[-1].strftime('%Y-%m-%d')]
+    else:
+        df_last = df_today
+
+    for j in range(len(LEVELS)):
+        lvl =  df_last['High'].max() - df_last['Low'].min()
+        lvl = LEVELS[j]*lvl +  df_last['Low'].min()
+        lvls.append(lvl)
+
+    return lvls
+
+def plot(tickers, verbose=False):
     s  = mpf.make_mpf_style(base_mpf_style='charles',gridaxis='both',y_on_right=False)
     fig = mpf.figure(figsize=(12,9), style=s)
     l = len(tickers)
@@ -353,12 +374,8 @@ def plot(tickers, verbose=True):
             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=axis[i], color='darkblue')
 
-            lvls = []
-            for j in range(len(LEVELS)):
-               lvl =  df['Close'].max() - df['Close'].min()
-               lvl = LEVELS[j]*lvl +  df['Close'].min()
-               lvls.append(lvl)
-            
+            lvls = make_fibonnaci(tickers[i], main_df, last_date)
+
             mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2],\
                                   hlines=dict(hlines=lvls,\
                                               colors=['blue','brown', 'y', 'orange','purple','olive'],\
@@ -493,7 +510,7 @@ def long_short(df, tickets):
 def main(update_tickets=False):
     global count
     #date1 = dt.datetime.now().strftime('%Y-%m-%d')
-    date1 = '2023-11-10' 
+    date1 = '2023-11-23' 
     if not os.path.exists(MAIN_DF_FILE):
        tickets = get_tickets()
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
