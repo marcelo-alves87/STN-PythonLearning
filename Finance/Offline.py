@@ -282,7 +282,7 @@ def process_hits(main_df):
 def to_timezone(row):
     delta = 0
     try:
-        dt.datetime.strptime(row, '%Y-%m-%d')
+        dt.datetime.strptime(row, '%Y-%m-%d %H:%M:%S')
         return row
     except:        
         if '-02:00' in row:
@@ -305,9 +305,20 @@ def make_fibonnaci(name, df, last_date):
     else:
         df_last = df_today
 
-    for j in range(len(LEVELS)):
+    lvls_ = LEVELS.copy()
+
+    if df_today['Close'].max() > df_last['High'].max():
+        lvls_.append(1.236)    
+        lvls_.append(1.618)
+        lvls_.append(2)
+    
+    if df_today['Close'].min() < df_last['Low'].min():
+        lvls_.append(-0.236)    
+        lvls_.append(-0.382)    
+    
+    for j in range(len(lvls_)):
         lvl =  df_last['High'].max() - df_last['Low'].min()
-        lvl = LEVELS[j]*lvl +  df_last['Low'].min()
+        lvl = lvls_[j]*lvl +  df_last['Low'].min()
         lvls.append(lvl)
 
     return lvls
@@ -378,7 +389,7 @@ def plot(tickers, verbose=False):
 
             mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2],\
                                   hlines=dict(hlines=lvls,\
-                                              colors=['blue','brown', 'y', 'orange','purple','olive'],\
+                                              colors=['red','brown', 'y', 'orange','purple','green'],\
                                               alpha=0.8,linestyle='--'),    show_nontrading=True)
             
         if not df.empty:
@@ -476,43 +487,41 @@ def day_trade(tickers):
     mpf.show()
 
 def long_short(df, tickets):
-    
-    df1 = df[df['Ativo'] == tickets[0]]
-    df2 = df[df['Ativo'] == tickets[1]]
-    df1['EMA_1'] = df1['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-    df1['EMA_2'] = df1['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
-    df2['EMA_1_'] = df2['Último'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-    df2['EMA_2_'] = df2['Último'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
-    df3 = df2['Último'] / df1['Último']
-    dates = df1.reset_index()['Data/Hora'].dt.date
-    dates = dates.drop_duplicates()
-    df4 = pd.concat([df1[['EMA_1', 'EMA_2']], df2[['EMA_1_', 'EMA_2_']]], axis=1)
-    for i,row in dates.items():
-        print('***************')
-        print(row)
-        print('----------------')
-        df1 = df4[df4.index.date == row]
-        df1 = df1[(df1['EMA_1'] > df1['EMA_2']) & (df1['EMA_1_'] < df1['EMA_2_']) | (df1['EMA_1'] < df1['EMA_2']) & (df1['EMA_1_'] > df1['EMA_2_'])]
-        df1 = df3[df3.index.isin(df1.index)]
-        print(df1)
-        print(len(df1))
-##    for i,row in dates.items():
-##        print('***************')
-##        print(row)
-##        print('----------------')
-##        df2 = df3[df3.index.date == row]
-##        mean = df2.mean()
-##        for i,row in df2.items():
-##            if abs(row - mean) > 0.002:
-##                print(i, abs(row - mean))
+
+  dates = df.reset_index()['Data/Hora'].dt.date
+  dates = dates.drop_duplicates()
+  dates = dates.reset_index()
+  dates = dates['Data/Hora']
+  for i,row in dates.items():
+      if i > 1:
+          df1 = df[(df['Ativo'] == tickets[0]) & (df.index.date == dates[i-1])]
+          df2 = df[(df['Ativo'] == tickets[-1]) & (df.index.date == dates[i-1])]
+
+          df3 = df[(df['Ativo'] == tickets[0]) & (df.index.date == row)]
+          df4 = df[(df['Ativo'] == tickets[-1]) & (df.index.date == row)]
+
+          df3 = pd.DataFrame((df3['Último'] - df1['Mínimo'].min()) / (df1['Máximo'].max() - df1['Mínimo'].min()) )
+          df3.rename(columns={'Último': tickets[0]}, inplace=True)  
+          df4 = pd.DataFrame((df4['Último'] - df2['Mínimo'].min()) / (df2['Máximo'].max() - df2['Mínimo'].min()) )
+          df4.rename(columns={'Último': tickets[-1]}, inplace=True)
+
+          df5 = pd.concat([df3,df4], axis=1)
+
+
+          print('*******************')  
+          print(df5.index[-1].strftime('%Y-%m-%d'))
+          print('*******************')    
+          for i,row in df5.iterrows():
+              print(i.strftime('%H:%M'),row[0],row[1],abs(row[0] - row[1]))
             
         
 def main(update_tickets=False):
     global count
     #date1 = dt.datetime.now().strftime('%Y-%m-%d')
-    date1 = '2023-11-23' 
+    date1 = '2023-12-02' 
     if not os.path.exists(MAIN_DF_FILE):
-       tickets = get_tickets()
+       #tickets = get_tickets()
+       tickets = ['PETR4', 'PETR3', 'BBDC4', 'BBDC3', 'GOAU4', 'GGBR4']
        df1 = pd.DataFrame({'Ativo' : tickets, 'Data/Hora' : dt.datetime.strptime(date1 + ' 18:00:00', '%Y-%m-%d %H:%M:%S')})
        df1.set_index('Data/Hora', inplace=True)
        df1 = update(df1)
@@ -527,9 +536,9 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    plot(['PETR4','PETR3'])
+    #plot(['GOAU4','GGBR4'])
     #day_trade(['PETR4','PETR3'])
-    #long_short(main_df,['GGBR4', 'GOAU4'])
+    long_short(main_df,['GOAU4', 'GGBR4'])
     
 def reset(reset_main):
    empty_json = {}
