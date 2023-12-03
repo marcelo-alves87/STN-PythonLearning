@@ -24,7 +24,7 @@ count_bull = 0
 count_bear = 0
 tickets_corr = []
 CORR_THRESHOLD = 10
-LEVELS = [0, 0.236, 0.382, 0.618, 0.786, 1]
+LEVELS = [0.236, 0.382, 0.5, 0.618, 0.786, 1]
 
 #fazer correlação com 30 min ou 15 min e verificar movimentos em 5-min
 # most effective 5min ma cross
@@ -488,6 +488,29 @@ def day_trade(tickers):
 
 def long_short(df, tickets):
 
+
+  def which_level(pct):
+      if isinstance(pct,float):
+          if pct > 0:
+              decimal = pct % 1
+              integer = pct // 1
+              i = 0  
+              for i in range(len(LEVELS)):
+                  if decimal < LEVELS[i]:
+                      i += 1
+                      break
+              return i + integer * len(LEVELS)
+          else:
+              decimal = pct % -1
+              integer = pct // -1
+              i = 0  
+              for i in range(len(LEVELS)):
+                  if decimal > -LEVELS[i]:
+                      i += 1
+                      break
+              return (i + integer * len(LEVELS)) * -1
+      else:
+          return pct
   dates = df.reset_index()['Data/Hora'].dt.date
   dates = dates.drop_duplicates()
   dates = dates.reset_index()
@@ -506,14 +529,16 @@ def long_short(df, tickets):
           df4.rename(columns={'Último': tickets[-1]}, inplace=True)
 
           df5 = pd.concat([df3,df4], axis=1)
-
-
-          print('*******************')  
-          print(df5.index[-1].strftime('%Y-%m-%d'))
-          print('*******************')    
-          for i,row in df5.iterrows():
-              print(i.strftime('%H:%M'),row[0],row[1],abs(row[0] - row[1]))
             
+          df5.reset_index(inplace=True)
+          print('*******************')  
+          print(df5['Data/Hora'].iloc[-1].strftime('%Y-%m-%d'))
+          print('*******************')
+          for i,row in df5.iterrows():
+              level1 = which_level(round(row[1],3))
+              level2 = which_level(round(row[2],3))
+              print(row[0].strftime('%H:%M'), max(level1, level2) - min(level1, level2) )
+              
         
 def main(update_tickets=False):
     global count
