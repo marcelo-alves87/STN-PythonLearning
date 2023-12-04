@@ -23,15 +23,15 @@ from tabulate import tabulate
 yfin.pdr_override()
 
 MAIN_DF_FILE = 'main_df.pickle'
-PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 color = sys.stdout.shell
 last_date = None
 last_ibov_var = None
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
-
-#todo: print prices in tabular form with deviation of the mean
+lvl = {}
+LEVELS = [0.236, 0.382, 0.5, 0.618, 0.786, 1]
+pairs = [['BBDC4', 'BBDC3'], ['GOAU4' , 'GGBR4'], ['PETR4','PETR3']]
 
 def get_page_source(driver):
    try :
@@ -48,71 +48,91 @@ def get_page_df(driver):
    df.dropna(inplace=True)
    return df
 
-def count_groups(df):
-   group = []
-   if not df.empty:
-     s1 = df.index - pd.Series(df.index).shift()
-     indexes = s1[s1 != 1].index
-     for i in range(len(indexes) - 1):
-         group.append(indexes[i + 1] - indexes[i])                        
-     group.append(len(df) - sum(group))
-   return group
-
 def strategy():
-    global main_df
+    global main_df, last_ibov_var
     if not main_df.empty:
-        if os.path.exists(PRICE_ALERT):       
-           with open (PRICE_ALERT, 'rb') as f:
-              price_alert = json.load(f)
+              
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
-        data = []
+        dict = {}
         for name in groups.index.unique():
            df_ticket = groups.loc[name][::-1]
            if name != 'IBOV' and isinstance(df_ticket, pd.Series):
               df = update(name)
               main_df = pd.concat([df, main_df])
-           else:
-              verify_ma(name, df_ticket, price_alert, data)
-        data.sort()    
-        print(tabulate(data, headers=['Ativo', 'EMA_1 > EMA_2', 'EMA_1 < EMA_2']))
+           elif isinstance(df_ticket, pd.DataFrame):
+              df_ticket.set_index('Data/Hora',inplace=True)
+              df_ticket.sort_index(inplace=True)   
+              if name == 'IBOV':
+                 last_ibov_var = df_ticket['Variação']['close'][-1]   
+              else:   
+                 dict[name] = df_ticket
+        verify_pair_diff(dict)      
            
-def verify_ma(name, df_ticket, price_alert, data):
-   global last_ibov_var
-   if isinstance(df_ticket, pd.DataFrame):
-      df_ticket.set_index('Data/Hora',inplace=True)
-      df_ticket.sort_index(inplace=True)
-
-      if name == 'IBOV':
-        last_ibov_var = df_ticket['Variação']['close'][-1]   
-      # if name in price alert it won't be verified the ma cross.
-      elif name in price_alert:
-         if isinstance(price_alert[name], float):
-            price_alert[name] = [price_alert[name]]
-         if isinstance(price_alert[name], list):
-            for i in range(len(price_alert[name])):
-               price = price_alert[name][i]
-               if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                    notify(df_ticket.index[-1], name, 'Alert')
-                    price_alert.pop(name) 
-                    with open(PRICE_ALERT, 'w') as f:
-                       json.dump(price_alert, f)
-                    time.sleep(1)   
-                    break   
-        
+def verify_pair_diff(dict):
+   global lvl, pairs
+   def which_level(pct):
+      if isinstance(pct,float):
+          if pct > 0:
+              decimal = pct % 1
+              integer = pct // 1
+              i = 0  
+              for i in range(len(LEVELS)):
+                  if decimal < LEVELS[i]:
+                      i += 1
+                      break
+              return i + integer * len(LEVELS)
+          else:
+              decimal = pct % -1
+              integer = pct // -1
+              i = 0  
+              for i in range(len(LEVELS)):
+                  if decimal > -LEVELS[i]:
+                      i += 1
+                      break
+              return (i + integer * len(LEVELS)) * -1
       else:
+          return pct
+   data = []
+   for pair in pairs:
+      if pair[0] in dict and pair[1] in dict:
+         df1 = dict[pair[0]]
+         df2 = dict[pair[1]]
 
-         df1 = df_ticket['Último']
-         df1['EMA_1'] = df1['close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-         df1['EMA_2'] = df1['close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
-         var = df_ticket['Variação']['close'][-1]
-         df1 = df1[df1.index > dt.datetime.today().strftime('%Y-%m-%d')]
-         df1.reset_index(inplace=True)
-         data.append([name, count_groups(df1[df1['EMA_1'] > df1['EMA_2']]), count_groups(df1[df1['EMA_1'] < df1['EMA_2']])])
+         dates = df1.reset_index()['Data/Hora'].dt.date
+         dates = dates.drop_duplicates()
+         dates = dates.reset_index()
+         dates = dates['Data/Hora']
+
          
+         df3 = df1[df1.index.date == dates.iloc[-2]]
+         df4 = df2[df2.index.date == dates.iloc[-2]]
+
+         df5 = df1[df1.index.date == dates.iloc[-1]]
+         df6 = df2[df2.index.date == dates.iloc[-1]]
+
          
-                  
+         df7 = pd.DataFrame((df5['Último']['close'] - df3['Mínimo']['close'].min()) / (df3['Máximo']['close'].max() - df3['Mínimo']['close'].min()) )
+         df7.rename(columns={'close': pair[0]}, inplace=True)
+         df8 = pd.DataFrame((df6['Último']['close'] - df4['Mínimo']['close'].min()) / (df4['Máximo']['close'].max() - df4['Mínimo']['close'].min()) )
+         df8.rename(columns={'close': pair[1]}, inplace=True)
+
+         df9 = pd.concat([df7,df8], axis=1)
+
+         level1 = which_level(round(df9[pair[0]][-1],3))
+         level2 = which_level(round(df9[pair[1]][-1],3))
+         diff = max(level1,level2) - min(level1, level2)
+         id = pair[0] + ' ' + pair[1]
+         if id not in lvl and isinstance(diff, float):
+            lvl[id] = diff
+         elif id in lvl and isinstance(diff, float) and abs(diff) > abs(lvl[id]) :
+            sound_alert()
+            lvl[id] = diff
+         data.append([id, diff, lvl[id]])
+   if len(data) > 0:
+      print(tabulate(data, headers=['Pair', 'Diff', 'Max Diff'], tablefmt="outline"))
+      
 def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
@@ -383,7 +403,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-22'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-28'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -425,12 +445,10 @@ def reset(reset_main):
    if reset_main:
       if os.path.exists(MAIN_DF_FILE):
          os.remove(MAIN_DF_FILE)
-      with open(PRICE_ALERT, 'w') as f:
-         json.dump(empty_json, f)   
-   
+      
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=False)
+reset(reset_main=True)
 main()
 #get_data(reset=True)
 
