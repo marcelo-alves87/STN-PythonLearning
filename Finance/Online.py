@@ -23,6 +23,7 @@ from tabulate import tabulate
 yfin.pdr_override()
 
 MAIN_DF_FILE = 'main_df.pickle'
+PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 color = sys.stdout.shell
 last_date = None
@@ -51,7 +52,10 @@ def get_page_df(driver):
 def strategy():
     global main_df, last_ibov_var
     if not main_df.empty:
-              
+        price_alert = {}
+        if os.path.exists(PRICE_ALERT):       
+           with open (PRICE_ALERT, 'rb') as f:
+              price_alert = json.load(f)      
         groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
@@ -68,10 +72,29 @@ def strategy():
                  last_ibov_var = df_ticket['Variação']['close'][-1]   
               else:   
                  dict[name] = df_ticket
-        verify_pair_diff(dict)      
+        verify_pair_diff(dict, price_alert)      
            
-def verify_pair_diff(dict):
+def verify_pair_diff(dict, price_alert):
    global lvl, pairs
+
+
+   def verify_price_alert(name, df, price_alert):
+      if name in price_alert:
+         if isinstance(price_alert[name], float):
+            price_alert[name] = [price_alert[name]]
+         if isinstance(price_alert[name], list):
+            for i in range(len(price_alert[name])):
+               price = price_alert[name][i]
+               if df['Último']['high'][-1] >= price and df['Último']['low'][-1] <= price:              
+                    sound_alert()
+                    color.write('\n <<<< Alert >>>>> \n',"STRING")
+                    color.write('\n <<<< {} --> {} >>>>> \n'.format(name, round(price,2)),"STRING")
+                    price_alert.pop(name) 
+                    with open(PRICE_ALERT, 'w') as f:
+                       json.dump(price_alert, f)
+                    time.sleep(1)   
+                    break   
+   
    def which_level(pct):
       if isinstance(pct,float):
           if pct > 0:
@@ -97,6 +120,7 @@ def verify_pair_diff(dict):
    data = []
    for pair in pairs:
       if pair[0] in dict and pair[1] in dict:
+         
          df1 = dict[pair[0]]
          df2 = dict[pair[1]]
 
@@ -112,6 +136,10 @@ def verify_pair_diff(dict):
          df5 = df1[df1.index.date == dates.iloc[-1]]
          df6 = df2[df2.index.date == dates.iloc[-1]]
 
+
+         verify_price_alert(pair[0], df5, price_alert)
+         verify_price_alert(pair[1], df6, price_alert)
+
          
          df7 = pd.DataFrame((df5['Último']['close'] - df3['Mínimo']['close'].min()) / (df3['Máximo']['close'].max() - df3['Mínimo']['close'].min()) )
          df7.rename(columns={'close': pair[0]}, inplace=True)
@@ -124,12 +152,16 @@ def verify_pair_diff(dict):
          level2 = which_level(round(df9[pair[1]][-1],3))
          diff = max(level1,level2) - min(level1, level2)
          id = pair[0] + ' ' + pair[1]
-         if id not in lvl and isinstance(diff, float):
-            lvl[id] = diff
-         elif id in lvl and isinstance(diff, float) and abs(diff) > abs(lvl[id]) :
-            sound_alert()
-            lvl[id] = diff
-         data.append([id, diff, lvl[id]])
+         if isinstance(diff, float):
+            if id not in lvl:
+               lvl[id] = diff
+               data.append([id, diff, lvl[id]])
+            elif id in lvl and abs(diff) > abs(lvl[id]) :
+               sound_alert()
+               lvl[id] = diff
+               data.append([id, str(diff) + ' *', lvl[id]])
+            elif id in lvl:
+               data.append([id, diff, lvl[id]])
    if len(data) > 0:
       print(tabulate(data, headers=['Pair', 'Diff', 'Max Diff'], tablefmt="outline"))
       
@@ -403,7 +435,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-28'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-04'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -445,7 +477,9 @@ def reset(reset_main):
    if reset_main:
       if os.path.exists(MAIN_DF_FILE):
          os.remove(MAIN_DF_FILE)
-      
+      if os.path.exists(PRICE_ALERT):
+         with open(PRICE_ALERT, 'w') as f:
+            json.dump(empty_json, f)      
     
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
