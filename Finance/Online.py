@@ -147,21 +147,22 @@ def verify_pair_diff(dict, price_alert):
          df8.rename(columns={'close': pair[1]}, inplace=True)
 
          df9 = pd.concat([df7,df8], axis=1)
-
-         level1 = which_level(round(df9[pair[0]][-1],3))
-         level2 = which_level(round(df9[pair[1]][-1],3))
-         diff = max(level1,level2) - min(level1, level2)
-         id = pair[0] + ' ' + pair[1]
-         if isinstance(diff, float):
-            if id not in lvl:
-               lvl[id] = diff
-               data.append([id, diff, lvl[id]])
-            elif id in lvl and abs(diff) > abs(lvl[id]) :
-               sound_alert()
-               lvl[id] = diff
-               data.append([id, str(diff) + ' *', lvl[id]])
-            elif id in lvl:
-               data.append([id, diff, lvl[id]])
+         df9.dropna(inplace=True)
+         if not df9.empty:
+            level1 = which_level(round(df9[pair[0]][-1],3))
+            level2 = which_level(round(df9[pair[1]][-1],3))
+            diff = max(level1,level2) - min(level1, level2)
+            id = pair[0] + ' ' + pair[1]
+            if isinstance(diff, float):
+               if id not in lvl:
+                  lvl[id] = diff
+                  data.append([id, diff, lvl[id]])
+               elif id in lvl and abs(diff) > abs(lvl[id]) :
+                  sound_alert()
+                  lvl[id] = diff
+                  data.append([id, str(diff) + ' *', lvl[id]])
+               elif id in lvl:
+                  data.append([id, diff, lvl[id]])
    if len(data) > 0:
       print(tabulate(data, headers=['Pair', 'Diff', 'Max Diff'], tablefmt="outline"))
       
@@ -435,7 +436,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-04'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-05'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -480,6 +481,7 @@ def reset(reset_main):
       if os.path.exists(PRICE_ALERT):
          with open(PRICE_ALERT, 'w') as f:
             json.dump(empty_json, f)      
+
     
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
