@@ -77,6 +77,19 @@ def strategy():
 def verify_pair_diff(dict, price_alert):
    global lvl, pairs
 
+   def format_price(price):
+      if isinstance(price, float):
+         if price > 10 ** 9:
+            return str(round(price / 10 ** 9, 2)) + 'B'
+         elif price > 10 ** 6:
+            return str(round(price / 10 ** 6, 2)) + 'M'
+         elif price > 10 ** 3:
+            return str(round(price / 10 ** 3, 2)) + 'k'
+         else:
+            return round(price, 2)
+      else:
+         return 0
+
 
    def verify_price_alert(name, df, price_alert):
       if name in price_alert:
@@ -156,44 +169,52 @@ def verify_pair_diff(dict, price_alert):
             if isinstance(diff, float):
                if id not in lvl:
                   lvl[id] = diff
-                  data.append([id, diff, lvl[id]])
+                  data1 = [id, diff, lvl[id]]
                elif id in lvl and abs(diff) > abs(lvl[id]) :
                   sound_alert()
                   lvl[id] = diff
-                  data.append([id, str(diff) + ' *', lvl[id]])
+                  data1 = [id, str(diff) + ' *', lvl[id]]
                elif id in lvl:
-                  data.append([id, diff, lvl[id]])
+                  data1 = [id, diff, lvl[id]]
+               data1.append(str(format_price(df5['Financeiro']['close'].diff()[-1]))\
+                            + ' - ' + str(format_price(df6['Financeiro']['close'].diff()[-1])))
+               data1.append(str(format_price(df5['Financeiro']['close'].diff().mean()))\
+                            + ' - ' + str(format_price(df6['Financeiro']['close'].diff().mean())))
+               data1.append(str(format_price(df5['Financeiro']['close'][-1]))\
+                            + ' - ' + str(format_price(df6['Financeiro']['close'][-1])))
+               data.append(data1)
    if len(data) > 0:
-      print(tabulate(data, headers=['Pair', 'Diff', 'Max Diff'], tablefmt="outline"))
+      print(tabulate(data, headers=['Pair', 'Diff', 'Max Diff', 'Volume' , 'Volume (Mean)', 'Volume (Accu)'], tablefmt="outline"))
       
 def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def handle_finance(row):   
+def handle_finance(row):
    if isinstance(row, float):
       return row
    elif isinstance(row, int):
       return float(row)
-   else:
+   elif isinstance(row, str):
       row = row.replace('.','')
       row = row.replace(',','')
       row = row.replace('-','')
-      row = row[:-3] + '.' + row[-3:]
-      if 'k' in row:
-         row = float(row.replace('k',''))
-         row = row * 10**3
-      elif 'M' in row:
-         row = float(row.replace('M',''))
-         row = row * 10**6
-      elif 'B' in row:
-         row = float(row.replace('B',''))
-         row = row * 10**9
-
-      if not isinstance(row, float):
-         row = 0
-         
+      if 'k' in row or 'M' in row or 'B' in row:
+         row = row[:-3] + '.' + row[-3:]
+         if 'k' in row:
+            row = float(row.replace('k',''))
+            row = row * 10**3
+         elif 'M' in row:
+            row = float(row.replace('M',''))
+            row = row * 10**6
+         elif 'B' in row:
+            row = float(row.replace('B',''))
+            row = row * 10** 9
+      else:   
+            row = float(row[:-2] + '.' + row[-2:])      
       return row
+   else:
+      return 0
 
 def handle_price(row):
    if isinstance(row, float):
@@ -436,7 +457,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-05'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-08'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -484,7 +505,7 @@ def reset(reset_main):
 
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=True)
+reset(reset_main=False)
 main()
 #get_data(reset=True)
 
