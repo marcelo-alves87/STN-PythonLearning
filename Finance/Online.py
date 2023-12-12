@@ -217,12 +217,12 @@ def handle_finance(row):
       return 0
 
 def handle_price(row):
-   if isinstance(row, float):
+   if not isinstance(row, str):
       row = str(row)
    
    if ',' in row:
       row = row.replace('.','').replace(',','.')   
-   else:
+   else:      
       if '.0' == row[-2:]:
          row = row.replace('.0','')         
       elif '.' in row:
@@ -359,12 +359,13 @@ def main():
         
         df = get_all_tickets_status(driver)
         
-        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', 'Estado Atual']]
-        
+        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', 'Estado Atual', 'Preço Teórico']]
+
         df['Último'] = df['Último'].apply(lambda row : handle_price(row)) 
         df['Máximo'] = df['Máximo'].apply(lambda row : handle_price(row)) 
         df['Mínimo'] = df['Mínimo'].apply(lambda row : handle_price(row))    
-        df['Abertura'] = df['Abertura'].apply(lambda row : handle_price(row))    
+        df['Abertura'] = df['Abertura'].apply(lambda row : handle_price(row))
+        df['Preço Teórico'] = df['Preço Teórico'].apply(lambda row : handle_price(row))    
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row))  
         df['Financeiro'] = df['Financeiro'].astype(float) 
         df['Data/Hora'] = df['Data/Hora'].replace('-','00:00:00') 
@@ -373,27 +374,34 @@ def main():
         start_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 10:00:00'
         end_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 18:00:00'
 
-        df = df[df['Data/Hora'] >= start_date]
-        df = df[df['Data/Hora'] <= end_date]
-
+        df1 = df[(df['Data/Hora'] >= start_date) & (df['Data/Hora'] <= end_date)]
+       
+        if not df1.empty: 
         
-        df.set_index('Data/Hora',inplace=True)
-        df.sort_index(inplace=True)
-        df = df[df.index >= dt.datetime.today().strftime('%Y-%m-%d')] 
-      
-        if main_df.empty:
-           main_df = df      
+           df1.set_index('Data/Hora',inplace=True)
+           df1.sort_index(inplace=True)
+           df1 = df1[df1.index >= dt.datetime.today().strftime('%Y-%m-%d')] 
+         
+           if main_df.empty:
+              main_df = df1      
+           else:
+              main_df = pd.concat([main_df, df1])
+              main_df.reset_index(inplace=True)
+              main_df.set_index(['Data/Hora', 'Ativo'], inplace=True)
+              main_df.drop_duplicates(inplace=True)
+              main_df.reset_index(inplace=True)
+              main_df.set_index('Data/Hora', inplace=True)            
+              main_df.to_pickle(MAIN_DF_FILE)
+              
+              strategy()
         else:
-           main_df = pd.concat([main_df, df])
-           main_df.reset_index(inplace=True)
-           main_df.set_index(['Data/Hora', 'Ativo'], inplace=True)
-           main_df.drop_duplicates(inplace=True)
-           main_df.reset_index(inplace=True)
-           main_df.set_index('Data/Hora', inplace=True)            
-           main_df.to_pickle(MAIN_DF_FILE)
-           
-           strategy()
-
+           df = df[df['Ativo'] != 'IBOV']
+           if not df.empty:
+              data = []
+              for i,row in df.iterrows():
+                 data.append([row['Ativo'], row['Estado Atual'], row['Preço Teórico']])
+              if len(data) > 0:
+                 print(tabulate(data, headers=['Ticket', 'Status', 'Price'], tablefmt="outline"))  
         time.sleep(1)
 
 def format_date(row):
@@ -457,7 +465,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-08'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-11'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
