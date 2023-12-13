@@ -359,7 +359,8 @@ def main():
         
         df = get_all_tickets_status(driver)
         
-        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', 'Estado Atual', 'Preço Teórico']]
+        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', \
+                 'Estado Atual', 'Preço Teórico', 'Variação Teórica', 'Quantidade Teórica']]
 
         df['Último'] = df['Último'].apply(lambda row : handle_price(row)) 
         df['Máximo'] = df['Máximo'].apply(lambda row : handle_price(row)) 
@@ -371,10 +372,16 @@ def main():
         df['Data/Hora'] = df['Data/Hora'].replace('-','00:00:00') 
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'], dayfirst=True)
 
-        start_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 10:00:00'
-        end_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 18:00:00'
+        df1 = df[(df['Estado Atual'] != 'Aberto') & (df['Ativo'] != 'IBOV')]
 
-        df1 = df[(df['Data/Hora'] >= start_date) & (df['Data/Hora'] <= end_date)]
+        if not df1.empty: 
+           data = []
+           for i,row in df1.iterrows():
+              data.append([row['Ativo'], row['Estado Atual'], row['Preço Teórico'], row['Variação Teórica']])
+           if len(data) > 0:
+              print(tabulate(data, headers=['Ticket', 'Status', 'Price', 'Variation'], tablefmt="outline")) 
+
+        df1 = df[df['Estado Atual'] == 'Aberto'] 
        
         if not df1.empty: 
         
@@ -394,14 +401,8 @@ def main():
               main_df.to_pickle(MAIN_DF_FILE)
               
               strategy()
-        else:
-           df = df[df['Ativo'] != 'IBOV']
-           if not df.empty:
-              data = []
-              for i,row in df.iterrows():
-                 data.append([row['Ativo'], row['Estado Atual'], row['Preço Teórico']])
-              if len(data) > 0:
-                 print(tabulate(data, headers=['Ticket', 'Status', 'Price'], tablefmt="outline"))  
+
+         
         time.sleep(1)
 
 def format_date(row):
@@ -465,7 +466,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-11'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-12'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -513,7 +514,7 @@ def reset(reset_main):
 
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=False)
+reset(reset_main=True)
 main()
 #get_data(reset=True)
 
