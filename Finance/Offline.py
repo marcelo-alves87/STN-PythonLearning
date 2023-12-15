@@ -295,6 +295,7 @@ def to_timezone(row):
 def make_fibonnaci(name, df, last_date):
     
     lvls = []
+    t_lvls = []
     df = df[df['Ativo'] == name]
     
     df_today = df[(df.index >= last_date.strftime('%Y-%m-%d 10:00:00')) & (df.index <= last_date.strftime('%Y-%m-%d 18:00:00'))]    
@@ -305,23 +306,37 @@ def make_fibonnaci(name, df, last_date):
     else:
         df_last = df_today
 
-    lvls_ = LEVELS.copy()
+    lvls_ = [0, 1]
 
     if df_today['Close'].max() > df_last['High'].max():
-        lvls_.append(1.236)    
-        lvls_.append(1.618)
         lvls_.append(2)
     
     if df_today['Close'].min() < df_last['Low'].min():
-        lvls_.append(-0.236)    
-        lvls_.append(-0.382)    
-    
+        lvls_.append(-0.236)
+        lvls_.append(-0.382)
+        
     for j in range(len(lvls_)):
         lvl =  df_last['High'].max() - df_last['Low'].min()
         lvl = lvls_[j]*lvl +  df_last['Low'].min()
         lvls.append(lvl)
 
-    return lvls
+    if not df_today.empty and not df_last.empty:
+
+        #lvls_ = [2]
+        lvls_ = [0, 0.236, 0.382, 0.5, 0.681, 0.786, 1, 1.236, 1.382, 1.5, 1.681, 1.786, 2, 2.236, 2.382]
+            
+        t_diff = abs(df_last[df_last['High'] == df_last['High'].max()].index[0] - df_last[df_last['Low'] == df_last['Low'].min()].index[0])
+        t_diff2 = df_today.index[0] - df_last.index[-1] - dt.timedelta(minutes = 5)
+        t_min = min(df_last[df_last['High'] == df_last['High'].max()].index[0],df_last[df_last['Low'] == df_last['Low'].min()].index[0])
+
+    
+        for j in range(len(lvls_)):
+            t_lvl = lvls_[j] * t_diff + t_min + t_diff2
+            if t_lvl > df_today.index.min() and t_lvl < df_today.index.max(): 
+                t_lvls.append(t_lvl)
+            
+    
+    return lvls, t_lvls
 
 def plot(tickers, verbose=False):
     s  = mpf.make_mpf_style(base_mpf_style='charles',gridaxis='both',y_on_right=False)
@@ -338,9 +353,6 @@ def plot(tickers, verbose=False):
             df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
             df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-            #df = df[df['Datetime'] > '2023-10-30']
-            #df = df[df['Datetime'] < '2023-10-31']
-         
             df = df[['Ativo','Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume', 'EMA_1', 'EMA_2']]
 
             df.index = pd.DatetimeIndex(df['Datetime'])
@@ -380,17 +392,17 @@ def plot(tickers, verbose=False):
             else:
                 df2 = pd.concat([df2, df])
             
-            axis[i].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
+            #axis[i].xaxis.set_major_locator(mdates.MinuteLocator(byminute=[0,30]))
 
             apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
             apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=axis[i], color='darkblue')
 
-            lvls = make_fibonnaci(tickers[i], main_df, last_date)
+            lvls, t_lvls = make_fibonnaci(tickers[i], main_df, last_date)
 
             mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2],\
                                   hlines=dict(hlines=lvls,\
-                                              colors=['red','brown', 'y', 'orange','purple','green'],\
-                                              alpha=0.8,linestyle='--'),    show_nontrading=True)
+                                              colors=['red','green', 'y', 'orange','purple','blue'],\
+                                              alpha=0.8,linestyle='--'),    show_nontrading=True , vlines=dict(vlines=t_lvls,linewidths=(1,2,3, 4, 5 ,6)))
             
         if not df.empty:
             fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
@@ -516,7 +528,7 @@ def long_short(df, tickets):
   dates = dates.reset_index()
   dates = dates['Data/Hora']
   for i,row in dates.items():
-      if i > 1:
+      if i > 0:
           df1 = df[(df['Ativo'] == tickets[0]) & (df.index.date == dates[i-1])]
           df2 = df[(df['Ativo'] == tickets[-1]) & (df.index.date == dates[i-1])]
 
@@ -529,8 +541,8 @@ def long_short(df, tickets):
           df4.rename(columns={'Último': tickets[-1]}, inplace=True)
 
           df5 = pd.concat([df3,df4], axis=1)
-            
           df5.reset_index(inplace=True)
+          df5.dropna(inplace=True)
           print('*******************')  
           print(df5['Data/Hora'].iloc[-1].strftime('%Y-%m-%d'))
           print('*******************')
@@ -543,7 +555,7 @@ def long_short(df, tickets):
 def main(update_tickets=False):
     global count
     #date1 = dt.datetime.now().strftime('%Y-%m-%d')
-    date1 = '2023-12-02' 
+    date1 = '2023-12-11' 
     if not os.path.exists(MAIN_DF_FILE):
        #tickets = get_tickets()
        tickets = ['PETR4', 'PETR3', 'BBDC4', 'BBDC3', 'GOAU4', 'GGBR4']
@@ -561,9 +573,9 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    #plot(['GOAU4','GGBR4'])
+    plot(['BBDC4','BBDC3'])
     #day_trade(['PETR4','PETR3'])
-    long_short(main_df,['GOAU4', 'GGBR4'])
+    #long_short(main_df,['BBDC4', 'BBDC3'])
     
 def reset(reset_main):
    empty_json = {}
@@ -573,5 +585,5 @@ def reset(reset_main):
       shutil.rmtree('stock_dfs')           
 
 warnings.simplefilter(action='ignore')
-reset(reset_main=False)
+#reset(reset_main=False)
 main()
