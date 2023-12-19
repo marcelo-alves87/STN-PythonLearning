@@ -171,7 +171,7 @@ def verify_pair_diff(dict, price_alert):
                   lvl[id] = diff
                   data1 = [id, diff, lvl[id]]
                elif id in lvl and abs(diff) > abs(lvl[id]) :
-                  sound_alert()
+                 # sound_alert()
                   lvl[id] = diff
                   data1 = [id, str(diff) + ' *', lvl[id]]
                elif id in lvl:
@@ -226,8 +226,11 @@ def handle_price(row):
       if '.0' == row[-2:]:
          row = row.replace('.0','')         
       elif '.' in row:
-         row = row.replace('.','')         
-      row = row[:-2] + '.' + row[-2:]
+         row = row.replace('.','')
+      try:   
+         row = row[:-2] + '.' + row[-2:]
+      except:
+         pdb.set_trace()
    return float(row)
       
 def get_tickets():
@@ -377,9 +380,9 @@ def main():
         if not df1.empty: 
            data = []
            for i,row in df1.iterrows():
-              data.append([row['Ativo'], row['Estado Atual'], row['Preço Teórico'], row['Variação Teórica']])
+              data.append([row['Ativo'], row['Estado Atual'], row['Preço Teórico'], row['Variação Teórica'], row['Máximo'], row['Mínimo']])
            if len(data) > 0:
-              print(tabulate(data, headers=['Ticket', 'Status', 'Price', 'Variation'], tablefmt="outline")) 
+              print(tabulate(data, headers=['Ticket', 'Status', 'Price', 'Variation', 'Maximum', 'Minimum'], tablefmt="outline")) 
 
         df1 = df[df['Estado Atual'] == 'Aberto'] 
        
@@ -466,7 +469,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-12'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-18'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
