@@ -8,7 +8,7 @@ import pdb
 # 28800 8 horas
 
 start = '10:00'
-period = 15
+period = 5
 module = 28800
 
 def fibonnaci(x):
@@ -39,12 +39,12 @@ def sequence(date, verbose=True):
 
 def levels(date, index1):
     dict = sequence(date, False)
-    LEVELS = [0, 0.236, 0.382, 0.5, 0.786, 1]
+    LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
     for i in LEVELS:
         k = calculate(date, i*index1)
         print('{} -> {}'.format(i, k.strftime('%H:%M')))
 
-date = '14:45'        
+date = '15:35'        
 #sequence(date)
 levels(date, 55)
 
