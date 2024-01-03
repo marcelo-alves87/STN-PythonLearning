@@ -164,6 +164,12 @@ def remove(list, item):
     except:
         pass
 
+def fibonnaci(x):
+    if x == 0 or x == 1:
+        return 1
+    else:
+        return fibonnaci(x - 1) + fibonnaci(x - 2)
+
 def process_data_corr(main_df, verbose=False):
     data = {}
     tickers = main_df['Ativo']
@@ -289,7 +295,8 @@ def to_timezone(row):
             delta = 1
         row = dt.datetime.strptime(row, '%Y-%m-%d %H:%M:%S%z')
         row -= dt.timedelta(hours=delta)   
-        return row.strftime('%Y-%m-%d %H:%M:%S')
+        str1 = row.strftime('%Y-%m-%d %H:%M:%S')
+        return dt.datetime.strptime(str1, '%Y-%m-%d %H:%M:%S')
 
 
 def make_fibonnaci(name, df, last_date):
@@ -320,20 +327,20 @@ def make_fibonnaci(name, df, last_date):
         lvl = lvls_[j]*lvl +  df_last['Low'].min()
         lvls.append(lvl)
 
-    if not df_today.empty and not df_last.empty:
-
-        #lvls_ = [2]
-        lvls_ = [0, 0.236, 0.382, 0.5, 0.681, 0.786, 1, 1.236, 1.382, 1.5, 1.681, 1.786, 2, 2.236, 2.382]
-            
-        t_diff = abs(df_last[df_last['High'] == df_last['High'].max()].index[0] - df_last[df_last['Low'] == df_last['Low'].min()].index[0])
-        t_diff2 = df_today.index[0] - df_last.index[-1] - dt.timedelta(minutes = 5)
-        t_min = min(df_last[df_last['High'] == df_last['High'].max()].index[0],df_last[df_last['Low'] == df_last['Low'].min()].index[0])
-
-    
-        for j in range(len(lvls_)):
-            t_lvl = lvls_[j] * t_diff + t_min + t_diff2
-            if t_lvl > df_today.index.min() and t_lvl < df_today.index.max(): 
-                t_lvls.append(t_lvl)
+##    if not df_today.empty and not df_last.empty:
+##
+##        #lvls_ = [2]
+##        lvls_ = [0, 0.236, 0.382, 0.5, 0.681, 0.786, 1, 1.236, 1.382, 1.5, 1.681, 1.786, 2, 2.236, 2.382]
+##            
+##        t_diff = abs(df_last[df_last['High'] == df_last['High'].max()].index[0] - df_last[df_last['Low'] == df_last['Low'].min()].index[0])
+##        t_diff2 = df_today.index[0] - df_last.index[-1] - dt.timedelta(minutes = 5)
+##        t_min = min(df_last[df_last['High'] == df_last['High'].max()].index[0],df_last[df_last['Low'] == df_last['Low'].min()].index[0])
+##
+##    
+##        for j in range(len(lvls_)):
+##            t_lvl = lvls_[j] * t_diff + t_min + t_diff2
+##            if t_lvl > df_today.index.min() and t_lvl < df_today.index.max(): 
+##                t_lvls.append(t_lvl)
             
     
     return lvls, t_lvls
@@ -437,26 +444,31 @@ def plot(tickers, verbose=False):
     #mpf.show()
 
 
+
+
 def day_trade(tickers):
-    global main_df
+    global main_df, shift, frame
     s  = mpf.make_mpf_style(base_mpf_style='charles',gridaxis='both',y_on_right=False)
     fig = mpf.figure(figsize=(5,9), style=s)
     l = len(tickers)
     axis = {}
     main_df = pd.DataFrame()
+    ani_running = True
+    shift = 0
+    frame = 0
     for i in range(l):        
         if os.path.exists('stock_dfs/{}.csv'.format(tickers[i])):
             df = pd.read_csv('stock_dfs/{}.csv'.format(tickers[i]))
             df.reset_index(inplace=True)
             df['Datetime'] = df['Datetime'].apply(lambda row: to_timezone(row))
             df['Ativo'] = tickers[i] 
-            df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-            df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
+           # df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
+           # df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
 
-            df = df[df['Datetime'] > '2023-11-10']
-            df = df[df['Datetime'] < '2023-11-11']
+            #df = df[df['Datetime'] > '2023-11-10']
+            #df = df[df['Datetime'] < '2023-11-11']
          
-            df = df[['Ativo','Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume', 'EMA_1', 'EMA_2']]
+            df = df[['Ativo','Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume']]
 
             df.index = pd.DatetimeIndex(df['Datetime'])
 
@@ -465,36 +477,61 @@ def day_trade(tickers):
             else:
                 main_df = pd.concat([main_df, df])
    
-    first_date =  main_df.index[0]
-    last_date = main_df.index[-1]
     for i in range(l):
         if i == 0:
             axis[i] = fig.add_subplot(l,1,i + 1)
         else:
             axis[i] = fig.add_subplot(l,1,i + 1, sharex=axis[0])
+
+    dates = main_df['Datetime'].dt.date.drop_duplicates()
     
-    def animate(ival):
-        if ival > 0:
-            print(ival)
+    def custom_plot():
+        global _ival, shift
+        if _ival < len(dates):
             for i in range(l): 
                 axis[i].clear()
                 if i != l - 1:
                     axis[i].get_xaxis().set_visible(False)
-            
-            
-                df = main_df[main_df['Ativo'] == tickers[i]]
-                index = df.index[0] + dt.timedelta(minutes = 5*ival)
-                df = df[df.index <= index]
+                    axis[i].set_title(dates[_ival].strftime('%Y-%m-%d'))
+                        
+                        
+                df = main_df[(main_df['Ativo'] == tickers[i]) &\
+                                  (main_df.index.date == dates[_ival])]
 
-                apd_1 = mpf.make_addplot(df['EMA_1'],type='line', ax=axis[i], color='blue')
-                apd_2 = mpf.make_addplot(df['EMA_2'],type='line', ax=axis[i], color='darkblue')
+                c1 = [df.index[1], df.index[2], df.index[3], df.index[5], df.index[8], df.index[13], df.index[21], df.index[34], df.index[55]]
 
-                mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', addplot=[apd_1,apd_2], show_nontrading=True)
+                c1 = [x + dt.timedelta(minutes=5*shift) for x in c1]
+
+                mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', show_nontrading=True, vlines=c1)
+        else:
+            exit()
+       
+    def animate(ival):
+        global _ival, frame
+        _ival = (ival % len(dates)) + frame
+        custom_plot()
+
+    def on_key_press(event):
+        global _ival, shift, frame
+        nonlocal ani_running
+        if event.key == ' ':
+            if ani_running:
+                ani.event_source.stop()
+                frame -= 1
+                ani_running = False                
+            else:
+                ani.event_source.start()
+                ani_running = True
+        elif event.key == 'right':
+            shift += 1
+        elif event.key == 'left':
+            shift -= 1
             
-            input(index)
             
-            
-    ani = animation.FuncAnimation(fig, animate, interval=250)     
+                   
+    #fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
+    fig.canvas.mpl_connect('key_press_event', on_key_press)    
+    ani = animation.FuncAnimation(fig, animate, interval=150)     
     
     mpf.show()
 
@@ -555,7 +592,7 @@ def long_short(df, tickets):
 def main(update_tickets=False):
     global count
     #date1 = dt.datetime.now().strftime('%Y-%m-%d')
-    date1 = '2023-12-11' 
+    date1 = '2024-01-02' 
     if not os.path.exists(MAIN_DF_FILE):
        #tickets = get_tickets()
        tickets = ['PETR4', 'PETR3', 'BBDC4', 'BBDC3', 'GOAU4', 'GGBR4']
@@ -573,8 +610,8 @@ def main(update_tickets=False):
     #verify_trends(main_df)
     #correlation(main_df)
     #process_hits(main_df)
-    plot(['BBDC4','BBDC3'])
-    #day_trade(['PETR4','PETR3'])
+    #plot(['GOAU4','GGBR4'])
+    day_trade(['PETR4','PETR3'])
     #long_short(main_df,['BBDC4', 'BBDC3'])
     
 def reset(reset_main):
@@ -585,5 +622,5 @@ def reset(reset_main):
       shutil.rmtree('stock_dfs')           
 
 warnings.simplefilter(action='ignore')
-#reset(reset_main=False)
+reset(reset_main=False)
 main()
