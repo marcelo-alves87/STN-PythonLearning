@@ -288,7 +288,7 @@ def process_hits(main_df):
 def to_timezone(row):
     delta = 0
     try:
-        dt.datetime.strptime(row, '%Y-%m-%d %H:%M:%S')
+        row = dt.datetime.strptime(row, '%Y-%m-%d %H:%M:%S')
         return row
     except:        
         if '-02:00' in row:
@@ -462,12 +462,9 @@ def day_trade(tickers):
             df.reset_index(inplace=True)
             df['Datetime'] = df['Datetime'].apply(lambda row: to_timezone(row))
             df['Ativo'] = tickers[i] 
-           # df['EMA_1'] = df['Close'].ewm(span=FIRST_EMA_LEN, adjust=False).mean()
-           # df['EMA_2'] = df['Close'].ewm(span=SECOND_EMA_LEN, adjust=False).mean()
-
-            #df = df[df['Datetime'] > '2023-11-10']
-            #df = df[df['Datetime'] < '2023-11-11']
          
+            df = df[df['Datetime'] > '2023-12-16']
+            
             df = df[['Ativo','Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close','Volume']]
 
             df.index = pd.DatetimeIndex(df['Datetime'])
@@ -482,7 +479,7 @@ def day_trade(tickers):
             axis[i] = fig.add_subplot(l,1,i + 1)
         else:
             axis[i] = fig.add_subplot(l,1,i + 1, sharex=axis[0])
-
+   
     dates = main_df['Datetime'].dt.date.drop_duplicates()
     
     def custom_plot():
@@ -502,7 +499,22 @@ def day_trade(tickers):
 
                 c1 = [x + dt.timedelta(minutes=5*shift) for x in c1]
 
-                mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', show_nontrading=True, vlines=c1)
+                h1 = []
+                
+                if _ival == 0:
+                    diff = df['High'].max() - df['Low'].min()
+                    for k in LEVELS:
+                        h1.append(round(df['Low'].min() + diff*k, 2))
+                else:
+                    df1 = main_df[(main_df['Ativo'] == tickers[i]) &\
+                                  (main_df.index.date == dates[_ival - 1])]
+                    diff = df1['High'].max() - df1['Low'].min()
+                    for k in LEVELS:
+                        h1.append(round(df1['Low'].min() + diff*k,2))
+
+               
+
+                mpf.plot(df,ax=axis[i], ylabel=tickers[i], type='candle', show_nontrading=True, vlines=c1, hlines=h1)
         else:
             exit()
        
@@ -531,7 +543,7 @@ def day_trade(tickers):
                    
     #fig.savefig('plots/{}.png'.format(last_date.strftime('%Y-%m-%d')))
     fig.canvas.mpl_connect('key_press_event', on_key_press)    
-    ani = animation.FuncAnimation(fig, animate, interval=150)     
+    ani = animation.FuncAnimation(fig, animate, interval=350)     
     
     mpf.show()
 
@@ -592,7 +604,7 @@ def long_short(df, tickets):
 def main(update_tickets=False):
     global count
     #date1 = dt.datetime.now().strftime('%Y-%m-%d')
-    date1 = '2024-01-02' 
+    date1 = '2023-12-18' 
     if not os.path.exists(MAIN_DF_FILE):
        #tickets = get_tickets()
        tickets = ['PETR4', 'PETR3', 'BBDC4', 'BBDC3', 'GOAU4', 'GGBR4']
@@ -603,7 +615,7 @@ def main(update_tickets=False):
        df1.to_pickle(MAIN_DF_FILE)
        
     main_df = pd.read_pickle(MAIN_DF_FILE)
-    main_df = main_df[main_df.index <= dt.datetime.strptime(date1, '%Y-%m-%d')]
+    main_df = main_df[main_df.index >= dt.datetime.strptime(date1, '%Y-%m-%d')]
     if update_tickets:
        main_df = update(main_df)
     main_df.dropna(inplace=True)
@@ -611,7 +623,7 @@ def main(update_tickets=False):
     #correlation(main_df)
     #process_hits(main_df)
     #plot(['GOAU4','GGBR4'])
-    day_trade(['PETR4','PETR3'])
+    day_trade(['GOAU4','GGBR4'])
     #long_short(main_df,['BBDC4', 'BBDC3'])
     
 def reset(reset_main):
