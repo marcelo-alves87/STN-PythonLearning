@@ -2,46 +2,51 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 import numpy as np
 import pandas as pd
+import pdb
+import os
+import datetime as dt
 
 style.use('ggplot')
 
-##def visualize_data():
-##    df = pd.read_csv('ibovespa_joined_closes.csv')
-##    df['ABEV3'].plot()
-##    plt.show()
+dict = {}
 
+def get_volume(ticker):
+    df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
+    if 'Datetime' in df.columns:
+        df['Datetime'] = df['Datetime'].apply(lambda x: dt.datetime.strptime(x, '%Y-%m-%d %H:%M:%S%z'))
+        df = df[df['Datetime'].dt.date ==  df['Datetime'].iloc[-1].date()]
+        return df['Volume'].sum()
+    else:
+        return 0
+    
+def check_volume(tickers):
+    for ticker in tickers:
+        if ticker in dict:
+            vol = dict[ticker]
+        else:            
+            vol = get_volume(ticker)
+            dict[ticker] = vol
+        if vol < 10**6:
+            return False
+    return True
+
+def list_tickets(volume):
+    tickers = []
+    for file_path in os.listdir('stock_dfs'):
+        tickers.append(file_path.replace('.csv',''))
+    for ticker in tickers:
+        vol = get_volume(ticker)
+        if vol > volume:
+            print('{} -> Volume: {}'.format(ticker, round(vol/volume,3)))
+                
 def visualize_data2():
     df = pd.read_csv('ibovespa_joined_closes.csv')
     df_corr = df.corr()
     for index, data in df_corr.iteritems():
         for index1, data1 in data.iteritems():
-            if data1 >= 0.95 and index != index1:
+            if data1 >= 0.97 and index != index1 and check_volume([index,index1]):                
                 print(('{} e {} fator de correlação: {}').format(index, index1, data1))
     
-def visualize_data():
-    df = pd.read_csv('ibovespa_joined_closes.csv')
-    df_corr = df.corr()
-   #print(df_corr.head())
-   #df_corr.to_csv('sp500corr.csv')
-    data1 = df_corr.values
-    fig1 = plt.figure()
-    ax1 = fig1.add_subplot(111)
 
-    heatmap1 = ax1.pcolor(data1, cmap=plt.cm.RdYlGn)
-    fig1.colorbar(heatmap1)
-
-    ax1.set_xticks(np.arange(data1.shape[1]) + 0.5, minor=False)
-    ax1.set_yticks(np.arange(data1.shape[0]) + 0.5, minor=False)
-    ax1.invert_yaxis()
-    ax1.xaxis.tick_top()
-    column_labels = df_corr.columns
-    row_labels = df_corr.index
-    ax1.set_xticklabels(column_labels)
-    ax1.set_yticklabels(row_labels)
-    plt.xticks(rotation=90)
-    heatmap1.set_clim(-1, 1)
-    plt.tight_layout()
-    plt.show()
-
-
-visualize_data2()    
+visualize_data2()
+#list_tickets(10**7)                
