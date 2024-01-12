@@ -18,11 +18,13 @@ import warnings
 import pandas_datareader.data as web
 import shutil
 import yfinance as yfin
-from tabulate import tabulate
 
 yfin.pdr_override()
 
+# inter ma alert
+
 MAIN_DF_FILE = 'main_df.pickle'
+STATUS_FILE = 'status.pickle'
 PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
 color = sys.stdout.shell
@@ -30,9 +32,7 @@ last_date = None
 last_ibov_var = None
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
-lvl = {}
-LEVELS = [0.236, 0.382, 0.5, 0.618, 0.786, 1]
-pairs = [['BBDC4', 'BBDC3'], ['GOAU4' , 'GGBR4'], ['PETR4','PETR3']]
+status = {}
 
 def get_page_source(driver):
    try :
@@ -50,187 +50,111 @@ def get_page_df(driver):
    return df
 
 def strategy():
-    global main_df, last_ibov_var
+    global main_df, status
     if not main_df.empty:
-        price_alert = {}
+        if os.path.exists(STATUS_FILE): 
+           with open(STATUS_FILE, 'rb') as handle:
+              status = pickle.load(handle)
         if os.path.exists(PRICE_ALERT):       
            with open (PRICE_ALERT, 'rb') as f:
-              price_alert = json.load(f)      
-        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
+              price_alert = json.load(f)
+              
+        groups = main_df.groupby([pd.Grouper(freq='1min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
-        dict = {}
         for name in groups.index.unique():
            df_ticket = groups.loc[name][::-1]
            if name != 'IBOV' and isinstance(df_ticket, pd.Series):
-              df = update(name)
-              main_df = pd.concat([df, main_df])
-           elif isinstance(df_ticket, pd.DataFrame):
-              df_ticket.set_index('Data/Hora',inplace=True)
-              df_ticket.sort_index(inplace=True)   
-              if name == 'IBOV':
-                 last_ibov_var = df_ticket['Variação']['close'][-1]   
-              else:   
-                 dict[name] = df_ticket
-        verify_pair_diff(dict, price_alert)      
+              #df = update(name)
+              #main_df = pd.concat([df, main_df])
+              pass
+           else:
+              verify_alert(name, df_ticket, price_alert)
            
-def verify_pair_diff(dict, price_alert):
-   global lvl, pairs
+def verify_alert(name, df_ticket, price_alert):
+   global last_ibov_var
+   if isinstance(df_ticket, pd.DataFrame):
+      df_ticket.set_index('Data/Hora',inplace=True)
+      df_ticket.sort_index(inplace=True)
 
-   def format_price(price):
-      if isinstance(price, float):
-         if price > 10 ** 9:
-            return str(round(price / 10 ** 9, 2)) + 'B'
-         elif price > 10 ** 6:
-            return str(round(price / 10 ** 6, 2)) + 'M'
-         elif price > 10 ** 3:
-            return str(round(price / 10 ** 3, 2)) + 'k'
-         else:
-            return round(price, 2)
-      else:
-         return 0
-
-
-   def verify_price_alert(name, df, price_alert):
-      if name in price_alert:
+      if name == 'IBOV':
+        last_ibov_var = df_ticket['Variação']['close'][-1]   
+      # if name in price alert it won't be verified the ma cross.
+      elif name in price_alert:
          if isinstance(price_alert[name], float):
             price_alert[name] = [price_alert[name]]
          if isinstance(price_alert[name], list):
             for i in range(len(price_alert[name])):
                price = price_alert[name][i]
-               if df['Último']['high'][-1] >= price and df['Último']['low'][-1] <= price:              
-                    sound_alert()
-                    color.write('\n <<<< Alert >>>>> \n',"STRING")
-                    color.write('\n <<<< {} --> {} >>>>> \n'.format(name, round(price,2)),"STRING")
+               if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
+                    notify(df_ticket.index[-1], name, 'Alert')
                     price_alert.pop(name) 
                     with open(PRICE_ALERT, 'w') as f:
                        json.dump(price_alert, f)
                     time.sleep(1)   
                     break   
+        
    
-   def which_level(pct):
-      if isinstance(pct,float):
-          if pct > 0:
-              decimal = pct % 1
-              integer = pct // 1
-              i = 0  
-              for i in range(len(LEVELS)):
-                  if decimal < LEVELS[i]:
-                      i += 1
-                      break
-              return i + integer * len(LEVELS)
-          else:
-              decimal = pct % -1
-              integer = pct // -1
-              i = 0  
-              for i in range(len(LEVELS)):
-                  if decimal > -LEVELS[i]:
-                      i += 1
-                      break
-              return (i + integer * len(LEVELS)) * -1
-      else:
-          return pct
-   data = []
-   for pair in pairs:
-      if pair[0] in dict and pair[1] in dict:
-         
-         df1 = dict[pair[0]]
-         df2 = dict[pair[1]]
-
-         dates = df1.reset_index()['Data/Hora'].dt.date
-         dates = dates.drop_duplicates()
-         dates = dates.reset_index()
-         dates = dates['Data/Hora']
-
-         
-         df3 = df1[df1.index.date == dates.iloc[-2]]
-         df4 = df2[df2.index.date == dates.iloc[-2]]
-
-         df5 = df1[df1.index.date == dates.iloc[-1]]
-         df6 = df2[df2.index.date == dates.iloc[-1]]
-
-
-         verify_price_alert(pair[0], df5, price_alert)
-         verify_price_alert(pair[1], df6, price_alert)
-
-         
-         df7 = pd.DataFrame((df5['Último']['close'] - df3['Mínimo']['close'].min()) / (df3['Máximo']['close'].max() - df3['Mínimo']['close'].min()) )
-         df7.rename(columns={'close': pair[0]}, inplace=True)
-         df8 = pd.DataFrame((df6['Último']['close'] - df4['Mínimo']['close'].min()) / (df4['Máximo']['close'].max() - df4['Mínimo']['close'].min()) )
-         df8.rename(columns={'close': pair[1]}, inplace=True)
-
-         df9 = pd.concat([df7,df8], axis=1)
-         df9.dropna(inplace=True)
-         if not df9.empty:
-            level1 = which_level(round(df9[pair[0]][-1],3))
-            level2 = which_level(round(df9[pair[1]][-1],3))
-            diff = max(level1,level2) - min(level1, level2)
-            id = pair[0] + ' ' + pair[1]
-            if isinstance(diff, float):
-               if id not in lvl:
-                  lvl[id] = diff
-                  data1 = [id, diff, lvl[id]]
-               elif id in lvl and abs(diff) > abs(lvl[id]) :
-                 # sound_alert()
-                  lvl[id] = diff
-                  data1 = [id, str(diff) + ' *', lvl[id]]
-               elif id in lvl:
-                  data1 = [id, diff, lvl[id]]
-               data1.append(str(format_price(df5['Financeiro']['close'].diff()[-1]))\
-                            + ' - ' + str(format_price(df6['Financeiro']['close'].diff()[-1])))
-               data1.append(str(format_price(df5['Financeiro']['close'].diff().mean()))\
-                            + ' - ' + str(format_price(df6['Financeiro']['close'].diff().mean())))
-               data1.append(str(format_price(df5['Financeiro']['close'][-1]))\
-                            + ' - ' + str(format_price(df6['Financeiro']['close'][-1])))
-               data.append(data1)
-   if len(data) > 0:
-      print(tabulate(data, headers=['Pair', 'Diff', 'Max Diff', 'Volume' , 'Volume (Mean)', 'Volume (Accu)'], tablefmt="outline"))
-      
+def save_status():
+   with open(STATUS_FILE, 'wb') as handle:
+         pickle.dump(status, handle)
+   time.sleep(1)
+   
 def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def handle_finance(row):
+def notify(index, name, type, mode=1):
+   if mode == 1:
+      print('************')
+      if type == 'Bullish':
+         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'STRING')
+      elif type == 'Bearish':
+         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'COMMENT')
+      elif type == 'Alert':
+         color.write(str(index) + ' ' + name + ' ' + type,'KEYWORD')   
+      print('\n************')
+      sound_alert()
+   else:
+      print("{} -> {} ({}) is {}".format(index, name, var, type))
+   
+def handle_finance(row):   
    if isinstance(row, float):
       return row
    elif isinstance(row, int):
       return float(row)
-   elif isinstance(row, str):
+   else:
       row = row.replace('.','')
       row = row.replace(',','')
       row = row.replace('-','')
-      if 'k' in row or 'M' in row or 'B' in row:
-         row = row[:-3] + '.' + row[-3:]
-         if 'k' in row:
-            row = float(row.replace('k',''))
-            row = row * 10**3
-         elif 'M' in row:
-            row = float(row.replace('M',''))
-            row = row * 10**6
-         elif 'B' in row:
-            row = float(row.replace('B',''))
-            row = row * 10** 9
-      else:   
-            row = float(row[:-2] + '.' + row[-2:])      
+      row = row[:-3] + '.' + row[-3:]
+      if 'k' in row:
+         row = float(row.replace('k',''))
+         row = row * 10**3
+      elif 'M' in row:
+         row = float(row.replace('M',''))
+         row = row * 10**6
+      elif 'B' in row:
+         row = float(row.replace('B',''))
+         row = row * 10**9
+
+      if not isinstance(row, float):
+         row = 0
+         
       return row
-   else:
-      return 0
 
 def handle_price(row):
-   if not isinstance(row, str):
+   if isinstance(row, float):
       row = str(row)
    
    if ',' in row:
       row = row.replace('.','').replace(',','.')   
-   else:      
+   else:
       if '.0' == row[-2:]:
          row = row.replace('.0','')         
       elif '.' in row:
-         row = row.replace('.','')
-      try:   
-         row = row[:-2] + '.' + row[-2:]
-      except:
-         pdb.set_trace()
+         row = row.replace('.','')         
+      row = row[:-2] + '.' + row[-2:]
    return float(row)
       
 def get_tickets():
@@ -362,54 +286,44 @@ def main():
         
         df = get_all_tickets_status(driver)
         
-        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', \
-                 'Estado Atual', 'Preço Teórico', 'Variação Teórica', 'Quantidade Teórica']]
-
+        df = df[['Ativo','Variação','Máximo','Mínimo','Data/Hora','Último', 'Abertura', 'Financeiro', 'Estado Atual']]
+        
         df['Último'] = df['Último'].apply(lambda row : handle_price(row)) 
         df['Máximo'] = df['Máximo'].apply(lambda row : handle_price(row)) 
         df['Mínimo'] = df['Mínimo'].apply(lambda row : handle_price(row))    
-        df['Abertura'] = df['Abertura'].apply(lambda row : handle_price(row))
-        df['Preço Teórico'] = df['Preço Teórico'].apply(lambda row : handle_price(row))    
+        df['Abertura'] = df['Abertura'].apply(lambda row : handle_price(row))    
         df['Financeiro'] = df['Financeiro'].apply(lambda row : handle_finance(row))  
         df['Financeiro'] = df['Financeiro'].astype(float) 
         df['Data/Hora'] = df['Data/Hora'].replace('-','00:00:00') 
         df['Data/Hora'] = pd.to_datetime(df['Data/Hora'], dayfirst=True)
 
-        df1 = df[(df['Estado Atual'] != 'Aberto') & (df['Ativo'] != 'IBOV')]
+        start_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 10:00:00'
+        end_date = dt.datetime.today().strftime('%Y-%m-%d') + ' 18:00:00'
 
-        if not df1.empty: 
-           data = []
-           for i,row in df1.iterrows():
-              data.append([row['Ativo'], row['Estado Atual'], row['Preço Teórico'], row['Variação Teórica'], row['Máximo'], row['Mínimo']])
-           if len(data) > 0:
-              print(tabulate(data, headers=['Ticket', 'Status', 'Price', 'Variation', 'Maximum', 'Minimum'], tablefmt="outline")) 
+        df = df[df['Data/Hora'] >= start_date]
+        df = df[df['Data/Hora'] <= end_date]
 
-        df1 = df[df['Estado Atual'] == 'Aberto'] 
-       
-        if not df1.empty: 
         
-           df1.set_index('Data/Hora',inplace=True)
-           df1.sort_index(inplace=True)
-           df1 = df1[df1.index >= dt.datetime.today().strftime('%Y-%m-%d')] 
-         
-           if main_df.empty:
-              main_df = df1      
-           else:
-              main_df = pd.concat([main_df, df1])
-              main_df.reset_index(inplace=True)
-              main_df.set_index(['Data/Hora', 'Ativo'], inplace=True)
-              main_df.drop_duplicates(inplace=True)
-              main_df.reset_index(inplace=True)
-              main_df.set_index('Data/Hora', inplace=True)            
-              main_df.to_pickle(MAIN_DF_FILE)
-              
-              strategy()
+        df.set_index('Data/Hora',inplace=True)
+        df.sort_index(inplace=True)
+        df = df[df.index >= dt.datetime.today().strftime('%Y-%m-%d')] 
+      
+        if main_df.empty:
+           main_df = df      
+        else:
+           main_df = pd.concat([main_df, df])
+           main_df.reset_index(inplace=True)
+           main_df.set_index(['Data/Hora', 'Ativo'], inplace=True)
+           main_df.drop_duplicates(inplace=True)
+           main_df.reset_index(inplace=True)
+           main_df.set_index('Data/Hora', inplace=True)            
+           main_df.to_pickle(MAIN_DF_FILE)
+           
+           strategy()
 
-         
         time.sleep(1)
 
 def format_date(row):
-   #todo: -02:00
    return row.replace('-03:00','')
 
 def get_data_from_yahoo(ticket, actual_date):
@@ -469,7 +383,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-12-18'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-01'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -511,13 +425,13 @@ def reset(reset_main):
    if reset_main:
       if os.path.exists(MAIN_DF_FILE):
          os.remove(MAIN_DF_FILE)
-      if os.path.exists(PRICE_ALERT):
-         with open(PRICE_ALERT, 'w') as f:
-            json.dump(empty_json, f)      
-
+      if os.path.exists(STATUS_FILE):   
+         os.remove(STATUS_FILE)
+      with open(PRICE_ALERT, 'w') as f:
+         json.dump(empty_json, f)   
+   
     
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
 main()
 #get_data(reset=True)
-
