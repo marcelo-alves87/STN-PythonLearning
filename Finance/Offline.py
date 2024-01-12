@@ -363,17 +363,39 @@ def day_trade(tickers):
     
     mpf.show()
 
+def has_bull_fractal(df1, time):
+   format = '%Y-%m-%d' + ' ' + time +':%S'
+   date = dt.datetime.strptime(df1.index[-1].strftime(format),'%Y-%m-%d %H:%M:%S')
+   try:
+      df1.reset_index(inplace=True)
+      index = df1[df1['Data/Hora'] == date].index[0]   
+      value = df1.iloc[index]['Mínimo']
+      value0 = df1.iloc[index - 2]['Mínimo']
+      value1 = df1.iloc[index - 1]['Mínimo']
+      value2 = df1.iloc[index + 1]['Mínimo']
+      value3 = df1.iloc[index + 2]['Mínimo']
+   except:
+      return False
+   if value0 > value1 and value1 > value and value < value2 and value2 < value3:
+      return True
+   else:
+      return False
+   
 def strategy(main_df):
-    df = main_df[main_df.index.date == main_df.index[-1].date()]
+    #12:15
+    time = '12:30'
+    df = main_df[main_df.index.date == main_df.index[-3].date()]
+    print(main_df.index[-3].date().strftime('%Y-%m-%d'))
     for i,ticket in df['Ativo'].drop_duplicates().items():
         df1 = df[df['Ativo'] == ticket]
         vol = df1['Financeiro'].sum()
-        df1 = df1[df1['Último'] == df1['Último'].min()]
-        if vol >  10**7:
+        
+        #df1 = df1[df1['Último'] == df1['Último'].min()]
+        if has_bull_fractal(df1, time) and vol >  10**7:
             #12' in df1.index.strftime('%H').values and 
-            print(ticket, df1.iloc[0].name.strftime('%H:%M'), format_volume(vol))
+            print(ticket, time, format_volume(vol))
             
-def main(update_tickets=False):
+def main(update_tickets=False): 
     global count
     #date1 = dt.datetime.now().strftime('%Y-%m-%d')
     date1 = '2024-01-10' 
