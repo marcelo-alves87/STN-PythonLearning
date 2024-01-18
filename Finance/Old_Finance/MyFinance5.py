@@ -1,11 +1,14 @@
 import pandas as pd
 import pickle
 import pdb
-
+import os
 def compile_data(start_date = None, end_date = None):
     
-    with open("ibovespatickers.pickle", "rb") as f:
-        tickers = pickle.load(f)
+##    with open("ibovespatickers.pickle", "rb") as f:
+##        tickers = pickle.load(f)
+    tickers = []
+    for file_path in os.listdir('stock_dfs'):
+        tickers.append(file_path.replace('.csv',''))
 
     main_df = pd.DataFrame()
 
@@ -16,7 +19,7 @@ def compile_data(start_date = None, end_date = None):
             
             df = pd.read_csv('stock_dfs/{}.csv'.format(ticker))
 
-            df.set_index('Date', inplace=True)
+            df.set_index('Datetime', inplace=True)
 
             if start_date is not None:
                 df = df.loc[start_date:]
@@ -24,7 +27,7 @@ def compile_data(start_date = None, end_date = None):
             if end_date is not None:
                 df = df.loc[:end_date]    
 
-            df.rename(columns={'Adj Close': ticker}, inplace=True)
+            df.rename(columns={'Close': ticker}, inplace=True)
 
             df = df[[ticker]]
 

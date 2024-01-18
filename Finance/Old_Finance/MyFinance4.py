@@ -57,7 +57,7 @@ def get_data_from_yahoo(tickers = None, interval_days = 30, now = dt.date.today(
         # just in case your connection breaks, we'd like to save our progress!
         if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
             try:
-                df = web.get_data_yahoo(ticker + '.SA', start=start.strftime('%Y-%m-%d'), end=tomorrow.strftime('%Y-%m-%d'), interval='5m')
+                df = web.get_data_yahoo(ticker + '.SA', start=start.strftime('%Y-%m-%d'), end=tomorrow.strftime('%Y-%m-%d'), interval='30m')
                 df.to_csv('stock_dfs/{}.csv'.format(ticker))           
             except:
                 print(ticker,'não foi encontrado')

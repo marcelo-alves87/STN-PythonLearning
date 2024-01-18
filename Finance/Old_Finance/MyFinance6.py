@@ -48,5 +48,5 @@ def visualize_data2():
                 print(('{} e {} fator de correlação: {}').format(index, index1, data1))
     
 
-visualize_data2()
-#list_tickets(10**7)                
+#visualize_data2()
+list_tickets(10**7)                
