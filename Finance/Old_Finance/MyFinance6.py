@@ -16,6 +16,8 @@ def get_volume(ticker):
         df['Datetime'] = df['Datetime'].apply(lambda x: dt.datetime.strptime(x, '%Y-%m-%d %H:%M:%S%z'))
         df = df[df['Datetime'].dt.date ==  df['Datetime'].iloc[-1].date()]
         return df['Volume'].sum()
+    elif 'Date' in df.columns:
+        return int(df['Volume'].mean())
     else:
         return 0
     
