@@ -87,8 +87,8 @@ def verify_alert(name, df_ticket, price_alert):
             for i in range(len(price_alert[name])):
                price = price_alert[name][i]
                if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                    notify(df_ticket.index[-1], name, 'Alert')
-                    price_alert.pop(name) 
+                    notify(df_ticket.index[-1], name, price, 'Alert')
+                    price_alert[name].remove(price) 
                     with open(PRICE_ALERT, 'w') as f:
                        json.dump(price_alert, f)
                     time.sleep(1)   
@@ -104,15 +104,16 @@ def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
    time.sleep(1)
  
-def notify(index, name, type, mode=1):
+def notify(index, name, var, type, mode=1):
    if mode == 1:
+      alert_str = str(index) + ' ' + name + ' ' + '(' + str(var) + ')'
       print('************')
       if type == 'Bullish':
-         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'STRING')
+         color.write(alert_str,'STRING')
       elif type == 'Bearish':
-         color.write(str(index) + ' ' + name + ' ' + '(' + var + ')' + ' ' + type,'COMMENT')
+         color.write(alert_str,'COMMENT')
       elif type == 'Alert':
-         color.write(str(index) + ' ' + name + ' ' + type,'KEYWORD')   
+         color.write(alert_str,'KEYWORD')   
       print('\n************')
       sound_alert()
    else:
