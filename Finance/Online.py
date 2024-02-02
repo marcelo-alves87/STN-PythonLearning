@@ -253,6 +253,7 @@ def do_scraping():
        main_df = pd.read_pickle(MAIN_DF_FILE)    
         
     options_ = webdriver.ChromeOptions()
+    options_.binary_location = "C:\\Users\\55819\\Downloads\\Chrome\\chrome-win64\\chrome-win64\\chrome.exe"
     options_.add_argument("--incognito")
     options_.add_argument("--disable-blink-features=AutomationControlled")
     service = Service(executable_path=r"Utils/chromedriver.exe")
