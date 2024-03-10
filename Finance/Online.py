@@ -18,6 +18,7 @@ import warnings
 import pandas_datareader.data as web
 import shutil
 import yfinance as yfin
+import numpy as np
 
 yfin.pdr_override()
 
@@ -33,6 +34,7 @@ last_ibov_var = None
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 status = {}
+EXTERNAL_JSON = "tradingview-angular-example/src/assets/btc-181123_2006-181124_0105.json"
 
 def get_page_source(driver):
    try :
@@ -93,8 +95,23 @@ def verify_alert(name, df_ticket, price_alert):
                        json.dump(price_alert, f)
                     time.sleep(1)   
                     break   
-        
-   
+           
+      else:
+         volume = df_ticket['Financeiro']['close'][-1]
+         df1 = df_ticket['Último'][-1]
+         df1.reset_index(inplace=True)
+         df1.rename(columns={'Data/Hora': 'time', 'Open' : 'open', 'High' : 'high', 'Low' : 'low', 'Close' : 'close'}, inplace=True)
+         df1['ativo'] = name
+         df1['volume'] = volume
+         with open(EXTERNAL_JSON) as json_file:
+            json1 = json.load(json_file)
+         df = pd.DataFrame.from_dict(json1, orient='records')   
+         df = pd.concat([df, df1])
+         out = df.to_json(orient='records')
+         with open(EXTERNAL_JSON, 'w') as f:
+            f.write(out)   
+         time.sleep(1)
+         
 def save_status():
    with open(STATUS_FILE, 'wb') as handle:
          pickle.dump(status, handle)
@@ -253,7 +270,7 @@ def do_scraping():
        main_df = pd.read_pickle(MAIN_DF_FILE)    
         
     options_ = webdriver.ChromeOptions()
-    options_.binary_location = "C:\\Users\\55819\\Downloads\\Chrome\\chrome-win64\\chrome-win64\\chrome.exe"
+    #options_.binary_location = "C:\\Users\\55819\\Downloads\\Chrome\\chrome-win64\\chrome-win64\\chrome.exe"
     options_.add_argument("--incognito")
     options_.add_argument("--disable-blink-features=AutomationControlled")
     service = Service(executable_path=r"Utils/chromedriver.exe")
@@ -272,9 +289,24 @@ def do_scraping():
     print('Running ...')
     return main_df, driver
 
+def save_csv_data():
+   df = pd.DataFrame()
+   if os.path.exists('stock_dfs'):
+      for file_path in os.listdir('stock_dfs'):
+         name = file_path.replace('.csv','')
+         df1 = pd.read_csv('stock_dfs/{}.csv'.format(name))
+         df1['ativo'] = name
+         df1 = df1.drop(['Unnamed: 0', 'Adj Close'], axis=1)
+         df1.rename(columns={'Datetime': 'time', 'Open' : 'open', 'High' : 'high', 'Low' : 'low', 'Close' : 'close', 'Volume' : 'volume' }, inplace=True)
+         df = pd.concat([df, df1])                  
+   out = df.to_json(orient='records')
+   with open(EXTERNAL_JSON, 'w') as f:
+      f.write(out)   
+
 def main():
     global main_df
-    main_df, driver = do_scraping()  
+    main_df, driver = do_scraping()
+    save_csv_data()
     #insert_tickets(driver)
     while(True):
         
@@ -434,6 +466,8 @@ def reset(reset_main):
    
     
 warnings.simplefilter(action='ignore')
-reset(reset_main=True)
+#reset(reset_main=True)
 main()
 #get_data(reset=True)
+
+
