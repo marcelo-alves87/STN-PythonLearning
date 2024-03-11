@@ -34,7 +34,7 @@ last_ibov_var = None
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 status = {}
-EXTERNAL_JSON = "tradingview-angular-example/src/assets/btc-181123_2006-181124_0105.json"
+EXTERNAL_JSON = "PriceServer/btc-181123_2006-181124_0105.json"
 
 def get_page_source(driver):
    try :
@@ -52,26 +52,28 @@ def get_page_df(driver):
    return df
 
 def strategy():
-    global main_df, status
-    if not main_df.empty:
-        if os.path.exists(STATUS_FILE): 
-           with open(STATUS_FILE, 'rb') as handle:
-              status = pickle.load(handle)
-        if os.path.exists(PRICE_ALERT):       
-           with open (PRICE_ALERT, 'rb') as f:
-              price_alert = json.load(f)
-              
-        groups = main_df.groupby([pd.Grouper(freq='1min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
-                    .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-        groups.reset_index('Data/Hora',inplace=True)
-        for name in groups.index.unique():
-           df_ticket = groups.loc[name][::-1]
-           if name != 'IBOV' and isinstance(df_ticket, pd.Series):
-              #df = update(name)
-              #main_df = pd.concat([df, main_df])
-              pass
-           else:
-              verify_alert(name, df_ticket, price_alert)
+    pdb.set_trace()
+    myjson = { 'time' :  '2024-03-08 19:05:00',\
+               'open' : 42.8,\
+               'high' : 42.9,\
+               'low' : 42.7,\
+               'close' : 42.6,\
+               'volume' : 400,\
+               'ativo' : 'IRBR3' }   
+##         df_ticket.reset_index(inplace=True)
+##         myjson = { 'time' :  df_ticket['Data/Hora'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),\
+##                   'open' : df_ticket['Último']['open'].iloc[-1],\
+##                   'high' : df_ticket['Último']['high'].iloc[-1],\
+##                   'low' : df_ticket['Último']['low'].iloc[-1],\
+##                   'close' : df_ticket['Último']['close'].iloc[-1],\
+##                   'volume' : df_ticket['Financeiro']['close'].iloc[-1],\
+##                    'ativo' : name }
+    with open(EXTERNAL_JSON) as json_file:
+       json1 = json.load(json_file)
+    json1.append(myjson)
+    with open(EXTERNAL_JSON, 'w') as f:
+       json.dump(json1, f)
+    time.sleep(1)
            
 def verify_alert(name, df_ticket, price_alert):
    global last_ibov_var
@@ -97,19 +99,27 @@ def verify_alert(name, df_ticket, price_alert):
                     break   
            
       else:
-         volume = df_ticket['Financeiro']['close'][-1]
-         df1 = df_ticket['Último'][-1]
-         df1.reset_index(inplace=True)
-         df1.rename(columns={'Data/Hora': 'time', 'Open' : 'open', 'High' : 'high', 'Low' : 'low', 'Close' : 'close'}, inplace=True)
-         df1['ativo'] = name
-         df1['volume'] = volume
+         pdb.set_trace()
+         myjson = { 'time' :  df_ticket['Data/Hora'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),\
+                   'open' : df_ticket['Último']['open'].iloc[-1],\
+                   'high' : df_ticket['Último']['high'].iloc[-1],\
+                   'low' : df_ticket['Último']['low'].iloc[-1],\
+                   'close' : df_ticket['Último']['close'].iloc[-1],\
+                   'volume' : df_ticket['Financeiro']['close'].iloc[-1],\
+                    'ativo' : name }   
+##         df_ticket.reset_index(inplace=True)
+##         myjson = { 'time' :  df_ticket['Data/Hora'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),\
+##                   'open' : df_ticket['Último']['open'].iloc[-1],\
+##                   'high' : df_ticket['Último']['high'].iloc[-1],\
+##                   'low' : df_ticket['Último']['low'].iloc[-1],\
+##                   'close' : df_ticket['Último']['close'].iloc[-1],\
+##                   'volume' : df_ticket['Financeiro']['close'].iloc[-1],\
+##                    'ativo' : name }
          with open(EXTERNAL_JSON) as json_file:
             json1 = json.load(json_file)
-         df = pd.DataFrame.from_dict(json1, orient='records')   
-         df = pd.concat([df, df1])
-         out = df.to_json(orient='records')
+         json1.append(myjson)
          with open(EXTERNAL_JSON, 'w') as f:
-            f.write(out)   
+            f.write(str(json1))
          time.sleep(1)
          
 def save_status():
@@ -417,7 +427,7 @@ def update(ticket):
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
    # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2023-11-01'));
+   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2024-01-01'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -466,7 +476,7 @@ def reset(reset_main):
    
     
 warnings.simplefilter(action='ignore')
-#reset(reset_main=True)
+reset(reset_main=True)
 main()
 #get_data(reset=True)
 
