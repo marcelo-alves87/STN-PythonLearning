@@ -6,3 +6,4 @@
 
 # and don't ignore files ending with ".php"
 !*.py
+!server.js
