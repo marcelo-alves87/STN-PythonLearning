@@ -52,28 +52,26 @@ def get_page_df(driver):
    return df
 
 def strategy():
-    pdb.set_trace()
-    myjson = { 'time' :  '2024-03-08 19:05:00',\
-               'open' : 42.8,\
-               'high' : 42.9,\
-               'low' : 42.7,\
-               'close' : 42.6,\
-               'volume' : 400,\
-               'ativo' : 'IRBR3' }   
-##         df_ticket.reset_index(inplace=True)
-##         myjson = { 'time' :  df_ticket['Data/Hora'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),\
-##                   'open' : df_ticket['Último']['open'].iloc[-1],\
-##                   'high' : df_ticket['Último']['high'].iloc[-1],\
-##                   'low' : df_ticket['Último']['low'].iloc[-1],\
-##                   'close' : df_ticket['Último']['close'].iloc[-1],\
-##                   'volume' : df_ticket['Financeiro']['close'].iloc[-1],\
-##                    'ativo' : name }
-    with open(EXTERNAL_JSON) as json_file:
-       json1 = json.load(json_file)
-    json1.append(myjson)
-    with open(EXTERNAL_JSON, 'w') as f:
-       json.dump(json1, f)
-    time.sleep(1)
+    global main_df, status
+    if not main_df.empty:
+        if os.path.exists(STATUS_FILE): 
+           with open(STATUS_FILE, 'rb') as handle:
+              status = pickle.load(handle)
+        if os.path.exists(PRICE_ALERT):       
+           with open (PRICE_ALERT, 'rb') as f:
+              price_alert = json.load(f)
+              
+        groups = main_df.groupby([pd.Grouper(freq='1min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
+                    .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+        groups.reset_index('Data/Hora',inplace=True)
+        for name in groups.index.unique():
+           df_ticket = groups.loc[name][::-1]
+           if name != 'IBOV' and isinstance(df_ticket, pd.Series):
+              #df = update(name)
+              #main_df = pd.concat([df, main_df])
+              pass
+           else:
+              verify_alert(name, df_ticket, price_alert)
            
 def verify_alert(name, df_ticket, price_alert):
    global last_ibov_var
@@ -99,27 +97,19 @@ def verify_alert(name, df_ticket, price_alert):
                     break   
            
       else:
-         pdb.set_trace()
+         df_ticket.reset_index(inplace=True)
          myjson = { 'time' :  df_ticket['Data/Hora'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),\
                    'open' : df_ticket['Último']['open'].iloc[-1],\
                    'high' : df_ticket['Último']['high'].iloc[-1],\
                    'low' : df_ticket['Último']['low'].iloc[-1],\
                    'close' : df_ticket['Último']['close'].iloc[-1],\
                    'volume' : df_ticket['Financeiro']['close'].iloc[-1],\
-                    'ativo' : name }   
-##         df_ticket.reset_index(inplace=True)
-##         myjson = { 'time' :  df_ticket['Data/Hora'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),\
-##                   'open' : df_ticket['Último']['open'].iloc[-1],\
-##                   'high' : df_ticket['Último']['high'].iloc[-1],\
-##                   'low' : df_ticket['Último']['low'].iloc[-1],\
-##                   'close' : df_ticket['Último']['close'].iloc[-1],\
-##                   'volume' : df_ticket['Financeiro']['close'].iloc[-1],\
-##                    'ativo' : name }
+                    'ativo' : name }
          with open(EXTERNAL_JSON) as json_file:
             json1 = json.load(json_file)
          json1.append(myjson)
          with open(EXTERNAL_JSON, 'w') as f:
-            f.write(str(json1))
+            json.dump(json1, f)
          time.sleep(1)
          
 def save_status():
