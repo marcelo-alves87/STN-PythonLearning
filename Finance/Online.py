@@ -61,7 +61,7 @@ def strategy():
            with open (PRICE_ALERT, 'rb') as f:
               price_alert = json.load(f)
               
-        groups = main_df.groupby([pd.Grouper(freq='1min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
+        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
                     .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
         groups.reset_index('Data/Hora',inplace=True)
         for name in groups.index.unique():
