@@ -107,9 +107,26 @@ def verify_alert(name, df_ticket, price_alert):
                     'ativo' : name }
          with open(EXTERNAL_JSON) as json_file:
             json1 = json.load(json_file)
-         json1.append(myjson)
-         with open(EXTERNAL_JSON, 'w') as f:
-            json.dump(json1, f)
+         df = pd.DataFrame(json1)
+         df.set_index('time',inplace=True)
+         df.sort_index(inplace=True)
+         df.reset_index(inplace=True)
+         df = df[df['ativo'] == name]
+         df = df[df['time'] == myjson['time']]
+         if df.empty:
+            json1.append(myjson)
+            with open(EXTERNAL_JSON, 'w') as f:
+               json.dump(json1, f)
+         else:
+            index = df.index[-1]
+            df = pd.DataFrame(json1)
+            df.iloc[index]['high'] = myjson['high']
+            df.iloc[index]['low'] = myjson['low']
+            df.iloc[index]['close'] = myjson['close']
+            df.iloc[index]['volume'] = myjson['volume']
+            json1 = df.to_json(orient='records')            
+            with open(EXTERNAL_JSON, 'w') as f:
+               f.write(json1)
          time.sleep(1)
          
 def save_status():
@@ -307,6 +324,7 @@ def main():
     global main_df
     main_df, driver = do_scraping()
     save_csv_data()
+    pdb.set_trace()
     #insert_tickets(driver)
     while(True):
         

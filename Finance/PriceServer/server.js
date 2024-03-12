@@ -27,13 +27,12 @@ app.get('/btc-181123_2006-181124_0105.json', (req, res) => {
 			return
 		}
 		try {
-			const data = JSON.parse(file)
+			var data = JSON.parse(file);								
 			res.end(JSON.stringify(data));
-			// output the parsed data
-			//console.log(data)
-		} catch (err) {
-			console.error('Error while parsing JSON data:', err)
-		}
+			
+		} catch(err) {
+			res.end();
+		}	
 	})
   
   //res.send('Welcome to my server!');
