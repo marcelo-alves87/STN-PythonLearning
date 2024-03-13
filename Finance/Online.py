@@ -34,6 +34,8 @@ last_ibov_var = None
 FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 status = {}
+price = {}
+tickets = ['PETR4' , 'WEGE3', 'EGIE3']
 EXTERNAL_JSON = "PriceServer/btc-181123_2006-181124_0105.json"
 
 def get_page_source(driver):
@@ -52,82 +54,23 @@ def get_page_df(driver):
    return df
 
 def strategy():
-    global main_df, status
-    if not main_df.empty:
-        if os.path.exists(STATUS_FILE): 
-           with open(STATUS_FILE, 'rb') as handle:
-              status = pickle.load(handle)
-        if os.path.exists(PRICE_ALERT):       
-           with open (PRICE_ALERT, 'rb') as f:
-              price_alert = json.load(f)
-              
-        groups = main_df.groupby([pd.Grouper(freq='5min'), 'Ativo'])['Último', 'Máximo', 'Mínimo', 'Variação', 'Estado Atual', 'Financeiro']\
-                    .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-        groups.reset_index('Data/Hora',inplace=True)
-        for name in groups.index.unique():
-           df_ticket = groups.loc[name][::-1]
-           if name != 'IBOV' and isinstance(df_ticket, pd.Series):
-              #df = update(name)
-              #main_df = pd.concat([df, main_df])
-              pass
-           else:
-              verify_alert(name, df_ticket, price_alert)
-           
-def verify_alert(name, df_ticket, price_alert):
-   global last_ibov_var
-   if isinstance(df_ticket, pd.DataFrame):
-      df_ticket.set_index('Data/Hora',inplace=True)
-      df_ticket.sort_index(inplace=True)
-
-      if name == 'IBOV':
-        last_ibov_var = df_ticket['Variação']['close'][-1]   
-      # if name in price alert it won't be verified the ma cross.
-      elif name in price_alert:
-         if isinstance(price_alert[name], float):
-            price_alert[name] = [price_alert[name]]
-         if isinstance(price_alert[name], list):
-            for i in range(len(price_alert[name])):
-               price = price_alert[name][i]
-               if df_ticket['Último']['high'][-1] >= price and df_ticket['Último']['low'][-1] <= price:              
-                    notify(df_ticket.index[-1], name, price, 'Alert')
-                    price_alert[name].remove(price) 
-                    with open(PRICE_ALERT, 'w') as f:
-                       json.dump(price_alert, f)
-                    time.sleep(1)   
-                    break   
-           
-      else:
-         df_ticket.reset_index(inplace=True)
-         myjson = { 'time' :  df_ticket['Data/Hora'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),\
-                   'open' : df_ticket['Último']['open'].iloc[-1],\
-                   'high' : df_ticket['Último']['high'].iloc[-1],\
-                   'low' : df_ticket['Último']['low'].iloc[-1],\
-                   'close' : df_ticket['Último']['close'].iloc[-1],\
-                   'volume' : df_ticket['Financeiro']['close'].iloc[-1],\
-                    'ativo' : name }
-         with open(EXTERNAL_JSON) as json_file:
-            json1 = json.load(json_file)
-         df = pd.DataFrame(json1)
-         df.set_index('time',inplace=True)
-         df.sort_index(inplace=True)
-         df.reset_index(inplace=True)
-         df = df[df['ativo'] == name]
-         df = df[df['time'] == myjson['time']]
-         if df.empty:
-            json1.append(myjson)
-            with open(EXTERNAL_JSON, 'w') as f:
-               json.dump(json1, f)
-         else:
-            index = df.index[-1]
-            df = pd.DataFrame(json1)
-            df.iloc[index]['high'] = myjson['high']
-            df.iloc[index]['low'] = myjson['low']
-            df.iloc[index]['close'] = myjson['close']
-            df.iloc[index]['volume'] = myjson['volume']
-            json1 = df.to_json(orient='records')            
-            with open(EXTERNAL_JSON, 'w') as f:
-               f.write(json1)
-         time.sleep(1)
+    global main_df
+    for ticket in tickets:
+       if len(main_df[main_df['Ativo'] == ticket]) > 0:
+          series = main_df[main_df['Ativo'] == ticket].iloc[-1]
+          if ticket not in price or (price[ticket] != series['Último']):
+             price[ticket] = series['Último']
+             myjson = { 'time' :  series.name.strftime('%Y-%m-%d %H:%M:%S'),\
+                 'close' : series['Último'],\
+                 'volume' : series['Financeiro'],\
+                 'ativo' : ticket }
+             with open(EXTERNAL_JSON) as json_file:
+                json1 = json.load(json_file)
+             json1.append(myjson)
+             with open(EXTERNAL_JSON, 'w') as f:
+                json.dump(json1, f)
+             time.sleep(0.5)
+             
          
 def save_status():
    with open(STATUS_FILE, 'wb') as handle:
