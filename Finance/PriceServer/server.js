@@ -5,9 +5,9 @@ const path = 'btc-181123_2006-181124_0105.json'
 const app = express();
 const port = 3000;
 
-app.get('/btc-181123_2006-181124_0105.json', (req, res) => {
+app.get('/*.json', (req, res) => {
   // Website you wish to allow to connect
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:4200');
 
     // Request methods you wish to allow
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -17,7 +17,7 @@ app.get('/btc-181123_2006-181124_0105.json', (req, res) => {
 
     // Set to true if you need the website to include cookies in the requests sent
     // to the API (e.g. in case you use sessions)
-    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Credentials', false);
     res.setHeader('Content-Type', 'application/json');
     fs.readFile(path, 'utf8', (err, file) => {
 
