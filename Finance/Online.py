@@ -324,7 +324,6 @@ def main():
     global main_df
     main_df, driver = do_scraping()
     save_csv_data()
-    pdb.set_trace()
     #insert_tickets(driver)
     while(True):
         
