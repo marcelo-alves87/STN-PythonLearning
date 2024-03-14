@@ -57,19 +57,18 @@ def strategy():
     global main_df
     for ticket in tickets:
        if len(main_df[main_df['Ativo'] == ticket]) > 0:
-          series = main_df[main_df['Ativo'] == ticket].iloc[-1]
-          if ticket not in price or (price[ticket] != series['Último']):
-             price[ticket] = series['Último']
-             myjson = { 'time' :  series.name.strftime('%Y-%m-%d %H:%M:%S'),\
+          series = main_df[main_df['Ativo'] == ticket].iloc[-1]          
+          price[ticket] = series['Último']
+          myjson = { 'time' :  series.name.strftime('%Y-%m-%d %H:%M:%S'),\
                  'close' : series['Último'],\
                  'volume' : series['Financeiro'],\
                  'ativo' : ticket }
-             with open(EXTERNAL_JSON) as json_file:
-                json1 = json.load(json_file)
-             json1.append(myjson)
-             with open(EXTERNAL_JSON, 'w') as f:
-                json.dump(json1, f)
-             time.sleep(0.5)
+          with open(EXTERNAL_JSON) as json_file:
+             json1 = json.load(json_file)
+          json1.append(myjson)
+          with open(EXTERNAL_JSON, 'w') as f:
+             json.dump(json1, f)
+          time.sleep(0.5)
              
          
 def save_status():
