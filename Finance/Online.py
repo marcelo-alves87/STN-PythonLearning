@@ -36,7 +36,6 @@ FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 status = {}
 price = {}
-tickets = ['BBAS3' , 'ARZZ3', 'VALE3']
 EXTERNAL_JSON = "PriceServer/btc-181123_2006-181124_0105.json"
 client =  MongoClient("localhost", 27017)
 db = client.mongodb
@@ -59,24 +58,23 @@ def get_page_df(driver):
 
 def strategy():
     global main_df
-    for ticket in tickets:
-       if len(main_df[main_df['Ativo'] == ticket]) > 0:
-          series = main_df[main_df['Ativo'] == ticket].iloc[-1]          
-          price[ticket] = series['Último']
+    group = []
+    for file_path in os.listdir('stock_dfs'):
+       name = file_path.replace('.csv','')
+       if len(main_df[main_df['Ativo'] == name]) > 0:
+          series = main_df[main_df['Ativo'] == name].iloc[-1]          
+          price[name] = series['Último']
           myjson = { 'time' :  series.name.strftime('%Y-%m-%d %H:%M:%S'),\
                      'open' :  series['Último'],\
                      'high' : series['Último'],\
                      'low' :  series['Último'],\
                      'close' : series['Último'],\
                      'volume' : series['Financeiro'],\
-                     'ativo' : ticket }
-          with open(EXTERNAL_JSON) as json_file:
-             json1 = json.load(json_file)
-          json1.append(myjson)
-          with open(EXTERNAL_JSON, 'w') as f:
-             json.dump(json1, f)
-          time.sleep(0.1)
-             
+                     'ativo' : name }
+          group.append(myjson)
+    df = pd.DataFrame(group)
+    df['time'] = pd.to_datetime(df['time'])
+    prices.insert_many(df.to_dict('records'))    
          
 def save_status():
    with open(STATUS_FILE, 'wb') as handle:
@@ -436,6 +434,6 @@ warnings.simplefilter(action='ignore')
 reset(reset_main=True)
 main()
 #get_data(reset=True)
-#remember to change tickets list high above
+
 
 

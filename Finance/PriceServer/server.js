@@ -40,7 +40,6 @@ app.get('/*.json', (req, res) => {
 	}).catch((err) => {
 		console.log(err.Message);
 	})*/
-	
 	collection.find({ ativo : req.query.ativo, time: { $gt : new Date(req.query.time) }  }).sort({time: 1}).toArray().then((data) => {
 		res.end(JSON.stringify(data));
 	}).catch((err) => {
