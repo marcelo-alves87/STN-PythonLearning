@@ -19,6 +19,7 @@ import pandas_datareader.data as web
 import shutil
 import yfinance as yfin
 import numpy as np
+from pymongo import MongoClient
 
 yfin.pdr_override()
 
@@ -35,8 +36,11 @@ FIRST_EMA_LEN = 10
 SECOND_EMA_LEN = 30
 status = {}
 price = {}
-tickets = ['PETR4' , 'WEGE3', 'EGIE3']
+tickets = ['BBAS3' , 'ARZZ3', 'VALE3']
 EXTERNAL_JSON = "PriceServer/btc-181123_2006-181124_0105.json"
+client =  MongoClient("localhost", 27017)
+db = client.mongodb
+prices = db.prices
 
 def get_page_source(driver):
    try :
@@ -60,15 +64,18 @@ def strategy():
           series = main_df[main_df['Ativo'] == ticket].iloc[-1]          
           price[ticket] = series['Último']
           myjson = { 'time' :  series.name.strftime('%Y-%m-%d %H:%M:%S'),\
-                 'close' : series['Último'],\
-                 'volume' : series['Financeiro'],\
-                 'ativo' : ticket }
+                     'open' :  series['Último'],\
+                     'high' : series['Último'],\
+                     'low' :  series['Último'],\
+                     'close' : series['Último'],\
+                     'volume' : series['Financeiro'],\
+                     'ativo' : ticket }
           with open(EXTERNAL_JSON) as json_file:
              json1 = json.load(json_file)
           json1.append(myjson)
           with open(EXTERNAL_JSON, 'w') as f:
              json.dump(json1, f)
-          time.sleep(0.5)
+          time.sleep(0.1)
              
          
 def save_status():
@@ -250,22 +257,23 @@ def do_scraping():
 
 def save_csv_data():
    df = pd.DataFrame()
+   prices.delete_many({})
    if os.path.exists('stock_dfs'):
       for file_path in os.listdir('stock_dfs'):
          name = file_path.replace('.csv','')
          df1 = pd.read_csv('stock_dfs/{}.csv'.format(name))
          df1['ativo'] = name
          df1 = df1.drop(['Unnamed: 0', 'Adj Close'], axis=1)
+         df1['Datetime'] = pd.to_datetime(df1['Datetime'])
          df1.rename(columns={'Datetime': 'time', 'Open' : 'open', 'High' : 'high', 'Low' : 'low', 'Close' : 'close', 'Volume' : 'volume' }, inplace=True)
          df = pd.concat([df, df1])                  
-   out = df.to_json(orient='records')
-   with open(EXTERNAL_JSON, 'w') as f:
-      f.write(out)   
+   prices.insert_many(df.to_dict('records'))      
 
 def main():
     global main_df
     main_df, driver = do_scraping()
     save_csv_data()
+    pdb.set_trace()
     #insert_tickets(driver)
     while(True):
         
@@ -314,7 +322,7 @@ def main():
            
            strategy()
 
-        time.sleep(1)
+        time.sleep(0.1)
 
 def format_date(row):
    return row.replace('-03:00','')
@@ -423,10 +431,11 @@ def reset(reset_main):
       with open(PRICE_ALERT, 'w') as f:
          json.dump(empty_json, f)   
    
-    
+         
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
 main()
 #get_data(reset=True)
+#remember to change tickets list high above
 
 
