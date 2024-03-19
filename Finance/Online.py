@@ -73,8 +73,9 @@ def strategy():
                      'ativo' : name }
           group.append(myjson)
     df = pd.DataFrame(group)
-    df['time'] = pd.to_datetime(df['time'])
-    prices.insert_many(df.to_dict('records'))    
+    if not df.empty and 'time' in df.columns:
+       df['time'] = pd.to_datetime(df['time'])
+       prices.insert_many(df.to_dict('records'))    
          
 def save_status():
    with open(STATUS_FILE, 'wb') as handle:
@@ -271,7 +272,7 @@ def main():
     global main_df
     main_df, driver = do_scraping()
     save_csv_data()
-    #pdb.set_trace()
+    pdb.set_trace()
     #insert_tickets(driver)
     while(True):
         
