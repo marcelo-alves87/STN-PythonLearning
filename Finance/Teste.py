@@ -2,37 +2,10 @@ import pymongo
 from pymongo import MongoClient
 import time
 import datetime as dt
-import pandas as pd
-import pdb
 
 client =  MongoClient("localhost", 27017)
 db = client["mongodb"]
 prices = db["prices"]
-
-
-def reset_data():
-   prices.delete_many({})   
-
-def insert_data(ticket):
-   data = []
-   df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
-   for i,row in df1.iterrows():
-      dt1 = {"time": dt.datetime.strptime(row['Datetime'], '%Y-%m-%d %H:%M:%S'),\
-            "close": row['Close'], "volume": row['Volume'], "ativo": ticket,\
-            "open" : row['Open'], "high" : row['High'], "low" : row['Low']}
-      data.append(dt1)
-   prices.insert_many(data)
-
-def insert_document(ticket, time_str, close, volume):
-   data = {"time": dt.datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S'), \
-        "close": close, "volume": volume, "ativo": ticket ,\
-        "open" : close, "high" : close, "low" : close}   
-   prices.insert_one(data)
-   
-#reset_data()
-#insert_data('ARZZ3')
-insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
-
 
 #prices.insert_one(data)
 #for dt in prices.find():
@@ -41,7 +14,7 @@ insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
 #prices.delete_many({})
 #print(prices.find_one())
 
-#print(list(prices.find().sort({'time':1}).limit(1)))
+print(list(prices.find().sort({'time':1}).limit(1)))
 
 #s = "01/12/2011"
 #time1 = time.mktime(datetime.datetime.strptime(s, "%d/%m/%Y").timetuple())
