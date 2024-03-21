@@ -37,9 +37,9 @@ def insert_document(ticket, date, sleep):
       prices.insert_one(dt1)
       time.sleep(sleep)
       
-#reset_data()
-#insert_data('VIVT3', '2024-03-12')
-insert_document('VIVT3', '2024-03-13', 5)
+reset_data()
+insert_data('ARZZ3', '2024-03-19')
+#insert_document('VIVT3', '2024-03-13', 2.5)
 
 
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
