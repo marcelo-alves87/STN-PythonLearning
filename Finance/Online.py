@@ -20,19 +20,26 @@ import shutil
 import yfinance as yfin
 import numpy as np
 from pymongo import MongoClient
-import threading
 
 yfin.pdr_override()
 
+# inter ma alert
+
 MAIN_DF_FILE = 'main_df.pickle'
+STATUS_FILE = 'status.pickle'
+PRICE_ALERT = 'Price_Alert.txt'
 URL = "https://rico.com.vc/"
+color = sys.stdout.shell
 last_date = None
 last_ibov_var = None
+FIRST_EMA_LEN = 10
+SECOND_EMA_LEN = 30
+status = {}
+price = {}
+EXTERNAL_JSON = "PriceServer/btc-181123_2006-181124_0105.json"
 client =  MongoClient("localhost", 27017)
 db = client.mongodb
 prices = db.prices
-dict = {}
-x = None
 
 def get_page_source(driver):
    try :
@@ -49,43 +56,14 @@ def get_page_df(driver):
    df.dropna(inplace=True)
    return df
 
-def check_alert_(ticket, time, open, high, low, close):
-   if ticket not in dict or dict[ticket] < time:            
-      if (low == open and high > close and close > open) or\
-          (high == open and low < close and close < open):
-              dict[ticket] = time
-              print('{} at {}'.format(ticket, time))
-              sound_alert()
-
-def check_alert(df):
-    global dict
-    df.reset_index(inplace=True)
-    df = df[['time', 'ativo', 'close']]
-    if isinstance(df, pd.DataFrame):
-        df.set_index('time', inplace=True)
-        df = df[df.index.date == dt.datetime.now().date()]
-        groups = df.groupby([pd.Grouper(freq='5min'), 'ativo'])\
-                        .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
-        groups.reset_index('time',inplace=True)
-        for name in groups.index.unique():
-            df_ticket = groups.loc[name][::-1]
-            if not df_ticket.empty and isinstance(df_ticket, pd.Series):
-                check_alert_(name, df_ticket['time'][0], df_ticket['close']['open'],\
-                            df_ticket['close']['high'],df_ticket['close']['low'],\
-                            df_ticket['close']['close'])
-            elif not df_ticket.empty and isinstance(df_ticket, pd.DataFrame):
-                pdb.set_trace()
-                #df_ticket.set_index('time',inplace=True)
-                #df_ticket.sort_index(inplace=True)                
-                #check_alert(name, df_ticket['close'].iloc[-1])
-
 def strategy():
-    global main_df, x
+    global main_df
     group = []
     for file_path in os.listdir('stock_dfs'):
        name = file_path.replace('.csv','')
        if len(main_df[main_df['Ativo'] == name]) > 0:
-          series = main_df[main_df['Ativo'] == name].iloc[-1]                    
+          series = main_df[main_df['Ativo'] == name].iloc[-1]          
+          price[name] = series['Último']
           myjson = { 'time' :  series.name.strftime('%Y-%m-%d %H:%M:%S'),\
                      'open' :  series['Último'],\
                      'high' : series['Último'],\
@@ -97,14 +75,31 @@ def strategy():
     df = pd.DataFrame(group)
     if not df.empty and 'time' in df.columns:
        df['time'] = pd.to_datetime(df['time'])
-       prices.insert_many(df.to_dict('records'))       
-       if not (isinstance(x, threading.Thread) and x.isAlive()):
-          x = threading.Thread(target=check_alert, args=(df,))
-          x.start()
-       
+       prices.insert_many(df.to_dict('records'))    
+         
+def save_status():
+   with open(STATUS_FILE, 'wb') as handle:
+         pickle.dump(status, handle)
+   time.sleep(1)
+   
 def sound_alert():
    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
-   time.sleep(1) 
+   time.sleep(1)
+ 
+def notify(index, name, var, type, mode=1):
+   if mode == 1:
+      alert_str = str(index) + ' ' + name + ' ' + '(' + str(var) + ')'
+      print('************')
+      if type == 'Bullish':
+         color.write(alert_str,'STRING')
+      elif type == 'Bearish':
+         color.write(alert_str,'COMMENT')
+      elif type == 'Alert':
+         color.write(alert_str,'KEYWORD')   
+      print('\n************')
+      sound_alert()
+   else:
+      print("{} -> {} ({}) is {}".format(index, name, var, type))
    
 def handle_finance(row):   
    if isinstance(row, float):
@@ -429,14 +424,17 @@ def reset(reset_main):
    empty_json = {}
    if reset_main:
       if os.path.exists(MAIN_DF_FILE):
-         os.remove(MAIN_DF_FILE)      
-      
+         os.remove(MAIN_DF_FILE)
+      if os.path.exists(STATUS_FILE):   
+         os.remove(STATUS_FILE)
+      with open(PRICE_ALERT, 'w') as f:
+         json.dump(empty_json, f)   
    
          
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
 main()
-#get_data(reset=False)
+#get_data(reset=True)
 
 
 
