@@ -13,10 +13,10 @@ prices = db["prices"]
 def reset_data():
    prices.delete_many({})   
 
-def insert_data(ticket, date):
+def insert_data(ticket, date, shift=0):
    data = []
    df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
-   df1['Datetime'] = pd.to_datetime(df1['Datetime'])
+   df1['Datetime'] = pd.to_datetime(df1['Datetime']) + dt.timedelta(days=shift)
    df1 = df1[df1['Datetime'].dt.date <= pd.to_datetime(date).date()]
    for i,row in df1.iterrows():
       dt1 = {"time": dt.datetime.strptime(str(row['Datetime']), '%Y-%m-%d %H:%M:%S'),\
@@ -25,23 +25,22 @@ def insert_data(ticket, date):
       data.append(dt1)
    prices.insert_many(data)
 
-def insert_document(ticket, date, sleep, add=0):
+def insert_document(ticket, date, sleep):
     data = []
     df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
     df1['Datetime'] = pd.to_datetime(df1['Datetime'])
     df1 = df1[df1['Datetime'].dt.date == pd.to_datetime(date).date()]
     for i,row in df1.iterrows():
       date = dt.datetime.strptime(str(row['Datetime']), '%Y-%m-%d %H:%M:%S')
-      date += dt.timedelta(days=add)      
       dt1 = {"time": date,\
             "close": row['Close'], "volume": row['Volume'], "ativo": ticket,\
             "open" : row['Open'], "high" : row['High'], "low" : row['Low']}
       prices.insert_one(dt1)
       time.sleep(sleep)
       
-reset_data()
-insert_data('VIVT3', '2024-03-08')
-#insert_document('VIVT3', '2024-03-08', 2.5, 3)
+#reset_data()
+#insert_data('BBAS3', '2024-03-25', -1)
+insert_document('BBAS3', '2024-03-25', 2.5)
 
 
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
