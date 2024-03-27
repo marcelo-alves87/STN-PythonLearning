@@ -7,6 +7,7 @@ import pdb
 import pickle
 import winsound
 import os
+import shutil
 
 dict = {}
     
@@ -25,7 +26,8 @@ def check_alert(ticket, df):
 while (True):
     if os.path.exists('main_df.pickle'):
        try:
-          df = pd.read_pickle('main_df.pickle')
+          shutil.copyfile('main_df.pickle', 'main_df2.pickle')
+          df = pd.read_pickle('main_df2.pickle')
        except:
           df = pd.DataFrame()
        if not df.empty and not 'Preço Teórico' in df.columns:
