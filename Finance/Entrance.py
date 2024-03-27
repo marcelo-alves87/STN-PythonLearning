@@ -24,8 +24,11 @@ def check_alert(ticket, df):
 
 while (True):
     if os.path.exists('main_df.pickle'):
-       df = pd.read_pickle('main_df.pickle')
-       if not 'Preço Teórico' in df.columns:
+       try:
+          df = pd.read_pickle('main_df.pickle')
+       except:
+          df = pd.DataFrame()
+       if not df.empty and not 'Preço Teórico' in df.columns:
            df.reset_index(inplace=True)
            df = df[['Data/Hora', 'Ativo', 'Último']]
            if isinstance(df, pd.DataFrame):
