@@ -16,8 +16,10 @@ def reset_data():
 def insert_data(ticket, date, shift=0):
    data = []
    df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
-   df1['Datetime'] = pd.to_datetime(df1['Datetime']) + dt.timedelta(days=shift)
+   pdb.set_trace()
+   df1['Datetime'] = pd.to_datetime(df1['Datetime'])
    df1 = df1[df1['Datetime'].dt.date <= pd.to_datetime(date).date()]
+   df1['Datetime'] += dt.timedelta(days=shift)
    for i,row in df1.iterrows():
       dt1 = {"time": dt.datetime.strptime(str(row['Datetime']), '%Y-%m-%d %H:%M:%S'),\
             "close": row['Close'], "volume": row['Volume'], "ativo": ticket,\
@@ -39,8 +41,8 @@ def insert_document(ticket, date, sleep):
       time.sleep(sleep)
       
 #reset_data()
-#insert_data('BBAS3', '2024-03-25', -1)
-insert_document('BBAS3', '2024-03-25', 2.5)
+#insert_data('RENT3', '2024-03-25', -1)
+insert_document('RENT3', '2024-03-25', 2.5)
 
 
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
