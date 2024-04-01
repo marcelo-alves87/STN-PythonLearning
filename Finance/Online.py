@@ -326,29 +326,6 @@ def main():
 def format_date(row):
    return row.replace('-03:00','')
 
-def get_data_from_yahoo(ticket, actual_date):
-   
-   if not os.path.exists('stock_dfs'):
-      os.makedirs('stock_dfs')
-   start_date = actual_date - dt.timedelta(days=3)   
-   end_date = actual_date + dt.timedelta(days=1)   
-   # just in case your connection breaks, we'd like to save our progress!
-   if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
-      try:
-         ticket = format_ticket(ticket)
-         print('{}'.format(ticket))
-         df = web.get_data_yahoo(ticket + '.SA', start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval="5m")
-         df.reset_index(inplace=True)
-         df['Datetime'] = df['Datetime'].astype(str)
-         df['Datetime'] = df['Datetime'].apply(lambda row : format_date(row))
-         df['Datetime'] = pd.to_datetime(df['Datetime'])
-         df = df[df['Datetime'] <= actual_date]
-         df.to_csv('stock_dfs/{}.csv'.format(ticket))           
-      except:
-         print(ticket,'not found')
-   else:
-      print('Already have {}'.format(ticket))
-
 def update(ticket):
    
    data = []
@@ -382,8 +359,8 @@ def update(ticket):
 
 def get_data(reset):
    #addPriceSerieEntityByDataSerieHistory
-   # 5 min
-   # mydata = t.filter((item) => item.dtDateTime >=  new Date('2024-01-01'));
+   # 1 min
+   # mydata = t.filter((item) => item.dtDateTime <  new Date('2024-04-01'));
 
    if reset and os.path.exists('stock_dfs'):
       shutil.rmtree('stock_dfs')      
@@ -433,8 +410,8 @@ def reset(reset_main):
          
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
-main()
-#get_data(reset=True)
+#main()
+get_data(reset=True)
 
 
 

@@ -9,7 +9,7 @@ import pdb
 
 start = '10:00'
 period = 5
-module = 28800
+module = 27000
 
 def fibonnaci(x):
     if x == 0 or x == 1:
@@ -39,12 +39,12 @@ def sequence(date, verbose=True):
 
 def levels(date, index1):
     dict = sequence(date, False)
-    LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
+    LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 1, 1.618, 2.618]
     for i in LEVELS:
         k = calculate(date, i*index1)
         print('{} -> {}'.format(i, k.strftime('%H:%M')))
 
-date = '15:35'        
+date = '10:30'        
 #sequence(date)
 levels(date, 55)
 
