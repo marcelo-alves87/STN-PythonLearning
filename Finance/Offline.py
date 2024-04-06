@@ -7,12 +7,14 @@ import pdb
 import os
 import yfinance as yfin
 import pandas_datareader.data as web
+from threading import Thread
 
 yfin.pdr_override()
 
 client =  MongoClient("localhost", 27017)
 db = client["mongodb"]
 prices = db["prices"]
+tickets = ['PRIO3','ITUB4', 'HYPE3', 'EGIE3']
 
 def get_data_from_yahoo(tickets, start_date, end_date):
    
@@ -70,11 +72,12 @@ def insert_data(ticket, date, shift=0, resample_=False):
       data.append(dt1)
    prices.insert_many(data)
 
-def insert_document(ticket, date, sleep, resample_=False):
+def insert_document(ticket, date, sleep, resample_=False, shift=0):
     data = []
     df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
     df1['Datetime'] = pd.to_datetime(df1['Datetime'])
     df1 = df1[df1['Datetime'].dt.date == pd.to_datetime(date).date()]
+    df1['Datetime'] += dt.timedelta(days=shift)
     if resample_:
        df1 = resample(ticket, df1)
     for i,row in df1.iterrows():
@@ -86,12 +89,23 @@ def insert_document(ticket, date, sleep, resample_=False):
       time.sleep(sleep)
 
 #get_data_from_yahoo(['ARZZ3','BBAS3', 'ELET6', 'PETR3', 'PETR4', 'RENT3', 'SUZB3', 'VALE3', 'VIVT3'], '2024-03-25', '2024-03-31')
-reset_data()
-#insert_data('ARZZ3', '2024-03-29', 0, True)
-#for i in range(6):
-#  insert_data('ARZZ3', '2024-03-29', -i, True)
-#  time.sleep(1)
-insert_document('ARZZ3', '2024-04-01', 2.5, True)
+#reset_data()
+#for ticket in tickets:      
+#   insert_data(ticket, '2024-04-04')
+#   time.sleep(.5)
+#for ticket in tickets:      
+#   for i in range(1,5):
+#      insert_data(ticket, '2024-04-04', -i, True)
+#      time.sleep(.5)
+
+for i in range(len(tickets)):
+   input('Next {} ...'.format(tickets[i]))
+   insert_document(tickets[i], '2024-04-05', 7, True)
+   
+
+#for ticket in tickets:
+#    t = Thread(target=insert_document, args=(ticket, '2024-04-04', 2.5, False, 0))
+#    t.start()
 
 #insert_document('RENT3', '2024-03-26', 2.5)
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
