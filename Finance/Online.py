@@ -270,8 +270,7 @@ def save_csv_data():
 
 def main():
     global main_df
-    main_df, driver = do_scraping()
-    save_csv_data()
+    main_df, driver = do_scraping()    
     #pdb.set_trace()
     #insert_tickets(driver)
     while(True):
@@ -396,7 +395,9 @@ def get_data(reset):
          if not os.path.exists('stock_dfs'):
             os.makedirs('stock_dfs')
          df.to_csv('stock_dfs/{}.csv'.format(ticket))           
-
+   time.sleep(1)
+   save_csv_data()
+   
 def reset(reset_main):
    empty_json = {}
    if reset_main:
