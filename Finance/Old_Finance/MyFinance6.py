@@ -15,7 +15,7 @@ def get_details(ticker):
     if 'Datetime' in df.columns:
         df['Datetime'] = df['Datetime'].apply(lambda x: dt.datetime.strptime(x, '%Y-%m-%d %H:%M:%S%z'))
         df = df[df['Datetime'].dt.date ==  df['Datetime'].iloc[-1].date()]
-        return [df['Close'][0],df['Volume'].sum()]
+        return [df['Close'].iloc[0],df['Volume'].sum()]
     elif 'Date' in df.columns:
         return [df['Close'][0],int(df['Volume'].mean())]
     else:
