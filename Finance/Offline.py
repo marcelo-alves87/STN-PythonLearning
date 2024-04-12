@@ -14,10 +14,10 @@ yfin.pdr_override()
 client =  MongoClient("localhost", 27017)
 db = client["mongodb"]
 prices = db["prices"]
-tickets = ['PRIO3','ITUB4', 'HYPE3', 'EGIE3']
+tickets = ['SBSP3', 'VALE3', 'SUZB3', 'BBAS3', 'ARZZ3', 'RENT3']
 
-def get_data_from_yahoo(tickets, start_date, end_date):
-   
+def get_data_from_yahoo(start_date, end_date):
+   global tickets
    if not os.path.exists('stock_dfs'):
       os.makedirs('stock_dfs')
    for ticket in tickets:   
@@ -88,19 +88,19 @@ def insert_document(ticket, date, sleep, resample_=False, shift=0):
       prices.insert_one(dt1)
       time.sleep(sleep)
 
-#get_data_from_yahoo(['ARZZ3','BBAS3', 'ELET6', 'PETR3', 'PETR4', 'RENT3', 'SUZB3', 'VALE3', 'VIVT3'], '2024-03-25', '2024-03-31')
+get_data_from_yahoo('2024-04-04', '2024-04-11')
 #reset_data()
 #for ticket in tickets:      
-#   insert_data(ticket, '2024-04-04')
+#   insert_data(ticket, '2024-04-11')
 #   time.sleep(.5)
 #for ticket in tickets:      
 #   for i in range(1,5):
-#      insert_data(ticket, '2024-04-04', -i, True)
+#      insert_data(ticket, '2024-04-09', -i, True)
 #      time.sleep(.5)
 
-for i in range(len(tickets)):
-   input('Next {} ...'.format(tickets[i]))
-   insert_document(tickets[i], '2024-04-05', 7, True)
+#for i in range(len(tickets)):
+#   input('Next {} ...'.format(tickets[i]))
+#   insert_document(tickets[i], '2024-04-09', 7, True, 0)
    
 
 #for ticket in tickets:
