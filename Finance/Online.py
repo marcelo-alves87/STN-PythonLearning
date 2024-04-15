@@ -369,7 +369,7 @@ def get_data(reset):
    main_df = get_all_tickets_status(driver)
    tickets = main_df['Ativo'].values
    for ticket in tickets:
-      if ticket != 'IBOV' and not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
+      if ticket != 'IBOV':
          input('Waiting for mydata of {} ...'.format(ticket))
          length = driver.execute_script("return mydata.length")
          data = []
@@ -394,7 +394,13 @@ def get_data(reset):
          df['Datetime'] = df['Datetime'] - dt.timedelta(hours = 3)
          if not os.path.exists('stock_dfs'):
             os.makedirs('stock_dfs')
-         df.to_csv('stock_dfs/{}.csv'.format(ticket))           
+         if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
+            df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
+            df1 = df1[['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']]
+            df = pd.concat([df1, df])
+            df.to_csv('stock_dfs/{}.csv'.format(ticket), mode='w+')           
+         else:
+            df.to_csv('stock_dfs/{}.csv'.format(ticket))           
    time.sleep(1)
    save_csv_data()
    
@@ -412,7 +418,7 @@ def reset(reset_main):
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
 #main()
-get_data(reset=True)
+get_data(reset=False)
 
 
 
