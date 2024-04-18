@@ -14,7 +14,7 @@ yfin.pdr_override()
 client =  MongoClient("localhost", 27017)
 db = client["mongodb"]
 prices = db["prices"]
-tickets = ['SBSP3', 'VALE3', 'SUZB3', 'BBAS3', 'ARZZ3', 'RENT3']
+tickets = ['ELET3', 'EMBR3', 'VALE3', 'VIVT3']
 
 def get_data_from_yahoo(start_date, end_date):
    global tickets
@@ -88,14 +88,37 @@ def insert_document(ticket, date, sleep, resample_=False, shift=0):
       prices.insert_one(dt1)
       time.sleep(sleep)
 
-get_data_from_yahoo('2024-04-04', '2024-04-11')
+
+def resample_database():
+   list1 = []
+   data = list(prices.find({}).sort({'time':1}))
+   df = pd.DataFrame(data)
+   for i,item in df['ativo'].drop_duplicates().items():
+      df1 = df[df['ativo'] == item][['time','open','high','low','close','volume', 'ativo']]
+      df1.set_index('time', inplace=True)
+      groups = df1.groupby([pd.Grouper(freq='5min')])\
+                    .agg([('open','first'),('high', 'max'),('low','min'),('close','last')])
+      groups.reset_index('time',inplace=True)
+      groups.dropna(inplace=True)
+      for i,row in groups.iterrows():         
+         date = dt.datetime.strptime(str(row['time'][0]), '%Y-%m-%d %H:%M:%S')         
+         dt1 = {"time": date,\
+                "close": row['close']['close'], "volume": row['volume']['close'],\
+                "ativo": row['ativo']['close'], "open" : row['open']['open'],\
+                "high": row['high']['high'], 'low': row['low']['low']}         
+         list1.append(dt1)
+   reset_data()
+   prices.insert_many(list1)
+   
+resample_database()
+#get_data_from_yahoo('2024-04-10', '2024-04-17')
 #reset_data()
 #for ticket in tickets:      
 #   insert_data(ticket, '2024-04-11')
 #   time.sleep(.5)
-#for ticket in tickets:      
-#   for i in range(1,5):
-#      insert_data(ticket, '2024-04-09', -i, True)
+#for ticket in ['EMBR3']:      
+#   for i in range(5):
+#      insert_data(ticket, '2024-04-15', -i, True)
 #      time.sleep(.5)
 
 #for i in range(len(tickets)):
@@ -107,7 +130,8 @@ get_data_from_yahoo('2024-04-04', '2024-04-11')
 #    t = Thread(target=insert_document, args=(ticket, '2024-04-04', 2.5, False, 0))
 #    t.start()
 
-#insert_document('RENT3', '2024-03-26', 2.5)
+#insert_data('VIVT3', '2024-04-15', 0, True)
+#insert_document('VIVT3', '2024-04-16', 2.5, True)
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
 
 
