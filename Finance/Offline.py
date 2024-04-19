@@ -14,7 +14,15 @@ yfin.pdr_override()
 client =  MongoClient("localhost", 27017)
 db = client["mongodb"]
 prices = db["prices"]
-tickets = ['ELET3', 'EMBR3', 'VALE3', 'VIVT3']
+tickets = ['SBSP3', 'VALE3', 'SUZB3', 'BBAS3', 'ARZZ3', 'RENT3', 'PRIO3', 'VIVT3']
+
+def get_open_price(ticket, date_str):
+   df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
+   df1['Datetime'] = pd.to_datetime(df1['Datetime'])
+   df1 = df1[df1['Datetime'].dt.date == pd.to_datetime(date_str).date()]
+   if not df1.empty:      
+      print(df1['Open'].iloc[0])   
+   
 
 def get_data_from_yahoo(start_date, end_date):
    global tickets
@@ -110,13 +118,13 @@ def resample_database():
    reset_data()
    prices.insert_many(list1)
    
-resample_database()
-#get_data_from_yahoo('2024-04-10', '2024-04-17')
+#resample_database()
+#get_data_from_yahoo('2024-04-15', '2024-04-20')
 #reset_data()
 #for ticket in tickets:      
 #   insert_data(ticket, '2024-04-11')
 #   time.sleep(.5)
-#for ticket in ['EMBR3']:      
+#for ticket in tickets:      
 #   for i in range(5):
 #      insert_data(ticket, '2024-04-15', -i, True)
 #      time.sleep(.5)
@@ -130,8 +138,9 @@ resample_database()
 #    t = Thread(target=insert_document, args=(ticket, '2024-04-04', 2.5, False, 0))
 #    t.start()
 
-#insert_data('VIVT3', '2024-04-15', 0, True)
-#insert_document('VIVT3', '2024-04-16', 2.5, True)
+get_open_price('VIVT3', '2024-04-19')
+#insert_data('VIVT3', '2024-04-18', 0, True)
+#insert_document('SUZB3', '2024-04-16', 2.5, False)
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
 
 
