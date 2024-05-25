@@ -126,18 +126,33 @@ def delete_ticket_time(ticket, time):
    #time = "2024-05-21 11:34:00"
    while True:
       prices.delete_many({'ativo' : ticket, 'time' : { '$gt' : dt.datetime.strptime(time, '%Y-%m-%d %H:%M:%S')}})
-      time.sleep(1) 
-   
+      time.sleep(1)
+
+def concat_both_csv():
+   for ticket in tickets:  
+      df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket)) #5min
+      df2 = pd.read_csv('stock_dfs_/{}.csv'.format(ticket)) #1min
+      df1 = df1[['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume']]
+      df2 = df2[['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume']]
+      df1['Datetime'] = pd.to_datetime(df1['Datetime'])
+      df2['Datetime'] = pd.to_datetime(df2['Datetime'])
+      df1.set_index('Datetime', inplace=True)
+      df2.set_index('Datetime', inplace=True)      
+      df3 = pd.concat([df1[df1.index < df2.index[0]], df2])
+      df3.to_csv('stock_dfs__/{}.csv'.format(ticket))  
+
+concat_both_csv()      
+    
 #resample_database()
    
-#get_data_from_yahoo('2024-05-17', '2024-05-25')
+#get_data_from_yahoo('2024-05-20', '2024-05-22')
 #reset_data()
 #for ticket in tickets:      
 #   insert_data(ticket, '2024-05-07')
 #   time.sleep(.5)
 #for ticket in tickets:      
 #   for i in range(5):
-#      insert_data(ticket, '2024-05-17', -i, True)
+#      insert_data(ticket, '2024-05-22', -i, True)
 #      time.sleep(.5)
 
 #   insert_data(ticket, '2024-05-07', 0, True)
@@ -152,8 +167,8 @@ def delete_ticket_time(ticket, time):
 #    t.start()
 
 #get_open_price('RENT3', '2024-05-03')
-#insert_data('VALE3', '2024-05-16', 0, True)
-#insert_document('VALE3', '2024-05-17 12:40', sleep=2.5)
+#insert_data('SBSP3', '2024-05-23', 0, True)
+#insert_document('SBSP3', '2024-05-24 14:55', sleep=2.5, resample_=False)
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
 
 
