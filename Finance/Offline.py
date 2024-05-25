@@ -14,7 +14,7 @@ yfin.pdr_override()
 client =  MongoClient("localhost", 27017)
 db = client["mongodb"]
 prices = db["prices"]
-tickets = ['SBSP3', 'VALE3', 'SUZB3', 'BBAS3', 'ARZZ3', 'RENT3', 'PRIO3', 'VIVT3']
+tickets = ['SBSP3','VALE3', 'ARZZ3', 'RENT3']
 
 def get_open_price(ticket, date_str):
    df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
@@ -33,7 +33,7 @@ def get_data_from_yahoo(start_date, end_date):
       if not os.path.exists('stock_dfs/{}.csv'.format(ticket)):
          
          print('{}'.format(ticket))
-         df = web.get_data_yahoo(ticket + '.SA', start=start_date, end=end_date, interval="1m")
+         df = web.get_data_yahoo(ticket + '.SA', start=start_date, end=end_date, interval="5m")
          if not df.empty:
             df.reset_index(inplace=True)
             df['Datetime'] = df['Datetime'].astype(str)
@@ -80,11 +80,14 @@ def insert_data(ticket, date, shift=0, resample_=False):
       data.append(dt1)
    prices.insert_many(data)
 
-def insert_document(ticket, date, sleep, resample_=False, shift=0):
+def insert_document(ticket, from_date, to_date=None,sleep=0, resample_=False, shift=0):
     data = []
     df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
     df1['Datetime'] = pd.to_datetime(df1['Datetime'])
-    df1 = df1[df1['Datetime'].dt.date == pd.to_datetime(date).date()]
+    df1 = df1[df1['Datetime'] >= pd.to_datetime(from_date)]
+    df1 = df1[df1['Datetime'].dt.date <= pd.to_datetime(from_date).date()]
+    if to_date != None:
+       df1 = df1[df1['Datetime'] <= pd.to_datetime(to_date)]      
     df1['Datetime'] += dt.timedelta(days=shift)
     if resample_:
        df1 = resample(ticket, df1)
@@ -117,18 +120,28 @@ def resample_database():
          list1.append(dt1)
    reset_data()
    prices.insert_many(list1)
+
+def delete_ticket_time(ticket, time):
+   #ticket = 'SBSP3'
+   #time = "2024-05-21 11:34:00"
+   while True:
+      prices.delete_many({'ativo' : ticket, 'time' : { '$gt' : dt.datetime.strptime(time, '%Y-%m-%d %H:%M:%S')}})
+      time.sleep(1) 
    
 #resample_database()
-#get_data_from_yahoo('2024-04-15', '2024-04-20')
+   
+#get_data_from_yahoo('2024-05-17', '2024-05-25')
 #reset_data()
 #for ticket in tickets:      
-#   insert_data(ticket, '2024-04-11')
+#   insert_data(ticket, '2024-05-07')
 #   time.sleep(.5)
 #for ticket in tickets:      
 #   for i in range(5):
-#      insert_data(ticket, '2024-04-15', -i, True)
+#      insert_data(ticket, '2024-05-17', -i, True)
 #      time.sleep(.5)
 
+#   insert_data(ticket, '2024-05-07', 0, True)
+#   time.sleep(.5)
 #for i in range(len(tickets)):
 #   input('Next {} ...'.format(tickets[i]))
 #   insert_document(tickets[i], '2024-04-09', 7, True, 0)
@@ -138,9 +151,9 @@ def resample_database():
 #    t = Thread(target=insert_document, args=(ticket, '2024-04-04', 2.5, False, 0))
 #    t.start()
 
-get_open_price('VIVT3', '2024-04-19')
-#insert_data('VIVT3', '2024-04-18', 0, True)
-#insert_document('SUZB3', '2024-04-16', 2.5, False)
+#get_open_price('RENT3', '2024-05-03')
+#insert_data('VALE3', '2024-05-16', 0, True)
+#insert_document('VALE3', '2024-05-17 12:40', sleep=2.5)
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
 
 
