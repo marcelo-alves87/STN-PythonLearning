@@ -1,15 +1,13 @@
 import datetime as dt
 import pdb
 
-# 27000 7 horas e 30 minutos
-# 27900 7 horas e 45 minutos
-# 28200 7 horas e 50 minutos
-# 28500 7 horas e 55 minutos
-# 28800 8 horas
+#6 horas + 50 minutos + 17:30
+#21600  + 3000 seg + 60 = 24660
 
 start = '10:00'
 period = 5
-module = 27000
+module = 24660
+
 
 def fibonnaci(x):
     if x == 0 or x == 1:
@@ -44,8 +42,8 @@ def levels(date, index1):
         k = calculate(date, i*index1)
         print('{} -> {}'.format(i, k.strftime('%H:%M')))
 
-date = '10:30'        
+#date = '10:35'        
 #sequence(date)
-levels(date, 55)
+#levels(date, 55)
 
- 
+

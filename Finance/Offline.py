@@ -14,7 +14,7 @@ yfin.pdr_override()
 client =  MongoClient("localhost", 27017)
 db = client["mongodb"]
 prices = db["prices"]
-tickets = ['SBSP3','VALE3', 'ARZZ3', 'RENT3']
+tickets = ['SBSP3', 'ENGI11']
 
 def get_open_price(ticket, date_str):
    df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
@@ -121,40 +121,42 @@ def resample_database():
    reset_data()
    prices.insert_many(list1)
 
-def delete_ticket_time(ticket, time):
+def delete_ticket_time(ticket, time1):
    #ticket = 'SBSP3'
    #time = "2024-05-21 11:34:00"
    while True:
-      prices.delete_many({'ativo' : ticket, 'time' : { '$gt' : dt.datetime.strptime(time, '%Y-%m-%d %H:%M:%S')}})
+      prices.delete_many({'ativo' : ticket, 'time' : { '$gt' : dt.datetime.strptime(time1, '%Y-%m-%d %H:%M:%S')}})
       time.sleep(1)
 
 def concat_both_csv():
    for ticket in tickets:  
-      df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket)) #5min
-      df2 = pd.read_csv('stock_dfs_/{}.csv'.format(ticket)) #1min
+      df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket)) #original
+      df2 = pd.read_csv('stock_dfs/{}_.csv'.format(ticket)) #modified
       df1 = df1[['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume']]
       df2 = df2[['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume']]
       df1['Datetime'] = pd.to_datetime(df1['Datetime'])
       df2['Datetime'] = pd.to_datetime(df2['Datetime'])
       df1.set_index('Datetime', inplace=True)
       df2.set_index('Datetime', inplace=True)      
-      df3 = pd.concat([df1[df1.index < df2.index[0]], df2])
-      df3.to_csv('stock_dfs__/{}.csv'.format(ticket))  
+      df3 = pd.concat([df2[df2.index < df1.index[0]], df1])
+      df3.to_csv('stock_dfs/{}__.csv'.format(ticket))
 
-concat_both_csv()      
-    
-#resample_database()
-   
-#get_data_from_yahoo('2024-05-20', '2024-05-22')
+
+
+#prices.delete_many({'time' : { '$gt' : dt.datetime.strptime('2024-06-16', '%Y-%m-%d')}})
+
+#delete_ticket_time('SBSP3', '2024-05-28 10:27:00')
+#concat_both_csv()          
+resample_database()   
+#get_data_from_yahoo('2024-05-01', '2024-06-03')
 #reset_data()
 #for ticket in tickets:      
-#   insert_data(ticket, '2024-05-07')
+#   insert_data(ticket, '2024-06-13', resample_=False)
 #   time.sleep(.5)
-#for ticket in tickets:      
-#   for i in range(5):
-#      insert_data(ticket, '2024-05-22', -i, True)
-#      time.sleep(.5)
-
+##for ticket in tickets:      
+##   for i in range(5):
+##      insert_data(ticket, '2024-05-29', -i, False)
+##      time.sleep(.5)
 #   insert_data(ticket, '2024-05-07', 0, True)
 #   time.sleep(.5)
 #for i in range(len(tickets)):
@@ -167,8 +169,8 @@ concat_both_csv()
 #    t.start()
 
 #get_open_price('RENT3', '2024-05-03')
-#insert_data('SBSP3', '2024-05-23', 0, True)
-#insert_document('SBSP3', '2024-05-24 14:55', sleep=2.5, resample_=False)
+#insert_data('SBSP3', '2024-06-19', 0, resample_=False)
+#insert_document('SBSP3', '2024-06-14 13:00', sleep=2.5, resample_=False)
 #insert_document('ARZZ3','2024-03-19 17:46:00', 64.01, 267529999)
 
 

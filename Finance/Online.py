@@ -1,3 +1,4 @@
+import threading
 import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -23,6 +24,9 @@ from pymongo import MongoClient
 
 yfin.pdr_override()
 
+pause_flag_file = "pause.flag"
+scraper_paused = False
+pause_lock = threading.Lock()
 # inter ma alert
 
 MAIN_DF_FILE = 'main_df.pickle'
@@ -235,10 +239,10 @@ def do_scraping():
        main_df = pd.read_pickle(MAIN_DF_FILE)    
         
     options_ = webdriver.ChromeOptions()
-    #options_.binary_location = "C:\\Users\\55819\\Downloads\\Chrome\\chrome-win64\\chrome-win64\\chrome.exe"
+    options_.binary_location = "C:\\Users\\55819\\Downloads\\Chrome\\chrome-win64\\chrome-win64\\chrome.exe"
     options_.add_argument("--incognito")
     options_.add_argument("--disable-blink-features=AutomationControlled")
-    service = Service(executable_path=r"Utils/chromedriver.exe")
+    service = Service(executable_path=r"C:\\Users\\55819\\Downloads\\Chrome\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe")
     driver = webdriver.Chrome(service=service,options=options_)
     driver.get(URL) 
 
@@ -261,8 +265,7 @@ def save_csv_data():
       for file_path in os.listdir('stock_dfs'):
          name = file_path.replace('.csv','')
          df1 = pd.read_csv('stock_dfs/{}.csv'.format(name))
-         df1['ativo'] = name
-         df1 = df1.drop(['Unnamed: 0', 'Adj Close'], axis=1)
+         df1['ativo'] = name         
          df1['Datetime'] = pd.to_datetime(df1['Datetime'])
          df1.rename(columns={'Datetime': 'time', 'Open' : 'open', 'High' : 'high', 'Low' : 'low', 'Close' : 'close', 'Volume' : 'volume' }, inplace=True)
          df = pd.concat([df, df1])                  
@@ -274,7 +277,11 @@ def main():
     #pdb.set_trace()
     #insert_tickets(driver)
     while(True):
-        
+        with pause_lock:
+            if scraper_paused:
+                print("Scraper waiting...")
+                time.sleep(1)
+                continue
         try:
            driver.execute_script("document.getElementById('app-menu').click()")
         except:
@@ -343,7 +350,7 @@ def update(ticket):
                       'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['High'],2),\
                       'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
          data.append({'Data/Hora' : (date + dt.timedelta(minutes = 3)).strftime('%Y-%m-%d %H:%M:%S') , 'Ativo' : ticket, 'Variação' : '0,00%',\
-                      'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) , 'Último' : round(row['Adj Close'],2),\
+                      'Máximo' : round(row['High'],2), 'Mínimo' : round(row['Low'],2) ,\
                       'Abertura' : round(row['Open'],2), 'Financeiro' : 0, 'Estado Atual' : 'Aberto'})
    df4 =  pd.DataFrame(data)
    if not df4.empty:
@@ -389,14 +396,14 @@ def get_data(reset):
 
             n_quantity = driver.execute_script("return mydata[" + str(i) +"].nQuantity")
            
-            data.append({'Datetime' : date, 'Open' : n_open, 'High' : n_max, 'Low' : n_min, 'Close' : n_close, 'Adj Close' : n_close, 'Volume' : n_quantity })
+            data.append({'Datetime' : date, 'Open' : n_open, 'High' : n_max, 'Low' : n_min, 'Close' : n_close, 'Volume' : n_quantity })
          df = pd.DataFrame(data)
          df['Datetime'] = df['Datetime'] - dt.timedelta(hours = 3)
          if not os.path.exists('stock_dfs'):
             os.makedirs('stock_dfs')
          if os.path.exists('stock_dfs/{}.csv'.format(ticket)):
             df1 = pd.read_csv('stock_dfs/{}.csv'.format(ticket))
-            df1 = df1[['Datetime', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']]
+            df1 = df1[['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume']]
             df = pd.concat([df1, df])
             df.to_csv('stock_dfs/{}.csv'.format(ticket), mode='w+')           
          else:
@@ -413,12 +420,35 @@ def reset(reset_main):
          os.remove(STATUS_FILE)
       with open(PRICE_ALERT, 'w') as f:
          json.dump(empty_json, f)   
+
+
+def check_pause():
+    """Check if the pause flag file exists and pause the scraper if necessary."""
+    global scraper_paused
+    while True:
+        if os.path.exists(pause_flag_file):
+            with pause_lock:
+                scraper_paused = True
+            print("Scraping paused due to flag.")
+        else:
+            with pause_lock:
+                scraper_paused = False
+            #print("Scraping resumed.")
+        time.sleep(5)  # Check every 5 seconds
    
          
 warnings.simplefilter(action='ignore')
 reset(reset_main=True)
-#main()
-get_data(reset=False)
 
+#get_data(reset=True)
 
+flag_monitor_thread = threading.Thread(target=check_pause)
+scraping_thread = threading.Thread(target=main)
+
+flag_monitor_thread.start()
+scraping_thread.start()
+
+# Keep the main program running
+flag_monitor_thread.join()
+scraping_thread.join()
 
