@@ -8,17 +8,29 @@
 #Support (S n > 2) = Low - n - 1 x (High - P)
 
 
-HIGH = 90.87
+##Common Fibonacci Extension Ratios
+##1.272 — Often indicates the first significant extension level beyond the primary trend.
+##1.414 — Another extension used for moderate trend continuations.
+##1.618 — Known as the “golden ratio,” this is frequently a strong level for trend extensions.
+##2.0 — Often used in more volatile markets; can signal further continuation.
+##2.618 — Another level based on the golden ratio; this marks a larger extension often seen in highly trending markets.
+##3.618 — Indicates an even larger continuation, though less common, used in extreme trends.
+
+# Resistance (Fibonacci Extension/Retraction)=P+(High−Low)×1.272
+# Support (1.272)=Low−(High−Low)×1.272
+
+HIGH = 90.88
 LOW = 89.21
 CLOSE = 90.41
-MAX_LEVEL = 4 
 
+EXTENSIONS = [ 1.272, 1.414, 1.618, 2.0, 2.618 ]
+RETRACTIONS = [0.236, 0.382, 0.5, 0.618, 0.786 ]
 
 pivot = ( HIGH + LOW + CLOSE ) / 3
 
 print('Pivot Point (P): {}'.format(round(pivot,2)))
 
-for i in range(MAX_LEVEL + 1):
+for i in range(4):
 
     if i == 1:
 
@@ -34,3 +46,9 @@ for i in range(MAX_LEVEL + 1):
 
         print('Resistance '+ str(i) +' (R' + str(i) +'): {}'.format(round(HIGH + (i - 1)*(pivot - LOW),2)))
         print('Support '+ str(i) + ' (S' + str(i) +'): {}'.format(round(LOW - (i - 1)*(HIGH - pivot),2)))
+
+for i in range(len(EXTENSIONS)):
+
+    print('Fibonacci Resistance '+ str(i) +' (' + str(EXTENSIONS[i]) +'): {}'.format(round(pivot + (HIGH - LOW) * EXTENSIONS[i],2)))
+    print('Fibonacci  Support '+ str(i) + ' (' + str(RETRACTIONS[i]) +'): {}'.format(round(LOW - (HIGH - LOW) * RETRACTIONS[i] ),2))
+    
