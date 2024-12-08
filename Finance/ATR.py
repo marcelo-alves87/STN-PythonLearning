@@ -26,10 +26,6 @@ for i in range(n, len(data)):
         (data.loc[i-1, 'ATR'] * (n-1) + data.loc[i, 'TR']) / n
     )
 
-# Calculate Moving Averages (50-day and 200-day MAs)
-data['50_MA'] = data['Close'].rolling(window=50).mean()
-data['200_MA'] = data['Close'].rolling(window=200).mean()
-
 # Filter the data for the most recent day (last day in the data)
 recent_data = data.iloc[-1]
 
@@ -89,24 +85,24 @@ m2 = (pivot + s1) / 2  # Mid between Pivot and Support 1
 m3 = (r1 + r2) / 2  # Mid between Resistance 1 and Resistance 2
 m4 = (s1 + s2) / 2  # Mid between Support 1 and Support 2
 
+# Calculate Distances to Pivot
+distance_to_r1 = abs(r1 - pivot)
+distance_to_s1 = abs(pivot - s1)
+
 # Print Pivot, Support, Resistance, and Mid points
 print("\nPivot, Support, Resistance and Mid Points:")
-print(f"  Pivot: {pivot:.2f}")
-print(f"  Resistance 1 (R1): {r1:.2f}")
 print(f"  Resistance 2 (R2): {r2:.2f}")
-print(f"  Support 1 (S1): {s1:.2f}")
-print(f"  Support 2 (S2): {s2:.2f}")
-print(f"  Mid Point 1 (M1): {m1:.2f}")
-print(f"  Mid Point 2 (M2): {m2:.2f}")
 print(f"  Mid Point 3 (M3): {m3:.2f}")
+print(f"  Resistance 1 (R1): {r1:.2f}, Distance to Pivot: {abs(r1 - pivot):.2f}")
+print(f"  Mid Point 1 (M1): {m1:.2f}")
+print(f"  Pivot: {pivot:.2f}")
+print(f"  Mid Point 2 (M2): {m2:.2f}")
+print(f"  Support 1 (S1): {s1:.2f}, Distance to Pivot: {abs(pivot - s1):.2f}")
 print(f"  Mid Point 4 (M4): {m4:.2f}")
+print(f"  Support 2 (S2): {s2:.2f}")
 
-# Determine Bullish or Bearish Prediction for the next day based on Moving Averages
-if recent_data['50_MA'] > recent_data['200_MA']:
-    trend_prediction = "Bullish"
-elif recent_data['50_MA'] < recent_data['200_MA']:
-    trend_prediction = "Bearish"
-else:
-    trend_prediction = "Neutral"
 
-print(f"\nPrediction for the next day: {trend_prediction}")
+
+
+
+
