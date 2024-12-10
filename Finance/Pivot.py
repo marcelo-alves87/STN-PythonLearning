@@ -1,76 +1,69 @@
-#Formula:
-#Pivot Point (P) = (High + Low + Close) / 3
-#Resistance 1 (R1) = 2P - Low
-#M1 (Midpoint between Pivot and R1) = (P + R1) / 2 
-#Support 1 (S1) = 2P - High
-#M2 (Midpoint between Pivot and S1) = (P + S1) / 2
-#Resistance 2 (R2) = P + (High - Low)
-#Support 2 (S2) = P - (High - Low)
-#Resistance (R n > 2) = High + n - 1 x (P - Low)
-#Support (S n > 2) = Low - n - 1 x (High - P)
+import pandas as pd
 
+# Load the dataset
+file_path = 'stock_dfs/SBSP3.csv'  # Replace with your file path
+data = pd.read_csv(file_path)
 
-##Common Fibonacci Extension Ratios
-##1.272 — Often indicates the first significant extension level beyond the primary trend.
-##1.414 — Another extension used for moderate trend continuations.
-##1.618 — Known as the “golden ratio,” this is frequently a strong level for trend extensions.
-##2.0 — Often used in more volatile markets; can signal further continuation.
-##2.618 — Another level based on the golden ratio; this marks a larger extension often seen in highly trending markets.
-##3.618 — Indicates an even larger continuation, though less common, used in extreme trends.
+# Convert 'Datetime' to datetime format
+data['Datetime'] = pd.to_datetime(data['Datetime'])
 
-# Resistance (Fibonacci Extension/Retraction)=P+(High−Low)×1.272
-# Support (1.272)=Low−(High−Low)×1.272
+# Sort data by date (if not already sorted)
+data = data.sort_values('Datetime')
 
-DIGITS = 2
+# Ensure the data has the required columns
+required_columns = ['High', 'Low', 'Close', 'Datetime']
+if not all(col in data.columns for col in required_columns):
+    raise ValueError(f"The dataset must contain the following columns: {', '.join(required_columns)}")
 
-HIGH = 99.88
-LOW = 96.56
-CLOSE = 97.06
+# Create a DataFrame to store pivot points
+pivot_points = []
 
-EXTENSIONS = [ 1.272, 1.414, 1.618, 2.0, 2.618 ]
-RETRACTIONS = [0.236, 0.382, 0.5, 0.618, 0.786 ]
+# Iterate through the data starting from the second day
+for i in range(1, len(data)):
+    # Get the previous day's data
+    prev_day = data.iloc[i - 1]
 
-pivot = ( HIGH + LOW + CLOSE ) / 3
+    # Calculate Pivot Points (PP), Resistances (R1, R2), Supports (S1, S2), and middle points
+    pp = round((prev_day['High'] + prev_day['Low'] + prev_day['Close']) / 3, 2)
+    r1 = round(2 * pp - prev_day['Low'], 2)
+    s1 = round(2 * pp - prev_day['High'], 2)
+    r2 = round(pp + (prev_day['High'] - prev_day['Low']), 2)
+    s2 = round(pp - (prev_day['High'] - prev_day['Low']), 2)
 
-print('Pivot Point (P): {}'.format(round(pivot,DIGITS)))
+    # Middle points
+    m1 = round((pp + r1) / 2, 2)
+    m2 = round((pp + s1) / 2, 2)
+    m3 = round((r1 + r2) / 2, 2)
+    m4 = round((s1 + s2) / 2, 2)
 
-for i in range(3):
+    # Distances
+    distance_pp_r1 = round(abs(pp - r1), 2)
+    distance_pp_s1 = round(abs(pp - s1), 2)
 
-    if i == 1:
+    # Append results to the pivot_points list
+    pivot_points.append({
+        'Date': data.iloc[i]['Datetime'].date(),
+        'PP': pp,
+        'R1': r1,
+        'S1': s1,
+        'R2': r2,
+        'S2': s2,
+        'M1': m1,
+        'M2': m2,
+        'M3': m3,
+        'M4': m4,
+        'Distance_PP_R1': distance_pp_r1,
+        'Distance_PP_S1': distance_pp_s1
+    })
 
-        ri = 2*pivot - LOW
-        si = 2*pivot - HIGH
-        
-        print('Resistance 1 (R1): {}, Difference to Pivot: {}'.format(round(ri,DIGITS),round(ri - pivot,DIGITS)))
-        print('Midpoint 1 (M1): {}'.format(round((pivot + ri)/2,DIGITS)))
-        print('Support 1 (S1): {}, Difference to Pivot: {}'.format(round(si,DIGITS), round(pivot - si,DIGITS)))
-        print('Midpoint 2 (M2): {}'.format(round((pivot + si)/2,DIGITS)))
+# Convert the pivot points list to a DataFrame
+pivot_points_df = pd.DataFrame(pivot_points)
 
-    if i == 2:
+# Configure pandas to display all columns
+pd.set_option('display.max_columns', None)
 
-        rj = pivot + (HIGH - LOW)
-        sj = pivot - (HIGH - LOW)
-        
-        print('Resistance 2 (R2): {}'.format(round(rj,DIGITS)))
-        print('Midpoint 3 (M3): {}'.format(round((ri + rj)/2,DIGITS)))
-        print('Support 2 (S2): {}'.format(round(sj,DIGITS)))
-        print('Midpoint 4 (M3): {}'.format(round((si + sj)/2,DIGITS)))
-    
-    if i > 2:
+# Print the DataFrame
+print(pivot_points_df)
 
-        ri = rj
-        si = sj
-
-        rj = HIGH + (i - 1)*(pivot - LOW)
-        sj = LOW - (i - 1)*(HIGH - pivot)  
-
-        print('Resistance '+ str(i) +' (R' + str(i) +'): {}'.format(round(rj,DIGITS)))
-        print('Midpoint '+ str(i + 2) +' (M' + str(i + 2) +'): {}'.format(round((ri + rj)/2,DIGITS)))
-        print('Support '+ str(i) + ' (S' + str(i) +'): {}'.format(round(sj,DIGITS)))
-        print('Midpoint '+ str(i + 3) +' (M' + str(i + 3) +'): {}'.format(round((si + sj)/2,DIGITS)))
-
-##for i in range(len(EXTENSIONS)):
-##
-##    print('Fibonacci Resistance '+ str(i) +' (' + str(EXTENSIONS[i]) +'): {}'.format(round(pivot + (HIGH - LOW) * EXTENSIONS[i],DIGITS)))
-##    print('Fibonacci  Support '+ str(i) + ' (' + str(RETRACTIONS[i]) +'): {}'.format(round(LOW - (HIGH - LOW) * RETRACTIONS[i],DIGITS)))
-##    
+# Reset to default settings after printing (optional)
+pd.reset_option('display.max_columns')
