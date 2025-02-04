@@ -151,10 +151,16 @@ def get_data_to_csv():
                     date_str = driver.execute_script(f"return mydata[{i}].dtDateTime.toLocaleString()")
                     date = dt.datetime.strptime(date_str, "%d/%m/%Y, %H:%M:%S")
                     n_open = driver.execute_script(f"return mydata[{i}].nOpen")
-                    n_max = driver.execute_script(f"return mydata[{i}].nMax")
-                    n_min = driver.execute_script(f"return mydata[{i}].nMin")
+                    
+                    # Check for both possible property names using JavaScript fallback
+                    n_max = driver.execute_script(
+                        f"return mydata[{i}].nMax !== undefined ? mydata[{i}].nMax : mydata[{i}].nMaximum"
+                    )
+                    n_min = driver.execute_script(
+                        f"return mydata[{i}].nMin !== undefined ? mydata[{i}].nMin : mydata[{i}].nMinimum"
+                    )
                     n_close = driver.execute_script(f"return mydata[{i}].nClose")
-                    n_quantity = driver.execute_script(f"return mydata[{i}].nQuantity")
+                    n_volume = driver.execute_script(f"return mydata[{i}].nVolume")
 
                     data.append(
                         {
@@ -163,7 +169,7 @@ def get_data_to_csv():
                             "High": n_max,
                             "Low": n_min,
                             "Close": n_close,
-                            "Volume": n_quantity,
+                            "Volume": n_volume,
                         }
                     )
                     print(f"Scraping [{i + 1}/{length}] data for {ticket}...")
@@ -177,7 +183,7 @@ def get_data_to_csv():
                     df_existing = df_existing[["Datetime", "Open", "High", "Low", "Close", "Volume"]]
                     df = pd.concat([df_existing, df])
                 # Save to CSV (override if file already exists)    
-                df.to_csv(file_path, index=False)
+                df.to_csv(file_path, index=False, mode = 'w')
                 print(f"Data for ticket {ticket} saved to {file_path}.")
         
         save_csv_data()
