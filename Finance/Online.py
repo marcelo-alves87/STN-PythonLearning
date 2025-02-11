@@ -132,7 +132,7 @@ def save_csv_data():
 
 def get_data_to_csv():
     """addPriceSerieEntityByDataSerieHistory"""
-    """ mydata = t.filter((item) => item.dtDateTime <  new Date('2024-04-01'));"""
+    """ mydata = t.filter((item) => item.dtDateTime >  new Date('2024-04-01'));"""
     """Scrape data and save it to CSV files."""
     driver = setup_scraper()
     try:
@@ -176,14 +176,20 @@ def get_data_to_csv():
                 df = pd.DataFrame(data)
                 df["Datetime"] = df["Datetime"] - dt.timedelta(hours=3)
 
-                # Save to CSV
-                file_path = f"stock_dfs/{ticket}.csv"
+ 
+                folder_path = "stock_dfs"
+                os.makedirs(folder_path, exist_ok=True)
+                file_path = f"{folder_path}/{ticket}.csv"
+
                 if os.path.exists(file_path):
-                    df_existing = pd.read_csv(file_path)
-                    df_existing = df_existing[["Datetime", "Open", "High", "Low", "Close", "Volume"]]
-                    df = pd.concat([df_existing, df])
-                # Save to CSV (override if file already exists)    
-                df.to_csv(file_path, index=False, mode = 'w')
+                    existing_df = pd.read_csv(file_path)
+                    df = pd.concat([existing_df, df]).drop_duplicates(subset=["Datetime"]).reset_index(drop=True)
+                    print(f"Data appended to {file_path}.")
+                else:
+                    print(f"New file created: {file_path}.")
+
+                # Save to CSV 
+                df.to_csv(file_path, index=False)
                 print(f"Data for ticket {ticket} saved to {file_path}.")
         
         save_csv_data()
