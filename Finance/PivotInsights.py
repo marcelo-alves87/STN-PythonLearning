@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from tabulate import tabulate
 
 # Load your CSV file
 def load_data(file_path):
@@ -44,25 +45,37 @@ def calculate_pivot_points(df):
     s1 = (2 * pp) - high
     r2 = pp + (high - low)
     s2 = pp - (high - low)
+    r3 = high + 2 * (pp - low)
+    s3 = low - 2 * (high - pp)
+    r4 = r3 + (r3 - r2)
+    s4 = s3 - (s2 - s3)
 
     m1 = (r2 + r1) / 2
     m2 = (r1 + pp) / 2
     m3 = (pp + s1) / 2
     m4 = (s1 + s2) / 2
+    m5 = (r3 + r2) / 2
+    m6 = (r4 + r3) / 2
+    m7 = (s3 + s2) / 2
+    m8 = (s4 + s3) / 2
 
-    return pp, r1, s1, r2, s2, m1, m2, m3, m4
+    return pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8
 
 # Simulate potential prices and calculate indicators
 def simulate_prices_and_insights(df, price_range=0.02):
     last_row = df.iloc[-1]
     last_close = last_row['Close']
 
-    price_changes = np.linspace(-price_range, price_range, num=20)  # 20 hypothetical price changes
+    price_changes = np.linspace(-price_range, price_range, num=20)
     potential_prices = last_close * (1 + price_changes)
 
-    pp, r1, s1, r2, s2, m1, m2, m3, m4 = calculate_pivot_points(df)
+    pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8 = calculate_pivot_points(df)
 
     insights = []
+    potential_buys = []
+    potential_sells = []
+    bullish_crossovers = []
+    bearish_crossovers = []
 
     for price in potential_prices:
         new_row = pd.DataFrame({
@@ -80,17 +93,17 @@ def simulate_prices_and_insights(df, price_range=0.02):
 
         signal_type = ""
         if rsi > 70 and macd > signal:
-            signal_type = "Potential Buy (RSI > 70 & Bullish MACD Crossover)"
+            potential_buys.append((price, rsi, macd, signal, "Potential Buy (RSI > 70 & Bullish MACD Crossover)"))
         elif rsi < 30 and macd < signal:
-            signal_type = "Potential Sell (RSI < 30 & Bearish MACD Crossover)"
+            potential_sells.append((price, rsi, macd, signal, "Potential Sell (RSI < 30 & Bearish MACD Crossover)"))
         elif rsi > 70:
             signal_type = "Overbought (Potential Sell)"
         elif rsi < 30:
             signal_type = "Oversold (Potential Buy)"
         elif macd > signal:
-            signal_type = "Bullish Crossover"
+            bullish_crossovers.append((price, rsi, macd, signal, "Bullish Crossover"))
         elif macd < signal:
-            signal_type = "Bearish Crossover"
+            bearish_crossovers.append((price, rsi, macd, signal, "Bearish Crossover"))
         elif 30 < rsi < 70 and macd > signal:
             signal_type = "Moderate Uptrend"
         elif 30 < rsi < 70 and macd < signal:
@@ -98,13 +111,34 @@ def simulate_prices_and_insights(df, price_range=0.02):
         else:
             signal_type = "Neutral"
 
-        insights.append((price, rsi, macd, signal, signal_type))
+        if signal_type:
+            insights.append((price, rsi, macd, signal, signal_type))
 
-    return insights, (pp, r1, s1, r2, s2, m1, m2, m3, m4)
+    if potential_buys:
+        min_buy = min(potential_buys, key=lambda x: x[0])
+        insights.append(min_buy)
+
+    if potential_sells:
+        max_sell = max(potential_sells, key=lambda x: x[0])
+        insights.append(max_sell)
+
+    if bullish_crossovers:
+        min_bullish = min(bullish_crossovers, key=lambda x: x[0])
+        insights.append(min_bullish)
+
+    if bearish_crossovers:
+        max_bearish = max(bearish_crossovers, key=lambda x: x[0])
+        insights.append(max_bearish)
+
+    return insights, (pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8)
 
 # Filter insights based on pivot point intervals
-def filter_by_intervals(insights, pp, r1, s1, r2, s2, m1, m2, m3, m4):
+def filter_by_intervals(insights, pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8):
     intervals = {
+        "M6 - R4": (m6, r4),
+        "R3 - M6": (r3, m6),
+        "M5 - R3": (m5, r3),
+        "R2 - M5": (r2, m5),
         "M1 - R2": (m1, r2),
         "R1 - M1": (r1, m1),
         "M2 - R1": (m2, r1),
@@ -112,7 +146,11 @@ def filter_by_intervals(insights, pp, r1, s1, r2, s2, m1, m2, m3, m4):
         "M3 - PP": (m3, pp),
         "S1 - M3": (s1, m3),
         "M4 - S1": (m4, s1),
-        "S2 - M4": (s2, m4)
+        "S2 - M4": (s2, m4),
+        "M7 - S2": (m7, s2),
+        "S3 - M7": (s3, m7),
+        "M8 - S3": (m8, s3),
+        "S4 - M8": (s4, m8)
     }
 
     filtered_insights = {key: [] for key in intervals.keys()}
@@ -122,7 +160,6 @@ def filter_by_intervals(insights, pp, r1, s1, r2, s2, m1, m2, m3, m4):
             if lower <= price <= upper:
                 filtered_insights[key].append((price, rsi, macd, signal, signal_type))
 
-    # Reverse the order of prices within each interval
     for key in filtered_insights:
         filtered_insights[key] = sorted(filtered_insights[key], key=lambda x: -x[0])
 
@@ -130,25 +167,24 @@ def filter_by_intervals(insights, pp, r1, s1, r2, s2, m1, m2, m3, m4):
 
 # Main function
 def main():
-    file_path = 'stock_dfs/SBSP3.csv'  # Replace with your file path
+    file_path = 'stock_dfs/SBSP3.csv'
     df = load_data(file_path)
 
     df['RSI'] = calculate_rsi(df)
     df['MACD'], df['Signal_Line'] = calculate_macd(df)
 
-    insights, (pp, r1, s1, r2, s2, m1, m2, m3, m4) = simulate_prices_and_insights(df)
-    filtered_insights = filter_by_intervals(insights, pp, r1, s1, r2, s2, m1, m2, m3, m4)
+    insights, (pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8) = simulate_prices_and_insights(df)
+    filtered_insights = filter_by_intervals(insights, pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8)
 
     print("Insights by Intervals:")
     for interval, data in filtered_insights.items():
         if data:
             print(f"\n{interval}:")
-            print("Price\tRSI\tMACD\tSignal Line\tInsight")
-            for price, rsi, macd, signal, signal_type in data:
-                print(f"{price:.2f}\t{rsi:.2f}\t{macd:.2f}\t{signal:.2f}\t{signal_type}")
+            table = [[f"{price:.2f}", f"{rsi:.2f}", f"{macd:.2f}", f"{signal:.2f}", signal_type] for price, rsi, macd, signal, signal_type in data]
+            print(tabulate(table, headers=["Price", "RSI", "MACD", "Signal Line", "Insight"], tablefmt="grid"))
 
     print("\nPivot Points:")
-    print(f"PP: {pp:.2f}, R1: {r1:.2f}, S1: {s1:.2f}, R2: {r2:.2f}, S2: {s2:.2f}, M1: {m1:.2f}, M2: {m2:.2f}, M3: {m3:.2f}, M4: {m4:.2f}")
+    print(f"PP: {pp:.2f}, R1: {r1:.2f}, S1: {s1:.2f}, R2: {r2:.2f}, S2: {s2:.2f}, R3: {r3:.2f}, S3: {s3:.2f}, R4: {r4:.2f}, S4: {s4:.2f}, M1: {m1:.2f}, M2: {m2:.2f}, M3: {m3:.2f}, M4: {m4:.2f}, M5: {m5:.2f}, M6: {m6:.2f}, M7: {m7:.2f}, M8: {m8:.2f}")
 
 if __name__ == "__main__":
     main()
