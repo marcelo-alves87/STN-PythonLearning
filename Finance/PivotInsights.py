@@ -183,7 +183,10 @@ def main():
             table = [[f"{price:.2f}", f"{rsi:.2f}", f"{macd:.2f}", f"{signal:.2f}", signal_type] for price, rsi, macd, signal, signal_type in data]
             print(tabulate(table, headers=["Price", "RSI", "MACD", "Signal Line", "Insight"], tablefmt="grid"))
 
-    print("\nPivot Points:")
+    last_date = df['Datetime'].dt.date.max()  # Get the last available date
+    next_date = last_date + pd.Timedelta(days=1)  # Get the next day
+
+    print(f"\nPivot Points for {next_date}:")
     print(f"PP: {pp:.2f}, R1: {r1:.2f}, S1: {s1:.2f}, R2: {r2:.2f}, S2: {s2:.2f}, R3: {r3:.2f}, S3: {s3:.2f}, R4: {r4:.2f}, S4: {s4:.2f}, M1: {m1:.2f}, M2: {m2:.2f}, M3: {m3:.2f}, M4: {m4:.2f}, M5: {m5:.2f}, M6: {m6:.2f}, M7: {m7:.2f}, M8: {m8:.2f}")
 
 if __name__ == "__main__":

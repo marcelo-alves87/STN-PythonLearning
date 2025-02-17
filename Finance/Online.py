@@ -132,7 +132,7 @@ def save_csv_data():
 
 def get_data_to_csv():
     """addPriceSerieEntityByDataSerieHistory"""
-    """ mydata = t.filter((item) => item.dtDateTime >  new Date('2024-04-01'));"""
+    """ mydata = t.filter((item) => item.dtDateTime >  new Date('2025-02-10'));"""
     """Scrape data and save it to CSV files."""
     driver = setup_scraper()
     try:
@@ -176,6 +176,8 @@ def get_data_to_csv():
                 df = pd.DataFrame(data)
                 df["Datetime"] = df["Datetime"] - dt.timedelta(hours=3)
 
+                #Remove pos-market data
+                df = df[df["Datetime"].dt.time <= dt.time(17, 50)]
  
                 folder_path = "stock_dfs"
                 os.makedirs(folder_path, exist_ok=True)
@@ -183,7 +185,8 @@ def get_data_to_csv():
 
                 if os.path.exists(file_path):
                     existing_df = pd.read_csv(file_path)
-                    df = pd.concat([existing_df, df]).drop_duplicates(subset=["Datetime"]).reset_index(drop=True)
+                    existing_df["Datetime"] = pd.to_datetime(existing_df["Datetime"])
+                    df = pd.concat([existing_df, df]).drop_duplicates(subset=["Datetime"]).sort_values(by="Datetime").reset_index(drop=True)                   
                     print(f"Data appended to {file_path}.")
                 else:
                     print(f"New file created: {file_path}.")
