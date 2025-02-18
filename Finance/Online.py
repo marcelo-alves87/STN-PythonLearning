@@ -64,7 +64,7 @@ def scrape_tickets(driver):
     """Scrape ticket data from the webpage and return as a DataFrame."""
     df = get_page_df(driver)
     df = df[
-        ["Ativo", "Variação", "Último", "Máximo", "Mínimo", "Abertura", "Financeiro", "Data/Hora"]
+        ["Ativo", "Último", "Financeiro", "Data/Hora"]
     ]
     df["Data/Hora"] = pd.to_datetime(df["Data/Hora"], dayfirst=True, errors="coerce")
     return df
@@ -72,22 +72,66 @@ def scrape_tickets(driver):
 def save_to_mongo(df):
     """Save the DataFrame to MongoDB."""
     records = df.to_dict("records")
-    DB_PRICES.insert_many(records)
-    print(f"Data saved to MongoDB. Rows added: {len(records)}")
+    result = DB_PRICES.insert_many(records)
+    print(f"Data saved to MongoDB. Rows added: {len(result.inserted_ids)}")
+
+def convert_numeric(value):
+    """Convert values from string format to numeric format."""
+    if isinstance(value, str):
+        value = value.replace(".", "").replace(",", ".")
+        if value.endswith("k"):
+            return float(value[:-1]) * 1e3
+        elif value.endswith("M"):
+            return float(value[:-1]) * 1e6
+        elif value.endswith("B"):
+            return float(value[:-1]) * 1e9
+        elif len(value) > 2:
+            return float(value[:-2] + '.' + value[-2:])
+        else:
+            return float(value)
+    return value
 
 def process_and_save_data(driver):
-    """Process data and save it to MongoDB."""
+    """Process data and save it to MongoDB, ensuring correct format and ignoring IBOV."""
     df = scrape_tickets(driver)
-    numeric_columns = ["Último", "Máximo", "Mínimo", "Abertura", "Financeiro"]
-    for col in numeric_columns:
-        df[col] = pd.to_numeric(df[col].str.replace(",", ".").str.replace(".", ""), errors="coerce")
-    df.set_index("Data/Hora", inplace=True)
+
+    # Filter out rows where 'Ativo' is 'IBOV'
+    df = df[df["Ativo"] != "IBOV"]
+
+    if df.empty:
+        print("No valid data to process after filtering out IBOV.")
+        return
+
+    # Convert "Último" (price) and "Financeiro" (volume) to numeric
+    df["Último"] = df["Último"].apply(convert_numeric)
+    df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
+
+    # Rename columns to match expected format
+    df.rename(columns={
+        "Ativo": "ativo",  # Fix Ativo -> ativo
+        "Último": "close",
+        "Financeiro": "volume",
+        "Data/Hora": "time"
+    }, inplace=True)
+
+    # Ensure high, low, and open are the same as close
+    df["high"] = df["close"]
+    df["low"] = df["close"]
+    df["open"] = df["close"]
+
+    df.set_index("time", inplace=True)
 
     # Avoid duplicating data in MongoDB
-    existing_timestamps = DB_PRICES.distinct("Data/Hora")
+    existing_timestamps = DB_PRICES.distinct("time")
     new_records = df[~df.index.isin(existing_timestamps)]
+
     if not new_records.empty:
         save_to_mongo(new_records)
+    else:
+        print("No new records to insert.")
+
+
+
 
 def scrape_to_mongo():
     """Main method to scrape data and save to MongoDB."""
@@ -203,5 +247,5 @@ def get_data_to_csv():
 
 if __name__ == "__main__":
     warnings.simplefilter(action="ignore")
-    get_data_to_csv()
-    #scrape_to_mongo()
+    #get_data_to_csv()
+    scrape_to_mongo()

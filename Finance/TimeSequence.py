@@ -1,49 +1,55 @@
-import datetime as dt
-import pdb
+from datetime import datetime, timedelta
+import pandas as pd
+from tabulate import tabulate
 
-#6 horas + 50 minutos + 17:30
-#21600  + 3000 seg + 60 = 24660
+# Define market hours
+market_open = "10:00"
+market_close = "17:50"
 
-start = '10:00'
-period = 5
-module = 24660
+# Define Fibonacci reference points
+fib_0 = "10:40"  # Level 0
+fib_1 = "15:15"  # Level 1 (275 minutes after 10:40)
+date_input = "2025-02-17"  # Example date
 
+# Fibonacci ratios to calculate
+fib_ratios = [0, 0.382, 0.618, 1, 1.618, 2.618]
 
-def fibonnaci(x):
-    if x == 0 or x == 1:
-        return 1
-    else:
-        return fibonnaci(x - 1) + fibonnaci(x - 2)
+# Convert times to datetime objects
+fib_0_dt = datetime.strptime(f"{date_input} {fib_0}", "%Y-%m-%d %H:%M")
+fib_1_dt = datetime.strptime(f"{date_input} {fib_1}", "%Y-%m-%d %H:%M")
+market_open_dt = datetime.strptime(f"{date_input} {market_open}", "%Y-%m-%d %H:%M")
+market_close_dt = datetime.strptime(f"{date_input} {market_close}", "%Y-%m-%d %H:%M")
 
-def calculate(date, j):
-    date = dt.datetime.strptime(date, '%H:%M')
-    norm = dt.datetime.strptime(start, '%H:%M')
-    date1 = date + dt.timedelta(minutes=period*j)
-    diff = (date1 - norm).seconds 
-    mod = diff % module
-    date1 = norm + dt.timedelta(hours=mod // 3600)
-    date1 += dt.timedelta(minutes=((mod/3600) % 1) * 60 )
-    return date1
+# Compute total minutes from Level 0 to Level 1
+total_minutes = int((fib_1_dt - fib_0_dt).total_seconds() // 60)
 
-def sequence(date, verbose=True):
-    dict = {}
-    for i in range(15):
-        j = fibonnaci(i)
-        date1 = calculate(date, j)
-        dict[j] = date1
-        if verbose:
-            print('{} -> {}'.format(j, date1.strftime('%H:%M')))
-    return dict
+# Function to calculate Fibonacci time zones while respecting market hours
+def calculate_fibonacci_times(base_time, total_minutes, ratios, open_time, close_time):
+    fib_times = []
+    current_day = base_time.date()
 
-def levels(date, index1):
-    dict = sequence(date, False)
-    LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 1, 1.618, 2.618]
-    for i in LEVELS:
-        k = calculate(date, i*index1)
-        print('{} -> {}'.format(i, k.strftime('%H:%M')))
+    for ratio in ratios:
+        added_minutes = int(total_minutes * ratio)
+        new_time = base_time + timedelta(minutes=added_minutes)
 
-#date = '10:35'        
-#sequence(date)
-#levels(date, 55)
+        # If new time is beyond market hours, move to the next session
+        if new_time.time() > close_time.time():
+            new_time = datetime.combine(new_time.date() + timedelta(days=1), open_time.time()) + (new_time - close_time)
+            current_day = new_time.date()
 
+        # Format Date and Time properly
+        date_str = new_time.strftime("%m-%d")
+        time_str = new_time.strftime("%H:%M")
 
+        fib_times.append((date_str, ratio, time_str))
+
+    return fib_times
+
+# Calculate Fibonacci time zones
+fib_results = calculate_fibonacci_times(fib_0_dt, total_minutes, fib_ratios, market_open_dt, market_close_dt)
+
+# Create a DataFrame for display
+df = pd.DataFrame(fib_results, columns=["Date", "Fibonacci Level", "Value"])
+
+# Print table properly formatted
+print(tabulate(df, headers="keys", tablefmt="grid"))

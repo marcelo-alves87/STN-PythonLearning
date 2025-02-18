@@ -48,7 +48,7 @@ def remove_registers_greater_than(timestamp):
 
 # 8️⃣ Method to find and display one example record from the database
 def find_example_register():
-    example = collection.find_one()
+    example = collection.find_one(sort=[("time", -1)])  # Replace "time" with your actual timestamp field name
     if example:
         print("Example Register Found:")
         print(example)
@@ -57,8 +57,7 @@ def find_example_register():
 
 # Example usage:
 # erase_all_data()
-#remove_registers_greater_than(dt.datetime(2025, 2, 5, 17, 50))
-#find_example_register()
-
-erase_all_data()
-insert_data_from_csv()
+# remove_registers_greater_than(dt.datetime(2025, 2, 5, 17, 50))
+find_example_register()
+#erase_all_data()
+#insert_data_from_csv()
