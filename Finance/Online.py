@@ -70,9 +70,14 @@ def scrape_tickets(driver):
     return df
 
 def save_to_mongo(df):
-    """Save the DataFrame to MongoDB."""
-    records = df.to_dict("records")
+    
+    """Save the DataFrame to MongoDB, ensuring time index is included."""
+    if df.index.name == "time":  # Only reset if 'time' is an index
+        df = df.reset_index()
+
+    records = df.to_dict("records")  # Convert to dictionary including the 'time' column
     result = DB_PRICES.insert_many(records)
+    
     print(f"Data saved to MongoDB. Rows added: {len(result.inserted_ids)}")
 
 def convert_numeric(value):
@@ -121,14 +126,29 @@ def process_and_save_data(driver):
 
     df.set_index("time", inplace=True)
 
-    # Avoid duplicating data in MongoDB
-    existing_timestamps = DB_PRICES.distinct("time")
-    new_records = df[~df.index.isin(existing_timestamps)]
+    # Get today's date in YYYY-MM-DD format
+    today_str = dt.datetime.now().strftime("%Y-%m-%d")
 
-    if not new_records.empty:
-        save_to_mongo(new_records)
-    else:
-        print("No new records to insert.")
+    # Retrieve total accumulated volume per ativo for today
+    total_volumes = {}
+    pipeline = [
+        {"$match": {"time": {"$gte": dt.datetime.strptime(today_str, "%Y-%m-%d")}}},  # Only today's records
+        {"$group": {"_id": "$ativo", "total_volume": {"$sum": "$volume"}}}  # Sum all volumes per ativo
+    ]
+    existing_data = list(DB_PRICES.aggregate(pipeline))
+
+    for entry in existing_data:
+        total_volumes[entry["_id"]] = entry["total_volume"]  # Store accumulated volume per ativo
+
+    # Calculate volume difference (If no previous volume for today, assume this is the first record)
+    df["volume_diff"] = df.apply(lambda row: max(row["volume"] - total_volumes.get(row["ativo"], 0), 0), axis=1)
+
+    # Use volume difference as the new volume value
+    df["volume"] = df["volume_diff"]
+    df.drop(columns=["volume_diff"], inplace=True)
+
+    save_to_mongo(df)
+ 
 
 
 

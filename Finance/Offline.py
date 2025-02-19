@@ -56,8 +56,12 @@ def find_example_register():
         print("No records found in the database.")
 
 # Example usage:
-# erase_all_data()
+#erase_all_data()
 # remove_registers_greater_than(dt.datetime(2025, 2, 5, 17, 50))
-find_example_register()
 #erase_all_data()
 #insert_data_from_csv()
+find_example_register()
+
+
+
+
