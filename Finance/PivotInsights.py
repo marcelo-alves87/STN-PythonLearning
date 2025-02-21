@@ -165,6 +165,20 @@ def filter_by_intervals(insights, pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3
 
     return filtered_insights
 
+def display_pivot_points_table(pivot_points):
+    pivot_labels = ["PP", "R1", "S1", "R2", "S2", "R3", "S3", "R4", "S4",
+                    "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"]
+    
+    pivot_dict = dict(zip(pivot_labels, pivot_points))  # Convert tuple to dictionary
+
+    sorted_pivot_points = sorted(pivot_dict.items(), key=lambda x: -x[1])  # Sort by value descending
+
+    table = [[key, f"{value:.2f}"] for key, value in sorted_pivot_points]
+    print(f"\nPivot Points:")
+    print(tabulate(table, headers=["Level", "Value"], tablefmt="grid"))
+
+
+
 # Main function
 def main():
     file_path = 'stock_dfs/SBSP3.csv'
@@ -173,21 +187,22 @@ def main():
     df['RSI'] = calculate_rsi(df)
     df['MACD'], df['Signal_Line'] = calculate_macd(df)
 
-    insights, (pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8) = simulate_prices_and_insights(df)
-    filtered_insights = filter_by_intervals(insights, pp, r1, s1, r2, s2, r3, s3, r4, s4, m1, m2, m3, m4, m5, m6, m7, m8)
+    insights, pivot_points = simulate_prices_and_insights(df)
+    filtered_insights = filter_by_intervals(insights, *pivot_points)
 
-    print("Insights by Intervals:")
+    last_date = df['Datetime'].dt.date.max()  # Get the last available date
+    next_date = last_date + pd.Timedelta(days=1)  # Get the next day
+
+    print(f"Insights by Intervals for {next_date}:")
     for interval, data in filtered_insights.items():
         if data:
             print(f"\n{interval}:")
             table = [[f"{price:.2f}", f"{rsi:.2f}", f"{macd:.2f}", f"{signal:.2f}", signal_type] for price, rsi, macd, signal, signal_type in data]
             print(tabulate(table, headers=["Price", "RSI", "MACD", "Signal Line", "Insight"], tablefmt="grid"))
 
-    last_date = df['Datetime'].dt.date.max()  # Get the last available date
-    next_date = last_date + pd.Timedelta(days=1)  # Get the next day
+   
 
-    print(f"\nPivot Points for {next_date}:")
-    print(f"PP: {pp:.2f}, R1: {r1:.2f}, S1: {s1:.2f}, R2: {r2:.2f}, S2: {s2:.2f}, R3: {r3:.2f}, S3: {s3:.2f}, R4: {r4:.2f}, S4: {s4:.2f}, M1: {m1:.2f}, M2: {m2:.2f}, M3: {m3:.2f}, M4: {m4:.2f}, M5: {m5:.2f}, M6: {m6:.2f}, M7: {m7:.2f}, M8: {m8:.2f}")
+    display_pivot_points_table(pivot_points)
 
 if __name__ == "__main__":
     main()
