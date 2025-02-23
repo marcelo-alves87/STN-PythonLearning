@@ -197,12 +197,29 @@ def main(date=None):
     # Display Min/Max prices for the last trading day
     last_date = df['Datetime'].dt.date.max()
     last_day_data = df[df['Datetime'].dt.date == last_date]
-    min_price, max_price, min_close_price, max_close_price = last_day_data['Low'].min(), last_day_data['High'].max(),\
-                                                             last_day_data['Close'].min(), last_day_data['Close'].max()
-    min_max_table = [ ["Maximum Price", f"{max_price:.2f}"],  ["Maximum Close Price", f"{max_close_price:.2f}"], ["Minimum Close Price", f"{min_close_price:.2f}"],\
-                      ["Minimum Price", f"{min_price:.2f}"], ["Average of Max/Min Prices", f"{(min_price + max_price) / 2:.2f}"] ]
+
+    min_price = last_day_data['Low'].min()
+    max_price = last_day_data['High'].max()
+    min_close_price = last_day_data['Close'].min()
+    max_close_price = last_day_data['Close'].max()
+
+    # Calculate averages
+    avg_price = (min_price + max_price) / 2
+    avg_close_price = (min_close_price + max_close_price) / 2
+
+    # Create the table with a separate column for averages
+    min_max_table = [
+        ["Maximum Price", f"{max_price:.2f}", ""],
+        ["Minimum Price", f"{min_price:.2f}", ""],
+        ["Average of Max/Min Prices", "", f"{avg_price:.2f}"],
+        ["Maximum Close Price", f"{max_close_price:.2f}", ""],
+        ["Minimum Close Price", f"{min_close_price:.2f}", ""],
+        ["Average of Max/Min Close Prices", "", f"{avg_close_price:.2f}"]
+    ]
+
+    # Print the table
     print(f"\nMax/Min Prices for {last_date}:\n")
-    print(tabulate(min_max_table, headers=["Type", "Price"], tablefmt="grid"))
+    print(tabulate(min_max_table, headers=["Type", "Price", "Average"], tablefmt="grid"))
 
     insights, pivot_points = simulate_prices_and_insights(df)
     filtered_insights = filter_by_intervals(insights, *pivot_points)
