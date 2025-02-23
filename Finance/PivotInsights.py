@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import pdb
 from tabulate import tabulate
 
 # Load your CSV file
@@ -180,12 +181,28 @@ def display_pivot_points_table(pivot_points):
 
 
 # Main function
-def main():
+def main(date=None):
     file_path = 'stock_dfs/SBSP3.csv'
     df = load_data(file_path)
 
+    if date:
+        df = df[df['Datetime'].dt.date <= pd.to_datetime(date).date()]
+        if df.empty:
+            print('No data found')
+            return
+
     df['RSI'] = calculate_rsi(df)
     df['MACD'], df['Signal_Line'] = calculate_macd(df)
+
+    # Display Min/Max prices for the last trading day
+    last_date = df['Datetime'].dt.date.max()
+    last_day_data = df[df['Datetime'].dt.date == last_date]
+    min_price, max_price, min_close_price, max_close_price = last_day_data['Low'].min(), last_day_data['High'].max(),\
+                                                             last_day_data['Close'].min(), last_day_data['Close'].max()
+    min_max_table = [ ["Maximum Price", f"{max_price:.2f}"],  ["Maximum Close Price", f"{max_close_price:.2f}"], ["Minimum Close Price", f"{min_close_price:.2f}"],\
+                      ["Minimum Price", f"{min_price:.2f}"], ["Average of Max/Min Prices", f"{(min_price + max_price) / 2:.2f}"] ]
+    print(f"\nMax/Min Prices for {last_date}:\n")
+    print(tabulate(min_max_table, headers=["Type", "Price"], tablefmt="grid"))
 
     insights, pivot_points = simulate_prices_and_insights(df)
     filtered_insights = filter_by_intervals(insights, *pivot_points)
@@ -193,16 +210,19 @@ def main():
     last_date = df['Datetime'].dt.date.max()  # Get the last available date
     next_date = last_date + pd.Timedelta(days=1)  # Get the next day
 
-    print(f"Insights by Intervals for {next_date}:")
+    print(f"\nInsights by Intervals for {next_date}:")
     for interval, data in filtered_insights.items():
         if data:
             print(f"\n{interval}:")
             table = [[f"{price:.2f}", f"{rsi:.2f}", f"{macd:.2f}", f"{signal:.2f}", signal_type] for price, rsi, macd, signal, signal_type in data]
             print(tabulate(table, headers=["Price", "RSI", "MACD", "Signal Line", "Insight"], tablefmt="grid"))
 
-   
 
     display_pivot_points_table(pivot_points)
 
+   
+
 if __name__ == "__main__":
+    #Example of usage
+    #main('2025-02-20')
     main()
