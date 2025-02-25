@@ -97,7 +97,7 @@ def convert_numeric(value):
     return value
 
 def process_and_save_data(driver):
-    """Process data and save it to MongoDB, ensuring correct format and ignoring IBOV."""
+    """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
     # Filter out rows where 'Ativo' is 'IBOV'
@@ -107,49 +107,57 @@ def process_and_save_data(driver):
         print("No valid data to process after filtering out IBOV.")
         return
 
-    # Convert "Último" (price) and "Financeiro" (volume) to numeric
+    # Convert price and volume columns to numeric values
     df["Último"] = df["Último"].apply(convert_numeric)
     df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
 
-    # Rename columns to match expected format
+    # Rename columns to match the database format
     df.rename(columns={
-        "Ativo": "ativo",  # Fix Ativo -> ativo
+        "Ativo": "ativo",
         "Último": "close",
         "Financeiro": "volume",
         "Data/Hora": "time"
     }, inplace=True)
 
-    # Ensure high, low, and open are the same as close
+    # Ensure high, low, and open are initialized as the close price
     df["high"] = df["close"]
     df["low"] = df["close"]
     df["open"] = df["close"]
 
+    # Set time as the index
     df.set_index("time", inplace=True)
 
-    # Get today's date in YYYY-MM-DD format
-    today_str = dt.datetime.now().strftime("%Y-%m-%d")
+    # Get today's date
+    today_start = dt.datetime.combine(dt.datetime.today(), dt.time(0, 0))
+    
+    # Retrieve existing data from MongoDB for the current day
+    existing_data = list(DB_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
+    df_existing = pd.DataFrame(existing_data)
 
-    # Retrieve total accumulated volume per ativo for today
-    total_volumes = {}
-    pipeline = [
-        {"$match": {"time": {"$gte": dt.datetime.strptime(today_str, "%Y-%m-%d")}}},  # Only today's records
-        {"$group": {"_id": "$ativo", "total_volume": {"$sum": "$volume"}}}  # Sum all volumes per ativo
-    ]
-    existing_data = list(DB_PRICES.aggregate(pipeline))
+    if not df_existing.empty:
+        df_existing["time"] = pd.to_datetime(df_existing["time"])
+        df_existing.set_index("time", inplace=True)
 
-    for entry in existing_data:
-        total_volumes[entry["_id"]] = entry["total_volume"]  # Store accumulated volume per ativo
+        # Append new data to the existing one
+        df = pd.concat([df_existing, df])
 
-    # Calculate volume difference (If no previous volume for today, assume this is the first record)
-    df["volume_diff"] = df.apply(lambda row: max(row["volume"] - total_volumes.get(row["ativo"], 0), 0), axis=1)
+    # Resample data to 5-minute intervals per 'ativo'
+    df_resampled = df.groupby("ativo").resample("5T").agg({
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum"
+    }).dropna().reset_index()
 
-    # Use volume difference as the new volume value
-    df["volume"] = df["volume_diff"]
-    df.drop(columns=["volume_diff"], inplace=True)
+    # Remove previous data from MongoDB that falls within the resampled time range
+    min_time = df_resampled["time"].min()
+    max_time = df_resampled["time"].max()
 
-    save_to_mongo(df)
- 
+    DB_PRICES.delete_many({"time": {"$gte": min_time, "$lte": max_time}})
 
+    # Save the newly aggregated data
+    save_to_mongo(df_resampled)
 
 
 
