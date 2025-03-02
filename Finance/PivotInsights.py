@@ -94,13 +94,13 @@ def simulate_prices_and_insights(df, price_range=0.02):
 
         signal_type = ""
         if rsi > 70 and macd > signal:
-            potential_buys.append((price, rsi, macd, signal, "Potential Buy (RSI > 70 & Bullish MACD Crossover)"))
+            potential_buys.append((price, rsi, macd, signal, "Potential Sell OR Profit-taking for Long-Buying (Overbought, Momentum Up)"))
         elif rsi < 30 and macd < signal:
-            potential_sells.append((price, rsi, macd, signal, "Potential Sell (RSI < 30 & Bearish MACD Crossover)"))
+            potential_sells.append((price, rsi, macd, signal, "Potential Buy OR Profit-taking for Short-Selling (Oversold, Momentum Down)"))
         elif rsi > 70:
-            signal_type = "Overbought (Potential Sell)"
+            signal_type = "Overbought (Reversal Down)"
         elif rsi < 30:
-            signal_type = "Oversold (Potential Buy)"
+            signal_type = "Oversold (Potential Reversal Up)"
         elif macd > signal:
             bullish_crossovers.append((price, rsi, macd, signal, "Bullish Crossover"))
         elif macd < signal:
@@ -242,4 +242,4 @@ def main(date=None):
 if __name__ == "__main__":
     #Example of usage
     #main('2025-02-20')
-    main()
+    main('2025-02-24')
