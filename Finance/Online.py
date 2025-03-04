@@ -64,7 +64,7 @@ def scrape_tickets(driver):
     """Scrape ticket data from the webpage and return as a DataFrame."""
     df = get_page_df(driver)
     df = df[
-        ["Ativo", "Último", "Financeiro", "Data/Hora"]
+        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual"]
     ]
     df["Data/Hora"] = pd.to_datetime(df["Data/Hora"], dayfirst=True, errors="coerce")
     return df
@@ -100,16 +100,19 @@ def process_and_save_data(driver):
     """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
-    # Filter out rows where 'Ativo' is 'IBOV'
-    df = df[df["Ativo"] != "IBOV"]
+    # Filter out rows where 'Ativo' is 'IBOV' and 'Estado Atual' isn't 'Aberto'
+    df = df[(df["Ativo"] != "IBOV") & (df["Estado Atual"] == "Aberto")]
 
     if df.empty:
-        print("No valid data to process after filtering out IBOV.")
+        print("No valid data to process.")
         return
 
     # Convert price and volume columns to numeric values
     df["Último"] = df["Último"].apply(convert_numeric)
     df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
+
+    # Remove the 'Estado Atual' column
+    df = df.drop(columns=["Estado Atual"])
 
     # Rename columns to match the database format
     df.rename(columns={
