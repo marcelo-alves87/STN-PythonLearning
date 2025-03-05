@@ -48,13 +48,14 @@ def remove_registers_greater_than(timestamp):
 
 # 8️⃣ Method to find and display records from the database
 def find_example_registers(size=1):
-    results = collection.find().sort("time", -1).limit(10)  # Replace "time" with your actual timestamp field name
+    results = collection.find().sort("time", -1).limit(size)  # Replace "time" with your actual timestamp field name
     if results:
-        print("Last 10 Registers Found:")
+        print(f"Last {size} Registers Found:")
         for example in results:
             print(example)
     else:
         print("No records found in the database.")    
+    
 
 # Example usage:
 #remove_registers_greater_than(dt.datetime(2025, 2, 27, 17, 50))
