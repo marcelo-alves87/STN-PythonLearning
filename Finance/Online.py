@@ -10,6 +10,7 @@ from pymongo import MongoClient
 import warnings
 import shutil
 import pdb
+import numpy
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -66,7 +67,7 @@ def scrape_tickets(driver):
     """Scrape ticket data from the webpage and return as a DataFrame."""
     df = get_page_df(driver)
     df = df[
-        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual", "Preço Teórico"]
+        ["Ativo", "Último", "Quantidade", "Data/Hora", "Estado Atual", "Preço Teórico"]
     ]
     df["Data/Hora"] = pd.to_datetime(df["Data/Hora"], dayfirst=True, errors="coerce")
     return df
@@ -96,6 +97,11 @@ def convert_numeric(value):
             return float(value[:-2] + '.' + value[-2:])
         else:
             return float(value)
+    elif isinstance(value,numpy.int64):
+        if(value > 0):
+            return float(value / 1e2)
+        else:
+            return float(0)
     return value
 
 def process_and_save_data(driver):
@@ -111,14 +117,14 @@ def process_and_save_data(driver):
         return
 
     elif "Aberto" != df.iloc[-1]["Estado Atual"]:        
-
+        
         status = df.iloc[-1]["Estado Atual"]
         df["Preço Teórico"] = df["Preço Teórico"].apply(convert_numeric)
         preco_teorico = df.iloc[-1]["Preço Teórico"]
         now = dt.datetime.today().strftime("%H:%M:%S")
              
         if last_preco_teorico is None or last_status is None or last_preco_teorico != preco_teorico or last_status != status:
-            print(f"{status} ({now}): R${preco_teorico:.2f}")
+            print(f"({now}) {status}: {preco_teorico:.2f}")
                
         last_preco_teorico = preco_teorico
         last_status = status
@@ -131,7 +137,7 @@ def process_and_save_data(driver):
         
         # Convert price and volume columns to numeric values
         df["Último"] = df["Último"].apply(convert_numeric)
-        df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
+        df["Quantidade"] = df["Quantidade"].apply(convert_numeric)
 
         # Remove 'Estado Atual' and Preço Teórico columns
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
@@ -140,7 +146,7 @@ def process_and_save_data(driver):
         df.rename(columns={
             "Ativo": "ativo",
             "Último": "close",
-            "Financeiro": "volume",
+            "Quantidade": "volume",
             "Data/Hora": "time"
         }, inplace=True)
 
@@ -159,11 +165,25 @@ def process_and_save_data(driver):
         existing_data = list(DB_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
         df_existing = pd.DataFrame(existing_data)
 
+        # Get the last known volume per ativo
+        last_volumes = {}
         if not df_existing.empty:
             df_existing["time"] = pd.to_datetime(df_existing["time"])
             df_existing.set_index("time", inplace=True)
 
-            # Append new data to the existing one
+            # Get the latest volume recorded for each ativo
+            last_volumes = df_existing.groupby("ativo")["volume"].last().to_dict()
+
+        # Calculate volume difference
+        df["prev_volume"] = df["ativo"].map(last_volumes)  # Map last recorded volume
+        df["volume"] = df["volume"] - df["prev_volume"]  # Compute difference
+        df["volume"] = df["volume"].clip(lower=0)  # Ensure no negative values
+
+        # Drop temp column
+        df.drop(columns=["prev_volume"], inplace=True)
+
+        # Append new data to the existing one
+        if not df_existing.empty:
             df = pd.concat([df_existing, df])
 
         # Resample data to 5-minute intervals per 'ativo'
