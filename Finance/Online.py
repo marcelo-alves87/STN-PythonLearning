@@ -67,7 +67,7 @@ def scrape_tickets(driver):
     """Scrape ticket data from the webpage and return as a DataFrame."""
     df = get_page_df(driver)
     df = df[
-        ["Ativo", "Último", "Quantidade", "Data/Hora", "Estado Atual", "Preço Teórico"]
+        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual", "Preço Teórico"]
     ]
     df["Data/Hora"] = pd.to_datetime(df["Data/Hora"], dayfirst=True, errors="coerce")
     return df
@@ -98,11 +98,9 @@ def convert_numeric(value):
         else:
             return float(value)
     elif isinstance(value,numpy.int64):
-        if(value > 0):
-            return float(value / 1e2)
-        else:
-            return float(0)
-    return value
+        return float(value / 1e2)
+    else:   
+        return value
 
 def process_and_save_data(driver):
     global last_preco_teorico, last_status
@@ -137,7 +135,7 @@ def process_and_save_data(driver):
         
         # Convert price and volume columns to numeric values
         df["Último"] = df["Último"].apply(convert_numeric)
-        df["Quantidade"] = df["Quantidade"].apply(convert_numeric)
+        df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
 
         # Remove 'Estado Atual' and Preço Teórico columns
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
@@ -146,7 +144,7 @@ def process_and_save_data(driver):
         df.rename(columns={
             "Ativo": "ativo",
             "Último": "close",
-            "Quantidade": "volume",
+            "Financeiro": "volume",
             "Data/Hora": "time"
         }, inplace=True)
 

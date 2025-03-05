@@ -46,21 +46,21 @@ def remove_registers_greater_than(timestamp):
     result = collection.delete_many({"time": {"$gt": timestamp}})
     print(f"Deleted {result.deleted_count} records with time greater than {timestamp}.")
 
-# 8️⃣ Method to find and display one example record from the database
-def find_example_register():
-    example = collection.find_one(sort=[("time", -1)])  # Replace "time" with your actual timestamp field name
-    if example:
-        print("Example Register Found:")
-        print(example)
+# 8️⃣ Method to find and display records from the database
+def find_example_registers(size=1):
+    results = collection.find().sort("time", -1).limit(10)  # Replace "time" with your actual timestamp field name
+    if results:
+        print("Last 10 Registers Found:")
+        for example in results:
+            print(example)
     else:
-        print("No records found in the database.")
+        print("No records found in the database.")    
 
 # Example usage:
-#erase_all_data()
-# remove_registers_greater_than(dt.datetime(2025, 2, 5, 17, 50))
+#remove_registers_greater_than(dt.datetime(2025, 2, 27, 17, 50))
 #erase_all_data()
 #insert_data_from_csv()
-find_example_register()
+#find_example_registers(10)
 
 
 
