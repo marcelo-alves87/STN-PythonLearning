@@ -16,6 +16,8 @@ URL = "https://rico.com.vc/"
 PAUSE_FLAG_FILE = "pause.flag"
 DB_CLIENT = MongoClient("localhost", 27017)
 DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing prices
+last_preco_teorico = None
+last_status = None
 
 def switch_to_correct_tab(driver):
     """Switch to the tab containing the desired element."""
@@ -64,7 +66,7 @@ def scrape_tickets(driver):
     """Scrape ticket data from the webpage and return as a DataFrame."""
     df = get_page_df(driver)
     df = df[
-        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual"]
+        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual", "Preço Teórico"]
     ]
     df["Data/Hora"] = pd.to_datetime(df["Data/Hora"], dayfirst=True, errors="coerce")
     return df
@@ -97,70 +99,90 @@ def convert_numeric(value):
     return value
 
 def process_and_save_data(driver):
+    global last_preco_teorico, last_status
     """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
-    # Filter out rows where 'Ativo' is 'IBOV' and 'Estado Atual' isn't 'Aberto'
-    df = df[(df["Ativo"] != "IBOV") & (df["Estado Atual"] == "Aberto")]
-
+    # Filter out rows where 'Ativo' is 'IBOV'
+    df = df[df["Ativo"] != "IBOV"]
+    
     if df.empty:
         print("No valid data to process.")
         return
 
-    # Convert price and volume columns to numeric values
-    df["Último"] = df["Último"].apply(convert_numeric)
-    df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
+    elif "Aberto" != df.iloc[-1]["Estado Atual"]:        
 
-    # Remove the 'Estado Atual' column
-    df = df.drop(columns=["Estado Atual"])
+        status = df.iloc[-1]["Estado Atual"]
+        df["Preço Teórico"] = df["Preço Teórico"].apply(convert_numeric)
+        preco_teorico = df.iloc[-1]["Preço Teórico"]
+        now = dt.datetime.today().strftime("%H:%M:%S")
+             
+        if last_preco_teorico is None or last_status is None or last_preco_teorico != preco_teorico or last_status != status:
+            print(f"{status} ({now}): R${preco_teorico:.2f}")
+               
+        last_preco_teorico = preco_teorico
+        last_status = status
+            
+    else:
 
-    # Rename columns to match the database format
-    df.rename(columns={
-        "Ativo": "ativo",
-        "Último": "close",
-        "Financeiro": "volume",
-        "Data/Hora": "time"
-    }, inplace=True)
+        # Reset Global Variables
+        last_preco_teorico = None
+        last_status = None
+        
+        # Convert price and volume columns to numeric values
+        df["Último"] = df["Último"].apply(convert_numeric)
+        df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
 
-    # Ensure high, low, and open are initialized as the close price
-    df["high"] = df["close"]
-    df["low"] = df["close"]
-    df["open"] = df["close"]
+        # Remove 'Estado Atual' and Preço Teórico columns
+        df = df.drop(columns=["Estado Atual", "Preço Teórico"])
 
-    # Set time as the index
-    df.set_index("time", inplace=True)
+        # Rename columns to match the database format
+        df.rename(columns={
+            "Ativo": "ativo",
+            "Último": "close",
+            "Financeiro": "volume",
+            "Data/Hora": "time"
+        }, inplace=True)
 
-    # Get today's date
-    today_start = dt.datetime.combine(dt.datetime.today(), dt.time(0, 0))
-    
-    # Retrieve existing data from MongoDB for the current day
-    existing_data = list(DB_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
-    df_existing = pd.DataFrame(existing_data)
+        # Ensure high, low, and open are initialized as the close price
+        df["high"] = df["close"]
+        df["low"] = df["close"]
+        df["open"] = df["close"]
 
-    if not df_existing.empty:
-        df_existing["time"] = pd.to_datetime(df_existing["time"])
-        df_existing.set_index("time", inplace=True)
+        # Set time as the index
+        df.set_index("time", inplace=True)
 
-        # Append new data to the existing one
-        df = pd.concat([df_existing, df])
+        # Get today's date
+        today_start = dt.datetime.combine(dt.datetime.today(), dt.time(0, 0))
+        
+        # Retrieve existing data from MongoDB for the current day
+        existing_data = list(DB_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
+        df_existing = pd.DataFrame(existing_data)
 
-    # Resample data to 5-minute intervals per 'ativo'
-    df_resampled = df.groupby("ativo").resample("5T").agg({
-        "open": "first",
-        "high": "max",
-        "low": "min",
-        "close": "last",
-        "volume": "sum"
-    }).dropna().reset_index()
+        if not df_existing.empty:
+            df_existing["time"] = pd.to_datetime(df_existing["time"])
+            df_existing.set_index("time", inplace=True)
 
-    # Remove previous data from MongoDB that falls within the resampled time range
-    min_time = df_resampled["time"].min()
-    max_time = df_resampled["time"].max()
+            # Append new data to the existing one
+            df = pd.concat([df_existing, df])
 
-    DB_PRICES.delete_many({"time": {"$gte": min_time, "$lte": max_time}})
+        # Resample data to 5-minute intervals per 'ativo'
+        df_resampled = df.groupby("ativo").resample("5T").agg({
+            "open": "first",
+            "high": "max",
+            "low": "min",
+            "close": "last",
+            "volume": "sum"
+        }).dropna().reset_index()
 
-    # Save the newly aggregated data
-    save_to_mongo(df_resampled)
+        # Remove previous data from MongoDB that falls within the resampled time range
+        min_time = df_resampled["time"].min()
+        max_time = df_resampled["time"].max()
+
+        DB_PRICES.delete_many({"time": {"$gte": min_time, "$lte": max_time}})
+
+        # Save the newly aggregated data
+        save_to_mongo(df_resampled)
 
 
 
