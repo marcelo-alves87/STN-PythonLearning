@@ -97,7 +97,7 @@ def convert_numeric(value):
             return float(value[:-2] + '.' + value[-2:])
         else:
             return float(value)
-    elif isinstance(value,numpy.int64):
+    elif isinstance(value, (numpy.int64, int)):
         return float(value / 1e2)
     else:   
         return value
