@@ -19,6 +19,7 @@ DB_CLIENT = MongoClient("localhost", 27017)
 DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing prices
 last_preco_teorico = None
 last_status = None
+volume_accumulated = 0
 
 def switch_to_correct_tab(driver):
     """Switch to the tab containing the desired element."""
@@ -103,7 +104,7 @@ def convert_numeric(value):
         return value
 
 def process_and_save_data(driver):
-    global last_preco_teorico, last_status
+    global last_preco_teorico, last_status, volume_accumulated 
     """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
@@ -157,32 +158,29 @@ def process_and_save_data(driver):
         df.set_index("time", inplace=True)
 
         # Get today's date
-        today_start = dt.datetime.combine(dt.datetime.today(), dt.time(0, 0))
-        
+        today_start = dt.datetime.combine(dt.datetime.today(), dt.time(0, 0))       
+
         # Retrieve existing data from MongoDB for the current day
         existing_data = list(DB_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
-        df_existing = pd.DataFrame(existing_data)
-
-        # Get the last known volume per ativo
-        last_volumes = {}
-        if not df_existing.empty:
-            df_existing["time"] = pd.to_datetime(df_existing["time"])
-            df_existing.set_index("time", inplace=True)
-
-            # Get the latest volume recorded for each ativo
-            last_volumes = df_existing.groupby("ativo")["volume"].last().to_dict()
-
-        # Calculate volume difference
-        df["prev_volume"] = df["ativo"].map(last_volumes)  # Map last recorded volume
-        df["volume"] = df["volume"] - df["prev_volume"]  # Compute difference
-        df["volume"] = df["volume"].clip(lower=0)  # Ensure no negative values
-
-        # Drop temp column
-        df.drop(columns=["prev_volume"], inplace=True)
+        df_existing = pd.DataFrame(existing_data)        
 
         # Append new data to the existing one
         if not df_existing.empty:
+            df_existing = df_existing.set_index('time')
+            # Get the last stored volume for each `ativo`
+            last_volumes = df_existing.groupby("ativo")["volume"].sum().to_dict()
+
+            # Map stored volume to the new scraped data
+            df["prev_volume"] = df["ativo"].map(last_volumes).fillna(0)
+
+            # Compute volume difference per `ativo`
+            df["volume"] = abs(df["volume"] - df["prev_volume"])
+
+            # Drop temporary column
+            df.drop(columns=["prev_volume"], inplace=True)
+
             df = pd.concat([df_existing, df])
+            
 
         # Resample data to 5-minute intervals per 'ativo'
         df_resampled = df.groupby("ativo").resample("5T").agg({
@@ -190,13 +188,13 @@ def process_and_save_data(driver):
             "high": "max",
             "low": "min",
             "close": "last",
-            "volume": "sum"
+            "volume": "last"
         }).dropna().reset_index()
 
         # Remove previous data from MongoDB that falls within the resampled time range
         min_time = df_resampled["time"].min()
         max_time = df_resampled["time"].max()
-
+        
         DB_PRICES.delete_many({"time": {"$gte": min_time, "$lte": max_time}})
 
         # Save the newly aggregated data
