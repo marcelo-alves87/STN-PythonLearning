@@ -3,6 +3,7 @@ import datetime as dt
 from pymongo import MongoClient
 import pdb
 import time
+import random
 
 # 1️⃣ Connect to MongoDB
 client = MongoClient("localhost", 27017)
@@ -66,72 +67,115 @@ def find_example_registers(size=1):
 
 
 
-def simulate_daily_trading(date, rate=1):
-    csv_file_path = "./stock_dfs/SBSP3_1min.csv"
-    df = pd.read_csv(csv_file_path)
-
-    # Ensure 'Datetime' is in datetime format
+def simulate_daily_trading(date, rate=1, steps=5, prob_high_early=0.6, prob_bullish=0.55):
+    # Load 5-minute OHLC data
+    df = pd.read_csv('./stock_dfs/SBSP3.csv')
     df['Datetime'] = pd.to_datetime(df['Datetime'])
-
-    date = pd.to_datetime(date).date()  # Ensure date format  
-
-    # Filter data for the selected date
-    df = df[df['Datetime'].dt.date == date]
+    df = df[df['Datetime'].dt.date == pd.to_datetime(date).date()]
 
     if df.empty:
         print(f"No data available for {date}")
         return
 
-    # Process 1-minute data row-by-row and update 5-minute candles dynamically
     for _, row in df.iterrows():
-        timestamp_1min = dt.datetime.strptime(str(row['Datetime']), '%Y-%m-%d %H:%M:%S')
+        timestamp = row['Datetime'].replace(second=0, microsecond=0)
+        o, h, l, c = row['Open'], row['High'], row['Low'], row['Close']
+        v = row['Volume']
 
-        # Convert 1-minute timestamp to its corresponding 5-minute bucket
-        timestamp_5min = timestamp_1min.replace(minute=(timestamp_1min.minute // 5) * 5, second=0)
+        high_first = random.random() < prob_high_early
+        is_bullish = c > o if random.random() < prob_bullish else c < o
 
-        # Retrieve the existing 5-minute candle
-        existing_candle = collection.find_one({"time": timestamp_5min})
+        # Generate step path that includes the real high and low at random steps
+        remaining_steps = steps - 3  # open, high, low, close are fixed
+        mid_prices = []
 
-        if existing_candle:
-            # If a 5-min candle exists, update it dynamically
-            updated_candle = {
-                "time": timestamp_5min,
-                "open": existing_candle["open"],  # Keep the original open price
-                "high": max(existing_candle["high"], row['High']),  # Update high
-                "low": min(existing_candle["low"], row['Low']),  # Update low
-                "close": row['Close'],  # Update close as the latest value
-                "volume": existing_candle["volume"] + row['Volume'],  # Accumulate volume
-                "ativo": "SBSP3"
+        for _ in range(remaining_steps):
+            mid = round(random.uniform(min(o, c), max(o, c)), 2)
+            mid = max(min(mid, h), l)
+            mid_prices.append(mid)
+
+        # Randomly choose steps to insert the real high and low
+        high_idx = random.randint(1, steps - 2)
+        low_idx = random.randint(1, steps - 2)
+        while low_idx == high_idx:
+            low_idx = random.randint(1, steps - 2)
+
+        # Build the full path
+        path = [None] * steps
+        path[0] = o
+        path[-1] = c
+        path[high_idx] = h
+        path[low_idx] = l
+
+        # Fill in midpoints
+        mid_idx = 0
+        for i in range(1, steps - 1):
+            if path[i] is None:
+                path[i] = mid_prices[mid_idx]
+                mid_idx += 1
+
+        print(f"\nSimulating candle @ {timestamp.time()} with {steps} steps")
+        high_so_far = o
+        low_so_far = o
+        volume_so_far = 0
+
+        for i in range(steps):
+            price = path[i]
+            high_so_far = max(high_so_far, price)
+            low_so_far = min(low_so_far, price)
+            volume_so_far += v / steps
+
+            partial_candle = {
+                "time": timestamp,
+                "open": o,
+                "high": round(high_so_far, 2),
+                "low": round(low_so_far, 2),
+                "close": round(price, 2),
+                "volume": round(volume_so_far),
+                "ativo": "SBSP3",
+                "status": f"step_{i + 1}/{steps}"
             }
-            collection.update_one({"time": timestamp_5min}, {"$set": updated_candle})
-        else:
-            #  If no existing candle, create a new one
-            new_candle = {
-                "time": timestamp_5min,
-                "open": row['Open'],
-                "high": row['High'],
-                "low": row['Low'],
-                "close": row['Close'],
-                "volume": row['Volume'],
-                "ativo": "SBSP3"
-            }
-            collection.insert_one(new_candle)
 
-        # Sleep to simulate real-time data flow
-        time.sleep(rate)
+            collection.update_one(
+                {"time": timestamp},
+                {"$set": partial_candle},
+                upsert=True
+            )
 
-    print(f"Simulation for {date} completed with proper 5-minute candle updates.")
+            print(f" Step {i+1}: {price:.2f} (H: {high_so_far:.2f}, L: {low_so_far:.2f})")
+            time.sleep(rate)
+
+      
+        final_candle = {
+            "time": timestamp,
+            "open": o,
+            "high": h,
+            "low": l,
+            "close": c,
+            "volume": v,
+            "ativo": "SBSP3",
+            "status": "completed"
+        }
+
+        collection.update_one(
+            {"time": timestamp},
+            {"$set": final_candle}
+        )
+
+        print(f" Final candle saved @ {timestamp.time()}")
+
+    print("\n Simulation completed for", date)
 
 
 
     
 
 # Example usage:
-#remove_registers_greater_than(dt.datetime(2025, 2, 27, 17, 50))
+#remove_registers_greater_than(dt.datetime(2025, 3, 18, 18, 00))
 #erase_all_data()
-#insert_data_from_csv('2025-02-26')
+#insert_data_from_csv()
 #find_example_registers(10)
-simulate_daily_trading('2025-02-27',3)
+#simulate_daily_trading('2025-03-19', rate=0.5)
 
 
 
