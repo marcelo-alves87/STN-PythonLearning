@@ -4,6 +4,7 @@ from pymongo import MongoClient
 import pdb
 import time
 import random
+import numpy as np
 
 # 1️⃣ Connect to MongoDB
 client = MongoClient("localhost", 27017)
@@ -167,6 +168,30 @@ def simulate_daily_trading(date, rate=1, steps=5, prob_high_early=0.6, prob_bull
     print("\n Simulation completed for", date)
 
 
+def update_with_fake_avg_values():
+
+
+    for doc in collection.find():
+        close_price = doc["close"]
+
+        fake_buy_price = round(close_price - np.random.uniform(0.01, 0.10), 2)
+        fake_sell_price = round(close_price + np.random.uniform(0.01, 0.10), 2)
+        fake_buy_qty = int(np.random.randint(1000, 5000))
+        fake_sell_qty = int(np.random.randint(1000, 5000))
+
+        collection.update_one(
+            {"_id": doc["_id"]},
+            {
+                "$set": {
+                    "AvgBuyPrice": 0,
+                    "AvgSellPrice": 0,
+                    "AvgBuyQty": 0,
+                    "AvgSellQty": 0
+                }
+            }
+        )
+
+    print("MongoDB documents updated with fake spread/imbalance values.")
 
     
 
@@ -176,6 +201,7 @@ def simulate_daily_trading(date, rate=1, steps=5, prob_high_early=0.6, prob_bull
 #insert_data_from_csv()
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
+update_with_fake_avg_values()
 
 
 

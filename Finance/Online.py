@@ -103,6 +103,48 @@ def convert_numeric(value):
     else:   
         return value
 
+def scrap_offerbook(driver, df):
+   
+    # Remember to set this.offerBook as global variable
+    # JavaScript execution to extract buy/sell offers
+    js_buy = """
+        const offerBook = temp1.getOfferBook().book;
+        return offerBook.arrLimitedBuy.map(entry => entry.obj);
+    """
+    js_sell = """
+        const offerBook = temp1.getOfferBook().book;
+        return offerBook.arrLimitedSell.map(entry => entry.obj);
+    """
+    limited_buys = driver.execute_script(js_buy)
+    limited_sells = driver.execute_script(js_sell)
+
+    # Create DataFrames
+    df_buy = pd.DataFrame(limited_buys)[["nPrice", "nQty"]]
+    df_sell = pd.DataFrame(limited_sells)[["nPrice", "nQty"]]
+
+    # Helper functions
+    def weighted_avg_price(df_side):
+        return (df_side["nPrice"] * df_side["nQty"]).sum() / df_side["nQty"].sum() if not df_side.empty else None
+
+    def avg_qty(df_side):
+        return df_side["nQty"].mean() if not df_side.empty else None
+
+    # Compute values
+    avg_buy_price = weighted_avg_price(df_buy)
+    avg_sell_price = weighted_avg_price(df_sell)
+    avg_buy_qty = avg_qty(df_buy)
+    avg_sell_qty = avg_qty(df_sell)
+
+    # Set into the last row of the existing DataFrame
+    df.at[df.index[-1], "AvgBuyPrice"] = avg_buy_price
+    df.at[df.index[-1], "AvgSellPrice"] = avg_sell_price
+    df.at[df.index[-1], "AvgBuyQty"] = avg_buy_qty
+    df.at[df.index[-1], "AvgSellQty"] = avg_sell_qty
+
+    
+    
+  
+
 def process_and_save_data(driver):
     global last_preco_teorico, last_status, volume_accumulated 
     """Process data, aggregate with previously saved records, and save to MongoDB."""
@@ -130,6 +172,8 @@ def process_and_save_data(driver):
             
     else:
 
+        
+        
         # Reset Global Variables
         last_preco_teorico = None
         last_status = None
@@ -140,6 +184,8 @@ def process_and_save_data(driver):
 
         # Remove 'Estado Atual' and Preço Teórico columns
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
+
+        scrap_offerbook(driver, df)
 
         # Rename columns to match the database format
         df.rename(columns={
@@ -169,26 +215,31 @@ def process_and_save_data(driver):
             df_existing = df_existing.set_index('time')
             # Get the last stored volume for each `ativo`
             last_volumes = df_existing.groupby("ativo")["volume"].sum().to_dict()
-
+            
             # Map stored volume to the new scraped data
             df["prev_volume"] = df["ativo"].map(last_volumes).fillna(0)
 
             # Compute volume difference per `ativo`
-            df["volume"] = abs(df["volume"] - df["prev_volume"])
-
+            df["volume"] = (df["volume"] - df["prev_volume"]).clip(lower=0)
+            
+            
             # Drop temporary column
             df.drop(columns=["prev_volume"], inplace=True)
 
             df = pd.concat([df_existing, df])
-            
-
+        
         # Resample data to 5-minute intervals per 'ativo'
         df_resampled = df.groupby("ativo").resample("5T").agg({
             "open": "first",
             "high": "max",
             "low": "min",
             "close": "last",
-            "volume": "last"
+            "volume": "last",
+            "AvgBuyPrice": "mean",
+            "AvgSellPrice": "mean",
+            "AvgBuyQty": "mean",
+            "AvgSellQty": "mean"
+
         }).dropna().reset_index()
 
         # Remove previous data from MongoDB that falls within the resampled time range
