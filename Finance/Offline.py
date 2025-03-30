@@ -193,6 +193,61 @@ def update_with_fake_avg_values():
 
     print("MongoDB documents updated with fake spread/imbalance values.")
 
+def export_all_to_csv(output_path="./mongo_export.csv"):
+    # Fetch all documents from the collection
+    cursor = collection.find()
+    data = list(cursor)
+
+    if not data:
+        print("No data found in MongoDB to export.")
+        return
+
+    # Convert to DataFrame
+    df = pd.DataFrame(data)
+
+    # Drop MongoDB's internal _id field
+    if '_id' in df.columns:
+        df.drop(columns=['_id'], inplace=True)
+
+    # Round all numeric columns to 2 decimal places
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+
+    # Save to CSV
+    df.to_csv(output_path, index=False)
+    print(f"Exported {len(df)} records to {output_path}")
+
+
+def insert_from_uploaded_csv(file_path="mongo_export.csv"):
+    try:
+        df = pd.read_csv(file_path)
+        if 'time' not in df.columns:
+            print("Error: 'time' column not found in the CSV.")
+            return
+
+        df['time'] = pd.to_datetime(df['time'], errors='coerce')
+        df.dropna(subset=['time'], inplace=True)
+
+        # Convert DataFrame rows into dictionaries and upsert one-by-one
+        inserted = 0
+        for _, row in df.iterrows():
+            record = row.to_dict()
+            timestamp = record['time']
+            del record['time']  # Remove 'time' from set to avoid overwrite conflicts
+
+            result = collection.update_one(
+                {'time': timestamp},
+                {'$set': record, '$setOnInsert': {'time': timestamp}},
+                upsert=True
+            )
+            if result.upserted_id or result.modified_count:
+                inserted += 1
+
+        print(f"Inserted/Updated {inserted} records from '{file_path}' into MongoDB.")
+    except Exception as e:
+        print(f"Failed to insert from CSV: {e}")
+
+
     
 
 # Example usage:
@@ -201,7 +256,7 @@ def update_with_fake_avg_values():
 #insert_data_from_csv()
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
-update_with_fake_avg_values()
-
-
-
+#update_with_fake_avg_values()
+#export_all_to_csv()
+insert_from_uploaded_csv()
+#print(collection.index_information())

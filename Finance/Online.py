@@ -7,6 +7,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import WebDriverException
 from pymongo import MongoClient
+from pymongo import UpdateOne
 import warnings
 import shutil
 import pdb
@@ -74,15 +75,43 @@ def scrape_tickets(driver):
     return df
 
 def save_to_mongo(df):
-    
-    """Save the DataFrame to MongoDB, ensuring time index is included."""
-    if df.index.name == "time":  # Only reset if 'time' is an index
+    """Efficiently upsert DataFrame rows into MongoDB, preserving existing fields."""
+    if df.index.name == "time":
         df = df.reset_index()
 
-    records = df.to_dict("records")  # Convert to dictionary including the 'time' column
-    result = DB_PRICES.insert_many(records)
-    
-    print(f"Data saved to MongoDB. Rows added: {len(result.inserted_ids)}")
+    records = df.to_dict("records")
+    if not records:
+        print("No records to save.")
+        return
+
+    # Step 1: Get all times in the incoming data
+    times = [r["time"] for r in records]
+
+    # Step 2: Fetch existing docs in one query
+    existing_docs = DB_PRICES.find({"time": {"$in": times}})
+    existing_map = {doc["time"]: doc for doc in existing_docs}
+
+    # Step 3: Prepare bulk upserts
+    operations = []
+    for record in records:
+        time_value = record["time"]
+        existing = existing_map.get(time_value)
+        if existing:
+            merged = existing.copy()
+            merged.update(record)
+            operations.append(
+                UpdateOne({"_id": existing["_id"]}, {"$set": merged})
+            )
+        else:
+            operations.append(
+                UpdateOne({"time": time_value}, {"$set": record}, upsert=True)
+            )
+
+    # Step 4: Execute bulk write
+    if operations:
+        result = DB_PRICES.bulk_write(operations)
+        print(f"Upserted: {result.upserted_count}, Modified: {result.modified_count}")
+
 
 def convert_numeric(value):
     """Convert values from string format to numeric format."""
@@ -105,14 +134,14 @@ def convert_numeric(value):
 
 def scrap_offerbook(driver, df):
    
-    # Remember to set this.offerBook as global variable
+    
     # JavaScript execution to extract buy/sell offers
     js_buy = """
-        const offerBook = temp1.getOfferBook().book;
+        const offerBook = temp2.getOfferBook().book;
         return offerBook.arrLimitedBuy.map(entry => entry.obj);
     """
     js_sell = """
-        const offerBook = temp1.getOfferBook().book;
+        const offerBook = temp2.getOfferBook().book;
         return offerBook.arrLimitedSell.map(entry => entry.obj);
     """
     limited_buys = driver.execute_script(js_buy)
@@ -254,8 +283,8 @@ def process_and_save_data(driver):
 
 
 def scrape_to_mongo():
-    """Main method to scrape data and save to MongoDB."""
-    driver = setup_scraper()
+
+    input("Remember to store 'this' inside getOfferBook() as the global variable temp2 ...")
 
     while True:
         if os.path.exists(PAUSE_FLAG_FILE):
@@ -263,7 +292,7 @@ def scrape_to_mongo():
             time.sleep(1)
             continue
 
-        try:
+        try:            
             process_and_save_data(driver)
         except Exception as e:
             print(f"Error during scraping: {e}")
@@ -294,11 +323,10 @@ def save_csv_data():
             df = pd.concat([df, df1])
         save_to_mongo(df)
 
-def get_data_to_csv():
-    """addPriceSerieEntityByDataSerieHistory"""
-    """ mydata = t.filter((item) => item.dtDateTime >  new Date('2025-02-10'));"""
+def get_data_to_csv():   
+    
     """Scrape data and save it to CSV files."""
-    driver = setup_scraper()
+    print("Remember to store the 't' parameter from addPriceSerieEntityByDataSerieHistory as the global variable temp1 ...")
     try:
         main_df = scrape_tickets(driver)
         tickets = main_df["Ativo"].values
@@ -307,24 +335,25 @@ def get_data_to_csv():
 
         for index, ticket in enumerate(tickets):
             if ticket != "IBOV":
-                input('Waiting for mydata of {} ...'.format(ticket))
-                length = driver.execute_script("return mydata.length")
+                
+                input('Waiting for temp1 to point to {} ...'.format(ticket))
+                length = driver.execute_script("return temp1.length")
                 data = []
 
                 for i in range(length):
-                    date_str = driver.execute_script(f"return mydata[{i}].dtDateTime.toLocaleString()")
+                    date_str = driver.execute_script(f"return temp1[{i}].dtDateTime.toLocaleString()")
                     date = dt.datetime.strptime(date_str, "%d/%m/%Y, %H:%M:%S")
-                    n_open = driver.execute_script(f"return mydata[{i}].nOpen")
+                    n_open = driver.execute_script(f"return temp1[{i}].nOpen")
                     
                     # Check for both possible property names using JavaScript fallback
                     n_max = driver.execute_script(
-                        f"return mydata[{i}].nMax !== undefined ? mydata[{i}].nMax : mydata[{i}].nMaximum"
+                        f"return temp1[{i}].nMax !== undefined ? temp1[{i}].nMax : temp1[{i}].nMaximum"
                     )
                     n_min = driver.execute_script(
-                        f"return mydata[{i}].nMin !== undefined ? mydata[{i}].nMin : mydata[{i}].nMinimum"
+                        f"return temp1[{i}].nMin !== undefined ? temp1[{i}].nMin : temp1[{i}].nMinimum"
                     )
-                    n_close = driver.execute_script(f"return mydata[{i}].nClose")
-                    n_volume = driver.execute_script(f"return mydata[{i}].nVolume")
+                    n_close = driver.execute_script(f"return temp1[{i}].nClose")
+                    n_volume = driver.execute_script(f"return temp1[{i}].nVolume")
 
                     data.append(
                         {
@@ -359,13 +388,13 @@ def get_data_to_csv():
                 df.to_csv(file_path, index=False)
                 print(f"Data for ticket {ticket} saved to {file_path}.")
         
-        save_csv_data()
-        print("Scraping completed successfully.")
-    finally:
-        driver.quit()
-        print("WebDriver closed. Script finished.")
+        save_csv_data()        
+    finally:        
+        print("Scraping of last prices completed.")
 
 if __name__ == "__main__":
-    warnings.simplefilter(action="ignore")
+    warnings.simplefilter(action="ignore")    
+    driver = setup_scraper()
     #get_data_to_csv()
     scrape_to_mongo()
+    driver.quit()
