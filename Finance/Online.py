@@ -110,7 +110,7 @@ def save_to_mongo(df):
     # Step 4: Execute bulk write
     if operations:
         result = DB_PRICES.bulk_write(operations)
-        print(f"Upserted: {result.upserted_count}, Modified: {result.modified_count}")
+        
 
 
 def convert_numeric(value):
@@ -285,14 +285,19 @@ def process_and_save_data(driver):
 def scrape_to_mongo():
 
     input("Remember to store 'this' inside getOfferBook() as the global variable temp2 ...")
-
+    show_message = True
     while True:
         if os.path.exists(PAUSE_FLAG_FILE):
-            print("Scraper paused. Waiting...")
-            time.sleep(1)
+            if show_message is False:
+                print("Scraper paused. Waiting...")
+                show_message = True
+            time.sleep(1)            
             continue
 
-        try:            
+        try:
+            if show_message:
+                print("Running scraper ...")
+                show_message = False
             process_and_save_data(driver)
         except Exception as e:
             print(f"Error during scraping: {e}")
