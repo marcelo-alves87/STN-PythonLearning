@@ -17,7 +17,8 @@ import numpy
 URL = "https://rico.com.vc/"
 PAUSE_FLAG_FILE = "pause.flag"
 DB_CLIENT = MongoClient("localhost", 27017)
-DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing prices
+DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing aggregated prices
+DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices # MongoDB collection for storing scraped prices
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
@@ -132,8 +133,34 @@ def convert_numeric(value):
     else:   
         return value
 
+def save_into_scraped_prices(df):
+
+    # 1. Assume df_scraped is already defined
+    df_scraped = df[['Data/Hora', 'AvgBuyPrice', 'AvgSellPrice',  'AvgBuyQty',  'AvgSellQty']].copy()
+
+    # 2. Rename column and convert to datetime
+    df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
+    df_scraped['time'] = pd.to_datetime(df_scraped['time'])
+
+    DB_SCRAPED_PRICES.create_index('time', unique=True)
+
+    # 5. Prepare bulk upsert operations to avoid duplicates
+    operations = [
+        UpdateOne(
+            {'time': row['time']},
+            {'$set': row},
+            upsert=True
+        )
+        for row in df_scraped.to_dict(orient='records')
+    ]
+
+    # 6. Execute the bulk write
+    if operations:
+        result = DB_SCRAPED_PRICES.bulk_write(operations)        
+    
+
 def scrap_offerbook(driver, df):
-   
+       
     
     # JavaScript execution to extract buy/sell offers
     js_buy = """
@@ -171,7 +198,7 @@ def scrap_offerbook(driver, df):
     df.at[df.index[-1], "AvgSellQty"] = avg_sell_qty
 
     
-    
+    save_into_scraped_prices(df)
   
 
 def process_and_save_data(driver):
@@ -264,18 +291,45 @@ def process_and_save_data(driver):
             "low": "min",
             "close": "last",
             "volume": "last",
-            "AvgBuyPrice": "mean",
-            "AvgSellPrice": "mean",
             "AvgBuyQty": "mean",
             "AvgSellQty": "mean"
 
         }).dropna().reset_index()
+
+        # Rename AvgBuyQty and AvgSellQty to match _Close convention
+        df_resampled.rename(columns={
+            "AvgBuyQty": "AvgBuyQty_Close",
+            "AvgSellQty": "AvgSellQty_Close"
+        }, inplace=True)
 
         # Remove previous data from MongoDB that falls within the resampled time range
         min_time = df_resampled["time"].min()
         max_time = df_resampled["time"].max()
         
         DB_PRICES.delete_many({"time": {"$gte": min_time, "$lte": max_time}})
+
+        scraped_data = list(DB_SCRAPED_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
+        df_scraped = pd.DataFrame(scraped_data)
+        if not df_scraped.empty:
+            df_scraped["time"] = pd.to_datetime(df_scraped["time"])
+            df_scraped.set_index("time", inplace=True)
+
+            df_scraped_ohlc = df_scraped.resample("5T").agg({
+                "AvgBuyPrice": ["first", "max", "min", "last"],
+                "AvgSellPrice": ["first", "max", "min", "last"]
+            })
+
+            # Rename columns to _Open, _High, _Low, _Close
+            df_scraped_ohlc.columns = [
+                "AvgBuyPrice_Open", "AvgBuyPrice_High", "AvgBuyPrice_Low", "AvgBuyPrice_Close",
+                "AvgSellPrice_Open", "AvgSellPrice_High", "AvgSellPrice_Low", "AvgSellPrice_Close"
+            ]
+
+            df_scraped_ohlc.reset_index(inplace=True)            
+
+            df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")
+
+
 
         # Save the newly aggregated data
         save_to_mongo(df_resampled)
@@ -400,6 +454,6 @@ def get_data_to_csv():
 if __name__ == "__main__":
     warnings.simplefilter(action="ignore")    
     driver = setup_scraper()
-    #get_data_to_csv()
+    get_data_to_csv()
     scrape_to_mongo()
     driver.quit()
