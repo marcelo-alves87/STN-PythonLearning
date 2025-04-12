@@ -12,22 +12,26 @@ db = client["mongodb"]  # Database name
 collection = db["prices"]  # Collection name
 
 def insert_data_from_csv(date=None):
+
+
     # 2️⃣ Load the CSV file
     csv_file_path = "./stock_dfs/SBSP3.csv"
     df = pd.read_csv(csv_file_path)
     df["Datetime"] = pd.to_datetime(df["Datetime"], errors='coerce')
+
     if date:
-        date = pd.to_datetime(date).date()        
+        date = pd.to_datetime(date).date()
         df = df[df['Datetime'].dt.date <= date]
 
     # 3️⃣ Define the stock ticker
     ticket = "SBSP3"
 
-    # 4️⃣ Convert DataFrame to MongoDB format
-    data_list = []
+    # 4️⃣ Upsert (insert or update) each row
+    upserted_count = 0
     for _, row in df.iterrows():
+        doc_time = dt.datetime.strptime(str(row['Datetime']), '%Y-%m-%d %H:%M:%S')
         data = {
-            "time": dt.datetime.strptime(str(row['Datetime']), '%Y-%m-%d %H:%M:%S'),
+            "time": doc_time,
             "close": row['Close'],
             "volume": row['Volume'],
             "ativo": ticket,
@@ -35,14 +39,17 @@ def insert_data_from_csv(date=None):
             "high": row['High'],
             "low": row['Low']
         }
-        data_list.append(data)
+        
+        result = collection.update_one(
+            {"time": doc_time},
+            {"$set": data},
+            upsert=True
+        )
+        if result.upserted_id or result.modified_count:
+            upserted_count += 1
 
-    # 5️⃣ Insert into MongoDB
-    if data_list:
-        collection.insert_many(data_list)
-        print(f"Inserted {len(data_list)} records into MongoDB collection 'prices'.")
-    else:
-        print("No data found in CSV to insert.")
+    print(f"{upserted_count} registros inseridos ou atualizados na coleção 'prices'.")
+
 
 # 6️⃣ Method to erase all data from the collection
 def erase_all_data():
@@ -256,11 +263,11 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 # Example usage:
 #remove_registers_greater_than(dt.datetime(2025, 4, 6, 18, 00))
 #erase_all_data()
-#insert_data_from_csv()
+insert_data_from_csv()
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
 #update_with_fake_avg_values()
-export_to_csv('2025-04-10')
+#export_to_csv('2025-04-10')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
 
