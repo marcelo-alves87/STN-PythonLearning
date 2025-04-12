@@ -290,10 +290,7 @@ def process_and_save_data(driver):
             "high": "max",
             "low": "min",
             "close": "last",
-            "volume": "last",
-            "AvgBuyQty": "mean",
-            "AvgSellQty": "mean"
-
+            "volume": "last"
         }).dropna().reset_index()
 
         # Rename AvgBuyQty and AvgSellQty to match _Close convention
@@ -316,13 +313,17 @@ def process_and_save_data(driver):
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({
                 "AvgBuyPrice": ["first", "max", "min", "last"],
-                "AvgSellPrice": ["first", "max", "min", "last"]
+                "AvgSellPrice": ["first", "max", "min", "last"],
+                'AvgBuyQty': ["first", "max", "min", "last"],
+                'AvgSellQty' : ["first", "max", "min", "last"] 
             })
 
             # Rename columns to _Open, _High, _Low, _Close
             df_scraped_ohlc.columns = [
                 "AvgBuyPrice_Open", "AvgBuyPrice_High", "AvgBuyPrice_Low", "AvgBuyPrice_Close",
-                "AvgSellPrice_Open", "AvgSellPrice_High", "AvgSellPrice_Low", "AvgSellPrice_Close"
+                "AvgSellPrice_Open", "AvgSellPrice_High", "AvgSellPrice_Low", "AvgSellPrice_Close",
+                "AvgBuyQty_Open", "AvgBuyQty_High", "AvgBuyQty_Low", "AvgBuyQty_Close",
+                "AvgSellQty_Open", "AvgSellQty_High", "AvgSellQty_Low", "AvgSellQty_Close",
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            

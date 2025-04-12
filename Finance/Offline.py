@@ -193,17 +193,20 @@ def update_with_fake_avg_values():
 
     print("MongoDB documents updated with fake spread/imbalance values.")
 
-def export_all_to_csv(output_path="./mongo_export.csv"):
+def export_to_csv(input_date = None, output_path="./mongo_export.csv"):
     # Fetch all documents from the collection
     cursor = collection.find()
     data = list(cursor)
 
     if not data:
         print("No data found in MongoDB to export.")
-        return
+        return    
 
     # Convert to DataFrame
     df = pd.DataFrame(data)
+
+    if(input_date):
+        df = df[df['time'].dt.date == pd.to_datetime(input_date).date()]
 
     # Drop MongoDB's internal _id field
     if '_id' in df.columns:
@@ -251,12 +254,18 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
     
 
 # Example usage:
-#remove_registers_greater_than(dt.datetime(2025, 3, 18, 18, 00))
+#remove_registers_greater_than(dt.datetime(2025, 4, 6, 18, 00))
 #erase_all_data()
 #insert_data_from_csv()
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
 #update_with_fake_avg_values()
-#export_all_to_csv()
-insert_from_uploaded_csv()
+export_to_csv('2025-04-10')
+#insert_from_uploaded_csv()
 #print(collection.index_information())
+
+
+
+
+
+
