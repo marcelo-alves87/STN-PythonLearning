@@ -136,7 +136,7 @@ def convert_numeric(value):
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'AvgBuyPrice', 'AvgSellPrice',  'AvgBuyQty',  'AvgSellQty']].copy()
+    df_scraped = df[['Data/Hora', 'OrderBookScore']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -156,47 +156,62 @@ def save_into_scraped_prices(df):
 
     # 6. Execute the bulk write
     if operations:
-        result = DB_SCRAPED_PRICES.bulk_write(operations)        
+        result = DB_SCRAPED_PRICES.bulk_write(operations)
+
+def compute_order_book_score(buy_book, sell_book, current_price, max_distance=0.15):
+    support_score = 0
+    resistance_score = 0
+
+    for level in buy_book:
+        price = level["price"]
+        qty = level["quantity"]
+        if price >= current_price:
+            continue  # skip bids above or at market
+        dist = current_price - price
+        if 0 < dist < max_distance:
+            support_score += qty / dist
+
+    for level in sell_book:
+        price = level["price"]
+        qty = level["quantity"]
+        if price <= current_price:
+            continue  # skip asks below or at market
+        dist = price - current_price
+        if 0 < dist < max_distance:
+            resistance_score += qty / dist
+
+    total_weight = support_score + resistance_score
+    if total_weight == 0:
+        normalized_score = 0  # avoid division by zero
+    else:
+        normalized_score = 100 * (support_score - resistance_score) / total_weight
+
+    return normalized_score
     
 
-def scrap_offerbook(driver, df):
-       
+def scrap_pricebook(driver, df):      
     
-    # JavaScript execution to extract buy/sell offers
-    js_buy = """
-        const offerBook = temp2.getOfferBook().book;
-        return offerBook.arrLimitedBuy.map(entry => entry.obj);
+ 
+    js_price_book_buy = """
+    return temp2.priceBook.arrPriceBookOriginal.buy.map(entry => ({
+        price: entry.nPrice,
+        quantity: entry.nQuantity,
+        count: entry.nCount
+    }));
     """
-    js_sell = """
-        const offerBook = temp2.getOfferBook().book;
-        return offerBook.arrLimitedSell.map(entry => entry.obj);
+    js_price_book_sell = """
+    return temp2.priceBook.arrPriceBookOriginal.sell.map(entry => ({
+        price: entry.nPrice,
+        quantity: entry.nQuantity,
+        count: entry.nCount
+    }));
     """
-    limited_buys = driver.execute_script(js_buy)
-    limited_sells = driver.execute_script(js_sell)
+    buy_book = driver.execute_script(js_price_book_buy)
+    sell_book = driver.execute_script(js_price_book_sell)
 
-    # Create DataFrames
-    df_buy = pd.DataFrame(limited_buys)[["nPrice", "nQty"]]
-    df_sell = pd.DataFrame(limited_sells)[["nPrice", "nQty"]]
-
-    # Helper functions
-    def weighted_avg_price(df_side):
-        return (df_side["nPrice"] * df_side["nQty"]).sum() / df_side["nQty"].sum() if not df_side.empty else None
-
-    def avg_qty(df_side):
-        return df_side["nQty"].mean() if not df_side.empty else None
-
-    # Compute values
-    avg_buy_price = weighted_avg_price(df_buy)
-    avg_sell_price = weighted_avg_price(df_sell)
-    avg_buy_qty = avg_qty(df_buy)
-    avg_sell_qty = avg_qty(df_sell)
-
-    # Set into the last row of the existing DataFrame
-    df.at[df.index[-1], "AvgBuyPrice"] = avg_buy_price
-    df.at[df.index[-1], "AvgSellPrice"] = avg_sell_price
-    df.at[df.index[-1], "AvgBuyQty"] = avg_buy_qty
-    df.at[df.index[-1], "AvgSellQty"] = avg_sell_qty
-
+    current_price = df["Último"].iloc[-1]
+    score = compute_order_book_score(buy_book, sell_book, current_price)
+    df.at[df.index[-1], "OrderBookScore"] = score
     
     save_into_scraped_prices(df)
   
@@ -241,7 +256,7 @@ def process_and_save_data(driver):
         # Remove 'Estado Atual' and Preço Teórico columns
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
 
-        scrap_offerbook(driver, df)
+        scrap_pricebook(driver, df)
 
         # Rename columns to match the database format
         df.rename(columns={
@@ -293,12 +308,6 @@ def process_and_save_data(driver):
             "volume": "last"
         }).dropna().reset_index()
 
-        # Rename AvgBuyQty and AvgSellQty to match _Close convention
-        df_resampled.rename(columns={
-            "AvgBuyQty": "AvgBuyQty_Close",
-            "AvgSellQty": "AvgSellQty_Close"
-        }, inplace=True)
-
         # Remove previous data from MongoDB that falls within the resampled time range
         min_time = df_resampled["time"].min()
         max_time = df_resampled["time"].max()
@@ -312,25 +321,19 @@ def process_and_save_data(driver):
             df_scraped.set_index("time", inplace=True)
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({
-                "AvgBuyPrice": ["first", "max", "min", "last"],
-                "AvgSellPrice": ["first", "max", "min", "last"],
-                'AvgBuyQty': ["first", "max", "min", "last"],
-                'AvgSellQty' : ["first", "max", "min", "last"] 
+                "OrderBookScore": ["first", "max", "min", "last"]               
             })
 
             # Rename columns to _Open, _High, _Low, _Close
             df_scraped_ohlc.columns = [
-                "AvgBuyPrice_Open", "AvgBuyPrice_High", "AvgBuyPrice_Low", "AvgBuyPrice_Close",
-                "AvgSellPrice_Open", "AvgSellPrice_High", "AvgSellPrice_Low", "AvgSellPrice_Close",
-                "AvgBuyQty_Open", "AvgBuyQty_High", "AvgBuyQty_Low", "AvgBuyQty_Close",
-                "AvgSellQty_Open", "AvgSellQty_High", "AvgSellQty_Low", "AvgSellQty_Close",
+                "OrderBookScore_Open", "OrderBookScore_High", "OrderBookScore_Low", "OrderBookScore_Close"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
 
             df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")
 
-
+            
 
         # Save the newly aggregated data
         save_to_mongo(df_resampled)
@@ -339,7 +342,7 @@ def process_and_save_data(driver):
 
 def scrape_to_mongo():
 
-    input("Remember to store 'this' inside getOfferBook() as the global variable temp2 ...")
+    input("Remember to store 'this' inside getPriceBook() as the global variable temp2 ...")
     show_message = True
     while True:
         if os.path.exists(PAUSE_FLAG_FILE):
