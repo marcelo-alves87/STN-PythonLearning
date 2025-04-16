@@ -12,6 +12,8 @@ import warnings
 import shutil
 import pdb
 import numpy
+from collections import defaultdict
+import math
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -22,6 +24,11 @@ DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices # MongoDB collection for st
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
+
+# Global persistent cluster trackers
+buy_cluster_tracker = defaultdict(int)
+sell_cluster_tracker = defaultdict(int)
+
 
 def switch_to_correct_tab(driver):
     """Switch to the tab containing the desired element."""
@@ -136,7 +143,7 @@ def convert_numeric(value):
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'OrderBookScore']].copy()
+    df_scraped = df[['Data/Hora', 'OrderBookScore', 'Spread']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -158,61 +165,101 @@ def save_into_scraped_prices(df):
     if operations:
         result = DB_SCRAPED_PRICES.bulk_write(operations)
 
-def compute_order_book_score(buy_book, sell_book, current_price, max_distance=0.15):
-    support_score = 0
-    resistance_score = 0
-
+def update_persistent_clusters(buy_book, sell_book, current_price,
+                                quantity_threshold=1500, distance_limit=0.15,
+                                tracker_buy=None, tracker_sell=None):
     for level in buy_book:
         price = level["price"]
         qty = level["quantity"]
-        if price >= current_price:
-            continue  # skip bids above or at market
-        dist = current_price - price
-        if 0 < dist < max_distance:
-            support_score += qty / dist
+        if price < current_price and qty >= quantity_threshold and (current_price - price) <= distance_limit:
+            tracker_buy[price] += 1
 
     for level in sell_book:
         price = level["price"]
         qty = level["quantity"]
-        if price <= current_price:
-            continue  # skip asks below or at market
+        if price > current_price and qty >= quantity_threshold and (price - current_price) <= distance_limit:
+            tracker_sell[price] += 1
+
+def compute_proximity_score_from_clusters(current_price,
+                                          buy_cluster_tracker,
+                                          sell_cluster_tracker,
+                                          buy_book,
+                                          sell_book,
+                                          max_distance=0.15):
+    """
+    Calculates a score from -100 (resistance) to +100 (support)
+    based on proximity to persistent clusters.
+    """
+    support_score = 0
+    resistance_score = 0
+    best_bid = max(buy_book, key=lambda x: x["price"])['price']
+    best_ask = min(sell_book, key=lambda x: x["price"])['price']
+    spread = best_ask - best_bid
+
+    for price, hits in buy_cluster_tracker.items():
+        dist = current_price - price
+        if 0 < dist <= max_distance:
+            support_score += hits / dist
+
+    for price, hits in sell_cluster_tracker.items():
         dist = price - current_price
-        if 0 < dist < max_distance:
-            resistance_score += qty / dist
+        if 0 < dist <= max_distance:
+            resistance_score += hits / dist
 
-    total_weight = support_score + resistance_score
-    if total_weight == 0:
-        normalized_score = 0  # avoid division by zero
-    else:
-        normalized_score = 100 * (support_score - resistance_score) / total_weight
+    total = support_score + resistance_score
+    if total == 0:
+        return 0, spread
 
-    return normalized_score
-    
+    return 100 * (support_score - resistance_score) / total, spread
 
-def scrap_pricebook(driver, df):      
-    
- 
-    js_price_book_buy = """
-    return temp2.priceBook.arrPriceBookOriginal.buy.map(entry => ({
+def scrap_pricebook(driver, df):
+    # JavaScript to scrape order book
+    js_price_book_buy = """return temp2.priceBook.arrPriceBookOriginal.buy.map(entry => ({
         price: entry.nPrice,
         quantity: entry.nQuantity,
         count: entry.nCount
-    }));
-    """
-    js_price_book_sell = """
-    return temp2.priceBook.arrPriceBookOriginal.sell.map(entry => ({
+    }));"""
+
+    js_price_book_sell = """return temp2.priceBook.arrPriceBookOriginal.sell.map(entry => ({
         price: entry.nPrice,
         quantity: entry.nQuantity,
         count: entry.nCount
-    }));
-    """
+    }));"""
+
     buy_book = driver.execute_script(js_price_book_buy)
     sell_book = driver.execute_script(js_price_book_sell)
 
+    if not buy_book or not sell_book:
+        return
+
     current_price = df["Último"].iloc[-1]
-    score = compute_order_book_score(buy_book, sell_book, current_price)
-    df.at[df.index[-1], "OrderBookScore"] = score
-    
+
+    # 1. Track persistent clusters
+    update_persistent_clusters(
+        buy_book,
+        sell_book,
+        current_price,
+        quantity_threshold=1500,
+        distance_limit=0.15,
+        tracker_buy=buy_cluster_tracker,
+        tracker_sell=sell_cluster_tracker
+    )
+
+    # 2. Compute proximity score
+    proximity_score, spread = compute_proximity_score_from_clusters(
+        current_price,
+        buy_cluster_tracker,
+        sell_cluster_tracker,
+        buy_book,
+        sell_book,
+        max_distance=0.15        
+    )
+
+    # 3. Save into latest row
+    df.at[df.index[-1], "OrderBookScore"] = proximity_score
+    df.at[df.index[-1], "Spread"] = spread    
+
+    # Save result (your existing storage function)
     save_into_scraped_prices(df)
   
 
@@ -321,12 +368,14 @@ def process_and_save_data(driver):
             df_scraped.set_index("time", inplace=True)
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({
-                "OrderBookScore": ["first", "max", "min", "last"]               
+                "OrderBookScore": ["first", "max", "min", "mean"],
+                "Spread": ["first", "max", "min", "mean"] 
             })
 
             # Rename columns to _Open, _High, _Low, _Close
             df_scraped_ohlc.columns = [
-                "OrderBookScore_Open", "OrderBookScore_High", "OrderBookScore_Low", "OrderBookScore_Close"
+                "OrderBookScore_Open", "OrderBookScore_High", "OrderBookScore_Low", "OrderBookScore_Close",
+                "Spread_Open", "Spread_High", "Spread_Low", "Spread_Close"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
@@ -358,7 +407,7 @@ def scrape_to_mongo():
                 show_message = False
             process_and_save_data(driver)
         except Exception as e:
-            print(f"Error during scraping: {e}")
+            #print(f"Error during scraping: {e}")
             time.sleep(5)
 
         time.sleep(1)
@@ -455,8 +504,12 @@ def get_data_to_csv():
     finally:        
         print("Scraping of last prices completed.")
 
+def delete_scraped_collection():
+    DB_SCRAPED_PRICES.delete_many({})
+
 if __name__ == "__main__":
-    warnings.simplefilter(action="ignore")    
+    warnings.simplefilter(action="ignore")
+    delete_scraped_collection()
     driver = setup_scraper()
     get_data_to_csv()
     scrape_to_mongo()
