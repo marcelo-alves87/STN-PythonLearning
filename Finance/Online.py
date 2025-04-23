@@ -368,8 +368,8 @@ def process_and_save_data(driver):
             df_scraped.set_index("time", inplace=True)
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({
-                "OrderBookScore": ["first", "max", "min", "mean"],
-                "Spread": ["first", "max", "min", "mean"] 
+                "OrderBookScore": ["first", "max", "min", "last"],
+                "Spread": ["first", "max", "min", "last"] 
             })
 
             # Rename columns to _Open, _High, _Low, _Close
