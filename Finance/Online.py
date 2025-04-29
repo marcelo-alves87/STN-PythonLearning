@@ -163,7 +163,8 @@ def save_into_scraped_prices(df):
 
     # 6. Execute the bulk write
     if operations:
-        result = DB_SCRAPED_PRICES.bulk_write(operations)
+        result = DB_SCRAPED_PRICES.bulk_write(operations)        
+    
 
 def update_persistent_clusters(buy_book, sell_book, current_price,
                                 quantity_threshold=1500, distance_limit=0.15,
@@ -192,19 +193,35 @@ def compute_proximity_score_from_clusters(current_price,
     """
     support_score = 0
     resistance_score = 0
+    support_points = []
+    resistance_points = []
+    
     best_bid = max(buy_book, key=lambda x: x["price"])['price']
     best_ask = min(sell_book, key=lambda x: x["price"])['price']
-    spread = best_ask - best_bid
+    fallback_spread = best_ask - best_bid
 
     for price, hits in buy_cluster_tracker.items():
         dist = current_price - price
         if 0 < dist <= max_distance:
             support_score += hits / dist
+            support_points.append(price)
 
     for price, hits in sell_cluster_tracker.items():
         dist = price - current_price
         if 0 < dist <= max_distance:
             resistance_score += hits / dist
+            resistance_points.append(price)
+
+    # Pair up to the shortest list length
+    pair_count = min(len(support_points), len(resistance_points))
+    if pair_count > 0:
+        paired_spreads = [
+            resistance_points[i] - support_points[i]
+            for i in range(pair_count)
+        ]
+        spread = numpy.mean(paired_spreads)
+    else:
+        spread = fallback_spread
 
     total = support_score + resistance_score
     if total == 0:
@@ -230,6 +247,7 @@ def scrap_pricebook(driver, df):
     sell_book = driver.execute_script(js_price_book_sell)
 
     if not buy_book or not sell_book:
+        input("Manually update temp2 by assigning 'this' of getPriceBook() in the console ...")
         return
 
     current_price = df["Último"].iloc[-1]
