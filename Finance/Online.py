@@ -172,14 +172,16 @@ def update_persistent_clusters(buy_book, sell_book, current_price,
     for level in buy_book:
         price = level["price"]
         qty = level["quantity"]
+        count = level["count"]
         if price < current_price and qty >= quantity_threshold and (current_price - price) <= distance_limit:
-            tracker_buy[price] += 1
+            tracker_buy[price] += count
 
     for level in sell_book:
         price = level["price"]
         qty = level["quantity"]
+        count = level["count"]
         if price > current_price and qty >= quantity_threshold and (price - current_price) <= distance_limit:
-            tracker_sell[price] += 1
+            tracker_sell[price] += count
 
 def compute_proximity_score_from_clusters(current_price,
                                           buy_cluster_tracker,
