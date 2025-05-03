@@ -140,10 +140,82 @@ def convert_numeric(value):
     else:   
         return value
 
+def detect_absorption_strength(df: pd.DataFrame, score_col="OrderBookScore_Mean", spread_col="Spread_Mean",
+                               max_score=100, max_spread=0.05) -> pd.Series:
+    """
+    Returns a continuous absorption score between -1.0 and +1.0 based on order book score and spread tightness.
+
+    Parameters:
+    - df: input DataFrame with order book metrics
+    - score_col: column name for order book score
+    - spread_col: column name for spread
+    - max_score: maximum score considered (for scaling)
+    - max_spread: spread value below which absorption is possible
+
+    Returns:
+    - pd.Series with float values from -1.0 (strong sell absorption) to +1.0 (strong buy absorption)
+    """
+    absorption_strength = []
+
+    for row in df.itertuples():
+        score = getattr(row, score_col, 0)
+        spread = getattr(row, spread_col, 1)  # use 1 if missing to disable absorption
+
+        if spread > max_spread:
+            absorption_strength.append(0.0)
+            continue
+
+        # Clamp score to max_score range
+        score_clamped = max(-max_score, min(score, max_score))
+        scaled = round(score_clamped / max_score, 4)
+        absorption_strength.append(scaled)
+
+    return pd.Series(absorption_strength, index=df.index, name="Absorption")
+
+def detect_smart_divergence(df: pd.DataFrame, lookback: int = 5):
+    """
+    Detect smart and reliable delta divergence with confirmation.
+    Returns a list with 'bullish', 'bearish', or None for each row.
+    Requires 'close' and 'Pressure_Mean' columns.
+    """
+    result = [None] * len(df)
+
+    for i in range(lookback + 2, len(df) - 1):
+        # Window to find previous swing
+        window = df.iloc[i - lookback:i]
+
+        # Find local min/max in price
+        price_low_idx = window["close"].idxmin()
+        price_high_idx = window["close"].idxmax()
+
+        # Use Pressure at those points
+        pressure_at_low = df.loc[price_low_idx, "Pressure_Mean"]
+        pressure_at_high = df.loc[price_high_idx, "Pressure_Mean"]
+
+        # Current bar
+        curr_price = df["close"].iloc[i]
+        curr_pressure = df["Pressure_Mean"].iloc[i]
+
+        # Confirmation bar (next candle)
+        next_price = df["close"].iloc[i + 1]
+
+        # Bullish divergence: price makes lower low, pressure makes higher low
+        if (curr_price < df.loc[price_low_idx, "close"]) and (curr_pressure > pressure_at_low):
+            if next_price > curr_price:
+                result[i + 1] = "bullish"
+
+        # Bearish divergence: price makes higher high, pressure makes lower high
+        elif (curr_price > df.loc[price_high_idx, "close"]) and (curr_pressure < pressure_at_high):
+            if next_price < curr_price:
+                result[i + 1] = "bearish"
+
+    return result
+
+
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'OrderBookScore', 'Spread']].copy()
+    df_scraped = df[['Data/Hora', 'OrderBookScore', 'Spread', 'Pressure']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -163,7 +235,15 @@ def save_into_scraped_prices(df):
 
     # 6. Execute the bulk write
     if operations:
-        result = DB_SCRAPED_PRICES.bulk_write(operations)        
+        result = DB_SCRAPED_PRICES.bulk_write(operations)
+
+
+def compute_pressure(trades):
+    buy_qty = sum(t["nQuantity"] for t in trades if t.get("bBuyerAgressor") is True)
+    sell_qty = sum(t["nQuantity"] for t in trades if t.get("bBuyerAgressor") is False)
+    total = buy_qty + sell_qty
+    return round((buy_qty - sell_qty) / total, 4) if total > 0 else 0.0
+
     
 
 def update_persistent_clusters(buy_book, sell_book, current_price,
@@ -233,6 +313,7 @@ def compute_proximity_score_from_clusters(current_price,
 
 def scrap_pricebook(driver, df):
     # JavaScript to scrape order book
+    # Warning: These things can be asynchronous!
     js_price_book_buy = """return temp2.priceBook.arrPriceBookOriginal.buy.map(entry => ({
         price: entry.nPrice,
         quantity: entry.nQuantity,
@@ -252,7 +333,20 @@ def scrap_pricebook(driver, df):
         input("Manually update temp2 by assigning 'this' of getPriceBook() in the console ...")
         return
 
-    current_price = df["Último"].iloc[-1]
+    js_trades_script = """return temp3.asset.arrTrades.slice(-10).map(entry => ({
+        dtDate: entry.dtDate,
+        nPrice: entry.nPrice,
+        nQuantity: entry.nQuantity,
+        bBuyerAgressor: entry.bBuyerAgressor
+    }));"""
+                                            
+    recent_trades = driver.execute_script(js_trades_script)
+
+    if not recent_trades:
+        input("Manually update temp3 by assigning 'this' of this.asset.arrTrades in the console ...")
+        return
+    
+    current_price = df["Último"].iloc[-1]    
 
     # 1. Track persistent clusters
     update_persistent_clusters(
@@ -275,9 +369,13 @@ def scrap_pricebook(driver, df):
         max_distance=0.15        
     )
 
+    # 3. Compute pressure
+    pressure = compute_pressure(recent_trades)
+
     # 3. Save into latest row
     df.at[df.index[-1], "OrderBookScore"] = proximity_score
-    df.at[df.index[-1], "Spread"] = spread    
+    df.at[df.index[-1], "Spread"] = spread
+    df.at[df.index[-1], "Pressure"] = pressure
 
     # Save result (your existing storage function)
     save_into_scraped_prices(df)
@@ -321,8 +419,8 @@ def process_and_save_data(driver):
         df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
 
         # Remove 'Estado Atual' and Preço Teórico columns
-        df = df.drop(columns=["Estado Atual", "Preço Teórico"])
-
+        df = df.drop(columns=["Estado Atual", "Preço Teórico"])        
+        
         scrap_pricebook(driver, df)
 
         # Rename columns to match the database format
@@ -388,21 +486,23 @@ def process_and_save_data(driver):
             df_scraped.set_index("time", inplace=True)
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({
-                "OrderBookScore": ["first", "max", "min", "last"],
-                "Spread": ["first", "max", "min", "last"] 
+                "OrderBookScore": "mean",
+                "Spread": "mean",
+                "Pressure" : "mean"
             })
 
-            # Rename columns to _Open, _High, _Low, _Close
+            # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "OrderBookScore_Open", "OrderBookScore_High", "OrderBookScore_Low", "OrderBookScore_Close",
-                "Spread_Open", "Spread_High", "Spread_Low", "Spread_Close"
+                "OrderBookScore_Mean", "Spread_Mean", "Pressure_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
 
             df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")
 
-            
+            df_resampled["DeltaDivergence"] = detect_smart_divergence(df_resampled)
+
+            df_resampled["Absorption"] = detect_absorption_strength(df_resampled)
 
         # Save the newly aggregated data
         save_to_mongo(df_resampled)
@@ -412,6 +512,7 @@ def process_and_save_data(driver):
 def scrape_to_mongo():
 
     input("Remember to store 'this' inside getPriceBook() as the global variable temp2 ...")
+    input("Remember to store 'this' of  this.asset.arrTrades as the global variable temp3 ...")
     show_message = True
     while True:
         if os.path.exists(PAUSE_FLAG_FILE):
@@ -529,8 +630,8 @@ def delete_scraped_collection():
 
 if __name__ == "__main__":
     warnings.simplefilter(action="ignore")
-    delete_scraped_collection()
+    #delete_scraped_collection()
     driver = setup_scraper()
     get_data_to_csv()
-    scrape_to_mongo()
+    #scrape_to_mongo()
     driver.quit()
