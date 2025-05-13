@@ -141,36 +141,27 @@ def convert_numeric(value):
         return value
 
 def detect_absorption_strength(df: pd.DataFrame, score_col="OrderBookScore_Mean", spread_col="Spread_Mean",
-                               max_score=100, max_spread=0.05) -> pd.Series:
+                               max_score=100, spread_quantile=0.25) -> float:
     """
-    Returns a continuous absorption score between -1.0 and +1.0 based on order book score and spread tightness.
-
-    Parameters:
-    - df: input DataFrame with order book metrics
-    - score_col: column name for order book score
-    - spread_col: column name for spread
-    - max_score: maximum score considered (for scaling)
-    - max_spread: spread value below which absorption is possible
-
-    Returns:
-    - pd.Series with float values from -1.0 (strong sell absorption) to +1.0 (strong buy absorption)
+    Computes the latest valid absorption score (between -1.0 and +1.0),
+    based on order book score and dynamically adjusted spread threshold.
     """
-    absorption_strength = []
+    valid_spreads = df[spread_col].dropna()
+    if valid_spreads.empty:
+        return 0.0
 
-    for row in df.itertuples():
-        score = getattr(row, score_col, 0)
-        spread = getattr(row, spread_col, 1)  # use 1 if missing to disable absorption
+    max_spread = valid_spreads.quantile(spread_quantile)
+    row = df.iloc[-1]  # last row
 
-        if spread > max_spread:
-            absorption_strength.append(0.0)
-            continue
+    score = row.get(score_col, 0)
+    spread = row.get(spread_col, 1)
 
-        # Clamp score to max_score range
-        score_clamped = max(-max_score, min(score, max_score))
-        scaled = round(score_clamped / max_score, 4)
-        absorption_strength.append(scaled)
+    if pd.isna(spread) or spread > max_spread:
+        return 0.0
 
-    return pd.Series(absorption_strength, index=df.index, name="Absorption")
+    score_clamped = max(-max_score, min(score, max_score))
+    return round(score_clamped / max_score, 4)
+
 
 def detect_smart_divergence(df: pd.DataFrame, lookback: int = 5):
     """
@@ -502,7 +493,10 @@ def process_and_save_data(driver):
 
             df_resampled["DeltaDivergence"] = detect_smart_divergence(df_resampled)
 
-            df_resampled["Absorption"] = detect_absorption_strength(df_resampled)
+            
+            df_resampled["Absorption"] = 0.0  
+            df_resampled.at[df_resampled.index[-1], "Absorption"] = detect_absorption_strength(df_resampled)
+
 
         # Save the newly aggregated data
         save_to_mongo(df_resampled)
@@ -630,8 +624,8 @@ def delete_scraped_collection():
 
 if __name__ == "__main__":
     warnings.simplefilter(action="ignore")
-    #delete_scraped_collection()
+    delete_scraped_collection()
     driver = setup_scraper()
     get_data_to_csv()
-    #scrape_to_mongo()
+    scrape_to_mongo()
     driver.quit()
