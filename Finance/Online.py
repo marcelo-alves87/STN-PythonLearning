@@ -494,8 +494,13 @@ def process_and_save_data(driver):
             df_resampled["DeltaDivergence"] = detect_smart_divergence(df_resampled)
 
             
-            df_resampled["Absorption"] = 0.0  
-            df_resampled.at[df_resampled.index[-1], "Absorption"] = detect_absorption_strength(df_resampled)
+            if "Absorption" not in df_resampled.columns:
+                df_resampled["Absorption"] = 0.0
+            else:
+                df_resampled["Absorption"] = df_resampled["Absorption"].fillna(0.0)
+
+
+            df_resampled.at[df_resampled.index[-1], "Absorption"] = detect_absorption_strength(df_resampled)            
 
 
         # Save the newly aggregated data
