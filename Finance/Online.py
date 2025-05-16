@@ -104,6 +104,7 @@ def save_to_mongo(df):
     for record in records:
         time_value = record["time"]
         existing = existing_map.get(time_value)
+        
         if existing:
             merged = existing.copy()
             merged.update(record)
@@ -114,6 +115,7 @@ def save_to_mongo(df):
             operations.append(
                 UpdateOne({"time": time_value}, {"$set": record}, upsert=True)
             )
+                            
 
     # Step 4: Execute bulk write
     if operations:
@@ -409,6 +411,7 @@ def process_and_save_data(driver):
         df["Último"] = df["Último"].apply(convert_numeric)
         df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
 
+        
         # Remove 'Estado Atual' and Preço Teórico columns
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])        
         
@@ -445,7 +448,7 @@ def process_and_save_data(driver):
             
             # Map stored volume to the new scraped data
             df["prev_volume"] = df["ativo"].map(last_volumes).fillna(0)
-
+                    
             # Compute volume difference per `ativo`
             df["volume"] = (df["volume"] - df["prev_volume"]).clip(lower=0)
             
@@ -462,13 +465,7 @@ def process_and_save_data(driver):
             "low": "min",
             "close": "last",
             "volume": "last"
-        }).dropna().reset_index()
-
-        # Remove previous data from MongoDB that falls within the resampled time range
-        min_time = df_resampled["time"].min()
-        max_time = df_resampled["time"].max()
-        
-        DB_PRICES.delete_many({"time": {"$gte": min_time, "$lte": max_time}})
+        }).dropna().reset_index()        
 
         scraped_data = list(DB_SCRAPED_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
         df_scraped = pd.DataFrame(scraped_data)
@@ -492,14 +489,7 @@ def process_and_save_data(driver):
             df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")
 
             df_resampled["DeltaDivergence"] = detect_smart_divergence(df_resampled)
-
             
-            if "Absorption" not in df_resampled.columns:
-                df_resampled["Absorption"] = 0.0
-            else:
-                df_resampled["Absorption"] = df_resampled["Absorption"].fillna(0.0)
-
-
             df_resampled.at[df_resampled.index[-1], "Absorption"] = detect_absorption_strength(df_resampled)            
 
 
