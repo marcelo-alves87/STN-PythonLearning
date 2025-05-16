@@ -200,24 +200,28 @@ def update_with_fake_avg_values():
 
     print("MongoDB documents updated with fake spread/imbalance values.")
 
-def export_to_csv(input_date = None, output_path="./mongo_export.csv"):
+def export_to_csv(input_date=None, output_path="./mongo_export.csv"):
     # Fetch all documents from the collection
     cursor = collection.find()
     data = list(cursor)
 
     if not data:
         print("No data found in MongoDB to export.")
-        return    
+        return
 
     # Convert to DataFrame
     df = pd.DataFrame(data)
 
-    if(input_date):
+    if input_date:
+        df['time'] = pd.to_datetime(df['time'])  # Ensure 'time' is datetime
         df = df[df['time'].dt.date == pd.to_datetime(input_date).date()]
 
     # Drop MongoDB's internal _id field
     if '_id' in df.columns:
         df.drop(columns=['_id'], inplace=True)
+
+    # Drop columns with all NaN values
+    df.dropna(axis=1, how='all', inplace=True)
 
     # Round all numeric columns to 2 decimal places
     numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -226,7 +230,6 @@ def export_to_csv(input_date = None, output_path="./mongo_export.csv"):
     # Save to CSV
     df.to_csv(output_path, index=False)
     print(f"Exported {len(df)} records to {output_path}")
-
 
 def insert_from_uploaded_csv(file_path="mongo_export.csv"):
     try:
@@ -263,14 +266,13 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 # Example usage:
 #remove_registers_greater_than(dt.datetime(2025, 4, 6, 18, 00))
 #erase_all_data()
-insert_data_from_csv()
+#insert_data_from_csv()
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
 #update_with_fake_avg_values()
-#export_to_csv('2025-04-10')
+export_to_csv('2025-05-15')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
-
 
 
 
