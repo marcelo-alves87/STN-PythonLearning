@@ -86,7 +86,7 @@ def scrape_tickets(driver):
     return df
 
 def save_to_mongo(df):
-    """Efficiently upsert DataFrame rows into MongoDB, preserving existing fields."""
+    """Smart upsert to MongoDB: update OHLCV fields, preserve calculated ones like Absorption."""
     if df.index.name == "time":
         df = df.reset_index()
 
@@ -95,34 +95,36 @@ def save_to_mongo(df):
         print("No records to save.")
         return
 
-    # Step 1: Get all times in the incoming data
     times = [r["time"] for r in records]
-
-    # Step 2: Fetch existing docs in one query
     existing_docs = DB_PRICES.find({"time": {"$in": times}})
     existing_map = {doc["time"]: doc for doc in existing_docs}
 
-    # Step 3: Prepare bulk upserts
+    # Define which fields are directly updatable from source data
+    updatable_fields = {"open", "high", "low", "close", "volume", "ativo", "time",
+                        "OrderBookScore_Mean", "Spread_Mean", "Pressure_Mean",
+                        "DeltaDivergence", "Absorption"}  # add more if needed
+
     operations = []
     for record in records:
         time_value = record["time"]
-        existing = existing_map.get(time_value)
-        
-        if existing:
-            merged = existing.copy()
-            merged.update(record)
-            operations.append(
-                UpdateOne({"_id": existing["_id"]}, {"$set": merged})
-            )
-        else:
-            operations.append(
-                UpdateOne({"time": time_value}, {"$set": record}, upsert=True)
-            )
-                            
+        existing = existing_map.get(time_value, {})
+        merged = existing.copy()
 
-    # Step 4: Execute bulk write
+        for key in updatable_fields:
+            if key in record:
+                value = record[key]
+                # Only update if new value is not null
+                if value is not None and (not isinstance(value, float) or not math.isnan(value)):
+                    merged[key] = record[key]
+
+        operations.append(
+            UpdateOne({"time": time_value}, {"$set": merged}, upsert=True)
+        )
+
     if operations:
         result = DB_PRICES.bulk_write(operations)
+        #print(f"Upserted: {result.upserted_count}, Modified: {result.modified_count}")
+
         
 
 
@@ -502,6 +504,22 @@ def process_and_save_data(driver):
         # Save the newly aggregated data
         save_to_mongo(df_resampled)
 
+def handle_shutdown(error=None):
+    print("\nInterrupted by user or unhandled error. Saving remaining absorption data...")
+    if error:
+        print(f"Unhandled error: {error}")
+    for time_key, absorption_value in last_valid_absorption.items():
+        DB_PRICES.update_one(
+            {'time': time_key},
+            {'$set': {'Absorption': absorption_value}},
+            upsert=True
+        )
+    print("Absorption data saved.")
+    try:
+        driver.quit()
+        print("Selenium driver closed.")
+    except Exception as e:
+        print(f"Error closing driver: {e}")
 
 
 def scrape_to_mongo():
@@ -526,22 +544,12 @@ def scrape_to_mongo():
             process_and_save_data(driver)
             time.sleep(1)
 
-    except Exception as e:
-        print("\nInterrupted by user or unhandled error. Saving remaining absorption data...")
-        print(f"Unhandled error: {e}")
-        for time_key, absorption_value in last_valid_absorption.items():
-            DB_PRICES.update_one(
-                {'time': time_key},
-                {'$set': {'Absorption': absorption_value}},
-                upsert=True
-            )
+    except KeyboardInterrupt:
+        handle_shutdown()
 
-        print("Absorption data saved.")
-        try:
-            driver.quit()
-            print("Selenium driver closed.")
-        except Exception as e:
-            print(f"Error closing driver: {e}")
+    except Exception as e:
+        handle_shutdown(e)
+
 
 def save_csv_data():
     """Save data from CSV files to MongoDB."""
