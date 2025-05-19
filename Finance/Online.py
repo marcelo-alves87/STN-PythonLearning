@@ -526,9 +526,9 @@ def scrape_to_mongo():
             process_and_save_data(driver)
             time.sleep(1)
 
-    except KeyboardInterrupt:
-        print("\nInterrupted by user. Saving remaining absorption data...")
-
+    except Exception as e:
+        print("\nInterrupted by user or unhandled error. Saving remaining absorption data...")
+        print(f"Unhandled error: {e}")
         for time_key, absorption_value in last_valid_absorption.items():
             DB_PRICES.update_one(
                 {'time': time_key},
@@ -542,12 +542,6 @@ def scrape_to_mongo():
             print("Selenium driver closed.")
         except Exception as e:
             print(f"Error closing driver: {e}")
-
-    except Exception as e:
-        # Optional: log or show exception
-        #print(f"Unhandled error: {e}")
-        time.sleep(5)
-
 
 def save_csv_data():
     """Save data from CSV files to MongoDB."""
