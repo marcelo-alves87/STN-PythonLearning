@@ -14,6 +14,7 @@ import pdb
 import numpy
 from collections import defaultdict
 import math
+import threading
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -24,6 +25,8 @@ DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices # MongoDB collection for st
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
+# Global in-memory cache of the last valid Absorption per time
+last_valid_absorption = {}
 
 # Global persistent cluster trackers
 buy_cluster_tracker = defaultdict(int)
@@ -375,7 +378,7 @@ def scrap_pricebook(driver, df):
   
 
 def process_and_save_data(driver):
-    global last_preco_teorico, last_status, volume_accumulated 
+    global last_preco_teorico, last_status, volume_accumulated, last_valid_absorption
     """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
@@ -489,8 +492,11 @@ def process_and_save_data(driver):
             df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")
 
             df_resampled["DeltaDivergence"] = detect_smart_divergence(df_resampled)
-            
-            df_resampled.at[df_resampled.index[-1], "Absorption"] = detect_absorption_strength(df_resampled)            
+
+            value = detect_absorption_strength(df_resampled)
+            time1 = df_resampled['time'].iloc[-1]
+            last_valid_absorption[time1] = value         
+            df_resampled.at[df_resampled.index[-1], "Absorption"] = value 
 
 
         # Save the newly aggregated data
@@ -499,28 +505,49 @@ def process_and_save_data(driver):
 
 
 def scrape_to_mongo():
-
     input("Remember to store 'this' inside getPriceBook() as the global variable temp2 ...")
-    input("Remember to store 'this' of  this.asset.arrTrades as the global variable temp3 ...")
-    show_message = True
-    while True:
-        if os.path.exists(PAUSE_FLAG_FILE):
-            if show_message is False:
-                print("Scraper paused. Waiting...")
-                show_message = True
-            time.sleep(1)            
-            continue
+    input("Remember to store 'this' of this.asset.arrTrades as the global variable temp3 ...")
 
-        try:
+    show_message = True
+    try:
+        while True:
+            if os.path.exists(PAUSE_FLAG_FILE):
+                if not show_message:
+                    print("Scraper paused. Waiting...")
+                    show_message = True
+                time.sleep(1)
+                continue
+
             if show_message:
                 print("Running scraper ...")
+                print("Stop its execution typing CTRL + C ...")
                 show_message = False
-            process_and_save_data(driver)
-        except Exception as e:
-            #print(f"Error during scraping: {e}")
-            time.sleep(5)
 
-        time.sleep(1)
+            process_and_save_data(driver)
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("\nInterrupted by user. Saving remaining absorption data...")
+
+        for time_key, absorption_value in last_valid_absorption.items():
+            DB_PRICES.update_one(
+                {'time': time_key},
+                {'$set': {'Absorption': absorption_value}},
+                upsert=True
+            )
+
+        print("Absorption data saved.")
+        try:
+            driver.quit()
+            print("Selenium driver closed.")
+        except Exception as e:
+            print(f"Error closing driver: {e}")
+
+    except Exception as e:
+        # Optional: log or show exception
+        #print(f"Unhandled error: {e}")
+        time.sleep(5)
+
 
 def save_csv_data():
     """Save data from CSV files to MongoDB."""
