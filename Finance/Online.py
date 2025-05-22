@@ -507,7 +507,8 @@ def process_and_save_data(driver):
 def handle_shutdown(error=None):
     print("\nInterrupted by user or unhandled error. Saving remaining absorption data...")
     if error:
-        print(f"Unhandled error: {error}")
+        print("Traceback (most recent call last):")
+        traceback.print_tb(error.__traceback__)  # Prints the stack trace
     for time_key, absorption_value in last_valid_absorption.items():
         DB_PRICES.update_one(
             {'time': time_key},
