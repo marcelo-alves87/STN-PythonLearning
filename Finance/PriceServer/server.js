@@ -1,18 +1,44 @@
 import express from "express";
 import fs from "fs";
 import { default as mongodb } from 'mongodb';
-
+import path from 'path';
 let MongoClient = mongodb.MongoClient;
 const client = new MongoClient('mongodb://localhost:27017/mongodb')
 await client.connect()
 const db = client.db()
 
-const path = 'btc-181123_2006-181124_0105.json'
+
 const app = express();
 const port = 3000;
 
 
+function deleteLayoutFiles() {
+    const directory = 'C:\\Users\\marce\\Downloads\\';
+    const regex = /^SBSP3_layout_(?:\s?\(\d+\))?\.json$/;
 
+    fs.readdir(directory, (err, files) => {
+        if (err) {
+            console.error('Error reading directory:', err);
+            return;
+        }
+
+        files.forEach(file => {
+            if (regex.test(file)) {
+                const filePath = path.join(directory, file);
+                fs.unlink(filePath, (err) => {
+                    if (err) {
+                        console.error(`Error deleting file ${file}:`, err);
+                    } else {
+                        //console.log(`Deleted file: ${file}`);
+                    }
+                });
+            }
+        });
+    });
+}
+
+
+deleteLayoutFiles();
 
 
 app.get('/*.json', (req, res) => {
