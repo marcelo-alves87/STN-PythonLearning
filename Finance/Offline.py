@@ -5,9 +5,10 @@ import pdb
 import time
 import random
 import numpy as np
+import os
 
 # 1️⃣ Connect to MongoDB
-client = MongoClient("localhost", 27017)
+client = MongoClient("mongodb://localhost:27017/")
 db = client["mongodb"]  # Database name
 collection = db["prices"]  # Collection name
 
@@ -209,6 +210,9 @@ def export_to_csv(input_date=None, output_path="./mongo_export.csv"):
         print("No data found in MongoDB to export.")
         return
 
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
     # Convert to DataFrame
     df = pd.DataFrame(data)
 
@@ -270,7 +274,7 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
 #update_with_fake_avg_values()
-export_to_csv('2025-05-15')
+export_to_csv('2025-05-22')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
 
