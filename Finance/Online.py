@@ -14,7 +14,7 @@ import pdb
 import numpy
 from collections import defaultdict
 import math
-import threading
+import traceback
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -504,23 +504,25 @@ def process_and_save_data(driver):
         # Save the newly aggregated data
         save_to_mongo(df_resampled)
 
-def handle_shutdown(error=None):
-    print("\nInterrupted by user or unhandled error. Saving remaining absorption data...")
+def handle_exception(error=None, shutdown=True):    
     if error:
         print("Traceback (most recent call last):")
         traceback.print_tb(error.__traceback__)  # Prints the stack trace
-    for time_key, absorption_value in last_valid_absorption.items():
-        DB_PRICES.update_one(
-            {'time': time_key},
-            {'$set': {'Absorption': absorption_value}},
-            upsert=True
-        )
-    print("Absorption data saved.")
-    try:
-        driver.quit()
-        print("Selenium driver closed.")
-    except Exception as e:
-        print(f"Error closing driver: {e}")
+    if shutdown:
+        print("\nInterrupted by user. Saving remaining absorption data...")
+        for time_key, absorption_value in last_valid_absorption.items():
+            DB_PRICES.update_one(
+                {'time': time_key},
+                {'$set': {'Absorption': absorption_value}},
+                upsert=True
+            )
+        print("Absorption data saved.")
+        try:
+            driver.quit()
+            print("Selenium driver closed.")
+        except Exception as e:
+            print(f"Error closing driver: {e}")
+
 
 
 def scrape_to_mongo():
@@ -528,28 +530,32 @@ def scrape_to_mongo():
     input("Remember to store 'this' of this.asset.arrTrades as the global variable temp3 ...")
 
     show_message = True
+
     try:
         while True:
-            if os.path.exists(PAUSE_FLAG_FILE):
-                if not show_message:
-                    print("Scraper paused. Waiting...")
-                    show_message = True
+            try:
+                if os.path.exists(PAUSE_FLAG_FILE):
+                    if not show_message:
+                        print("Scraper paused. Waiting...")
+                        show_message = True
+                    time.sleep(1)
+                    continue
+
+                if show_message:
+                    print("Running scraper ...")
+                    print("Stop its execution typing CTRL + C ...")
+                    show_message = False
+
+                process_and_save_data(driver)
                 time.sleep(1)
-                continue
 
-            if show_message:
-                print("Running scraper ...")
-                print("Stop its execution typing CTRL + C ...")
-                show_message = False
-
-            process_and_save_data(driver)
-            time.sleep(1)
+            except Exception as e:
+                handle_exception(e, False)
+                time.sleep(2)  # Optional: wait before retrying to avoid hammering
 
     except KeyboardInterrupt:
-        handle_shutdown()
-
-    except Exception as e:
-        handle_shutdown(e)
+        handle_exception()
+        print("Scraper stopped by user.")
 
 
 def save_csv_data():
