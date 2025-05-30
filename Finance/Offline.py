@@ -220,6 +220,13 @@ def export_to_csv(input_date=None, output_path="./mongo_export.csv"):
         df['time'] = pd.to_datetime(df['time'])  # Ensure 'time' is datetime
         df = df[df['time'].dt.date == pd.to_datetime(input_date).date()]
 
+    # Drop Ativo column
+    column_to_remove = "ativo"
+
+    if column_to_remove in df.columns:
+        df = df.drop(columns=[column_to_remove])
+
+
     # Drop MongoDB's internal _id field
     if '_id' in df.columns:
         df.drop(columns=['_id'], inplace=True)
@@ -274,7 +281,7 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
 #update_with_fake_avg_values()
-export_to_csv('2025-05-22')
+export_to_csv('2025-05-30')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
 
