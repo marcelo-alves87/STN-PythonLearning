@@ -100,9 +100,12 @@ def save_to_mongo(df):
     existing_map = {doc["time"]: doc for doc in existing_docs}
 
     # Define which fields are directly updatable from source data
-    updatable_fields = {"open", "high", "low", "close", "volume", "ativo", "time",
-                        "OrderBookScore_Mean", "Spread_Mean", "Pressure_Mean",
-                        "DeltaDivergence", "Absorption"}  # add more if needed
+    updatable_fields = {
+        "open", "high", "low", "close", "volume", "ativo", "time",
+        "OrderBookScore_Mean", "ClusterPairSpread_Mean", "RawSpread_Mean", "DensitySpread_Mean", "Pressure_Mean",
+        "DeltaDivergence", "Absorption"
+    }
+    
 
     operations = []
     for record in records:
@@ -147,7 +150,32 @@ def convert_numeric(value):
     else:   
         return value
 
-def detect_absorption_strength(df: pd.DataFrame, score_col="OrderBookScore_Mean", spread_col="Spread_Mean",
+def compute_density_spread(buy_book, sell_book):
+    """
+    Computes a normalized DensitySpread: (buy_density - sell_density) / (buy_density + sell_density)
+    Density = total quantity / price span for each side.
+    """
+    if not buy_book or not sell_book:
+        return 0.0
+
+    buy_prices = [entry["price"] for entry in buy_book]
+    sell_prices = [entry["price"] for entry in sell_book]
+    buy_qty = sum(entry["quantity"] for entry in buy_book)
+    sell_qty = sum(entry["quantity"] for entry in sell_book)
+
+    buy_span = max(buy_prices) - min(buy_prices)
+    sell_span = max(sell_prices) - min(sell_prices)
+
+    buy_density = buy_qty / buy_span if buy_span > 0 else 0
+    sell_density = sell_qty / sell_span if sell_span > 0 else 0
+
+    total = buy_density + sell_density
+    if total == 0:
+        return 0.0
+
+    return round((buy_density - sell_density) / total, 4)
+
+def detect_absorption_strength(df: pd.DataFrame, score_col="OrderBookScore_Mean", spread_col="ClusterPairSpread_Mean",
                                max_score=100, spread_quantile=0.25) -> float:
     """
     Computes the latest valid absorption score (between -1.0 and +1.0),
@@ -213,7 +241,7 @@ def detect_smart_divergence(df: pd.DataFrame, lookback: int = 5):
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'OrderBookScore', 'Spread', 'Pressure']].copy()
+    df_scraped = df[['Data/Hora', 'OrderBookScore', 'ClusterPairSpread', 'RawSpread', 'DensitySpread', 'Pressure']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -305,9 +333,9 @@ def compute_proximity_score_from_clusters(current_price,
 
     total = support_score + resistance_score
     if total == 0:
-        return 0, spread
+        return 0, spread, fallback_spread
 
-    return 100 * (support_score - resistance_score) / total, spread
+    return 100 * (support_score - resistance_score) / total, spread, fallback_spread
 
 def scrap_pricebook(driver, df):
     # JavaScript to scrape order book
@@ -358,7 +386,7 @@ def scrap_pricebook(driver, df):
     )
 
     # 2. Compute proximity score
-    proximity_score, spread = compute_proximity_score_from_clusters(
+    proximity_score, spread, raw_spread = compute_proximity_score_from_clusters(
         current_price,
         buy_cluster_tracker,
         sell_cluster_tracker,
@@ -370,9 +398,14 @@ def scrap_pricebook(driver, df):
     # 3. Compute pressure
     pressure = compute_pressure(recent_trades)
 
+    # 4. Compute DensitySpread
+    density_spread = compute_density_spread(buy_book, sell_book)
+
     # 3. Save into latest row
     df.at[df.index[-1], "OrderBookScore"] = proximity_score
-    df.at[df.index[-1], "Spread"] = spread
+    df.at[df.index[-1], "ClusterPairSpread"] = spread
+    df.at[df.index[-1], "RawSpread"] = raw_spread
+    df.at[df.index[-1], "DensitySpread"] = density_spread
     df.at[df.index[-1], "Pressure"] = pressure
 
     # Save result (your existing storage function)
@@ -448,18 +481,11 @@ def process_and_save_data(driver):
         # Append new data to the existing one
         if not df_existing.empty:
             df_existing = df_existing.set_index('time')
-            # Get the last stored volume for each `ativo`
             last_volumes = df_existing.groupby("ativo")["volume"].sum().to_dict()
-            
-            # Map stored volume to the new scraped data
+            df["volume_raw"] = df["volume"]
             df["prev_volume"] = df["ativo"].map(last_volumes).fillna(0)
-                    
-            # Compute volume difference per `ativo`
-            df["volume"] = (df["volume"] - df["prev_volume"]).clip(lower=0)
-            
-            
-            # Drop temporary column
-            df.drop(columns=["prev_volume"], inplace=True)
+            df["volume"] = (df["volume_raw"] - df["prev_volume"]).apply(lambda x: x if x > 0 else 0)
+            df.drop(columns=["prev_volume", "volume_raw"], inplace=True)
 
             df = pd.concat([df_existing, df])
         
@@ -469,7 +495,7 @@ def process_and_save_data(driver):
             "high": "max",
             "low": "min",
             "close": "last",
-            "volume": "last"
+            "volume": "sum"
         }).dropna().reset_index()        
 
         scraped_data = list(DB_SCRAPED_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
@@ -480,13 +506,15 @@ def process_and_save_data(driver):
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({
                 "OrderBookScore": "mean",
-                "Spread": "mean",
+                "ClusterPairSpread": "mean",
+                "RawSpread": "mean",
+                "DensitySpread": "mean",
                 "Pressure" : "mean"
             })
 
             # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "OrderBookScore_Mean", "Spread_Mean", "Pressure_Mean"
+                "OrderBookScore_Mean", "ClusterPairSpread_Mean", "RawSpread_Mean" , "DensitySpread_Mean", "Pressure_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
