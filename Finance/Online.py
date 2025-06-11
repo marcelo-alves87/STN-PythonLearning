@@ -15,6 +15,9 @@ import numpy
 from collections import defaultdict
 import math
 import traceback
+from dateutil import parser
+import re
+from datetime import timedelta
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -25,8 +28,6 @@ DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices # MongoDB collection for st
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
-# Global in-memory cache of the last valid Absorption per time
-last_valid_absorption = {}
 
 # Global persistent cluster trackers
 buy_cluster_tracker = defaultdict(int)
@@ -102,8 +103,8 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "OrderBookScore_Mean", "ClusterPairSpread_Mean", "RawSpread_Mean", "DensitySpread_Mean", "Pressure_Mean",
-        "DeltaDivergence", "Absorption"
+        "RawSpread_Mean", "DensitySpread_Mean", "Pressure_Mean",
+        "AgentFlow_Mean"
     }
     
 
@@ -175,73 +176,10 @@ def compute_density_spread(buy_book, sell_book):
 
     return round((buy_density - sell_density) / total, 4)
 
-def detect_absorption_strength(df: pd.DataFrame, score_col="OrderBookScore_Mean", spread_col="ClusterPairSpread_Mean",
-                               max_score=100, spread_quantile=0.25) -> float:
-    """
-    Computes the latest valid absorption score (between -1.0 and +1.0),
-    based on order book score and dynamically adjusted spread threshold.
-    """
-    valid_spreads = df[spread_col].dropna()
-    if valid_spreads.empty:
-        return 0.0
-
-    max_spread = valid_spreads.quantile(spread_quantile)
-    row = df.iloc[-1]  # last row
-
-    score = row.get(score_col, 0)
-    spread = row.get(spread_col, 1)
-
-    if pd.isna(spread) or spread > max_spread:
-        return 0.0
-
-    score_clamped = max(-max_score, min(score, max_score))
-    return round(score_clamped / max_score, 4)
-
-
-def detect_smart_divergence(df: pd.DataFrame, lookback: int = 5):
-    """
-    Detect smart and reliable delta divergence with confirmation.
-    Returns a list with 'bullish', 'bearish', or None for each row.
-    Requires 'close' and 'Pressure_Mean' columns.
-    """
-    result = [None] * len(df)
-
-    for i in range(lookback + 2, len(df) - 1):
-        # Window to find previous swing
-        window = df.iloc[i - lookback:i]
-
-        # Find local min/max in price
-        price_low_idx = window["close"].idxmin()
-        price_high_idx = window["close"].idxmax()
-
-        # Use Pressure at those points
-        pressure_at_low = df.loc[price_low_idx, "Pressure_Mean"]
-        pressure_at_high = df.loc[price_high_idx, "Pressure_Mean"]
-
-        # Current bar
-        curr_price = df["close"].iloc[i]
-        curr_pressure = df["Pressure_Mean"].iloc[i]
-
-        # Confirmation bar (next candle)
-        next_price = df["close"].iloc[i + 1]
-
-        # Bullish divergence: price makes lower low, pressure makes higher low
-        if (curr_price < df.loc[price_low_idx, "close"]) and (curr_pressure > pressure_at_low):
-            if next_price > curr_price:
-                result[i + 1] = "bullish"
-
-        # Bearish divergence: price makes higher high, pressure makes lower high
-        elif (curr_price > df.loc[price_high_idx, "close"]) and (curr_pressure < pressure_at_high):
-            if next_price < curr_price:
-                result[i + 1] = "bearish"
-
-    return result
-
-
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'OrderBookScore', 'ClusterPairSpread', 'RawSpread', 'DensitySpread', 'Pressure']].copy()
+    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'Pressure', 'AgentFlow']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -272,70 +210,13 @@ def compute_pressure(trades):
 
     
 
-def update_persistent_clusters(buy_book, sell_book, current_price,
-                                quantity_threshold=1500, distance_limit=0.15,
-                                tracker_buy=None, tracker_sell=None):
-    for level in buy_book:
-        price = level["price"]
-        qty = level["quantity"]
-        count = level["count"]
-        if price < current_price and qty >= quantity_threshold and (current_price - price) <= distance_limit:
-            tracker_buy[price] += count
-
-    for level in sell_book:
-        price = level["price"]
-        qty = level["quantity"]
-        count = level["count"]
-        if price > current_price and qty >= quantity_threshold and (price - current_price) <= distance_limit:
-            tracker_sell[price] += count
-
-def compute_proximity_score_from_clusters(current_price,
-                                          buy_cluster_tracker,
-                                          sell_cluster_tracker,
-                                          buy_book,
-                                          sell_book,
-                                          max_distance=0.15):
-    """
-    Calculates a score from -100 (resistance) to +100 (support)
-    based on proximity to persistent clusters.
-    """
-    support_score = 0
-    resistance_score = 0
-    support_points = []
-    resistance_points = []
-    
+def compute_raw_spread(buy_book, sell_book):
+        
     best_bid = max(buy_book, key=lambda x: x["price"])['price']
     best_ask = min(sell_book, key=lambda x: x["price"])['price']
-    fallback_spread = best_ask - best_bid
-
-    for price, hits in buy_cluster_tracker.items():
-        dist = current_price - price
-        if 0 < dist <= max_distance:
-            support_score += hits / dist
-            support_points.append(price)
-
-    for price, hits in sell_cluster_tracker.items():
-        dist = price - current_price
-        if 0 < dist <= max_distance:
-            resistance_score += hits / dist
-            resistance_points.append(price)
-
-    # Pair up to the shortest list length
-    pair_count = min(len(support_points), len(resistance_points))
-    if pair_count > 0:
-        paired_spreads = [
-            resistance_points[i] - support_points[i]
-            for i in range(pair_count)
-        ]
-        spread = numpy.mean(paired_spreads)
-    else:
-        spread = fallback_spread
-
-    total = support_score + resistance_score
-    if total == 0:
-        return 0, spread, fallback_spread
-
-    return 100 * (support_score - resistance_score) / total, spread, fallback_spread
+    return best_ask - best_bid
+    
+    
 
 def scrap_pricebook(driver, df):
     # JavaScript to scrape order book
@@ -357,63 +238,51 @@ def scrap_pricebook(driver, df):
 
     if not buy_book or not sell_book:
         input("Manually update temp2 by assigning 'this' of getPriceBook() in the console ...")
-        return
 
-    js_trades_script = """return temp3.asset.arrTrades.slice(-10).map(entry => ({
-        dtDate: entry.dtDate,
+    js_trades_script = """return temp3.asset.arrTrades.map(entry => ({
+        dtDate: entry.dtDate.toString(),
         nPrice: entry.nPrice,
         nQuantity: entry.nQuantity,
-        bBuyerAgressor: entry.bBuyerAgressor
+        bBuyerAgressor: entry.bBuyerAgressor,
+        nQuoteNumber: entry.nQuoteNumber,
+        nBuyAgent: entry.nBuyAgent,
+        nSellAgent: entry.nSellAgent,
+        nTradeType: entry.nTradeType
     }));"""
                                             
     recent_trades = driver.execute_script(js_trades_script)
 
     if not recent_trades:
         input("Manually update temp3 by assigning 'this' of this.asset.arrTrades in the console ...")
-        return
+       
+    current_price = df["Último"].iloc[-1]
+
+    # 2. Compute raw spread
+    raw_spread = compute_raw_spread(buy_book, sell_book)    
     
-    current_price = df["Último"].iloc[-1]    
-
-    # 1. Track persistent clusters
-    update_persistent_clusters(
-        buy_book,
-        sell_book,
-        current_price,
-        quantity_threshold=1500,
-        distance_limit=0.15,
-        tracker_buy=buy_cluster_tracker,
-        tracker_sell=sell_cluster_tracker
-    )
-
-    # 2. Compute proximity score
-    proximity_score, spread, raw_spread = compute_proximity_score_from_clusters(
-        current_price,
-        buy_cluster_tracker,
-        sell_cluster_tracker,
-        buy_book,
-        sell_book,
-        max_distance=0.15        
-    )
-
     # 3. Compute pressure
     pressure = compute_pressure(recent_trades)
 
     # 4. Compute DensitySpread
     density_spread = compute_density_spread(buy_book, sell_book)
 
+    # 5. Compute AgentFlow (net unique buy - sell agents)
+    buy_agents = set(t["nBuyAgent"] for t in recent_trades if t.get("bBuyerAgressor") is True and pd.notnull(t["nBuyAgent"]))
+    sell_agents = set(t["nSellAgent"] for t in recent_trades if t.get("bBuyerAgressor") is False and pd.notnull(t["nSellAgent"]))
+    agent_flow = len(buy_agents) - len(sell_agents)
+
     # 3. Save into latest row
-    df.at[df.index[-1], "OrderBookScore"] = proximity_score
-    df.at[df.index[-1], "ClusterPairSpread"] = spread
     df.at[df.index[-1], "RawSpread"] = raw_spread
     df.at[df.index[-1], "DensitySpread"] = density_spread
     df.at[df.index[-1], "Pressure"] = pressure
+    df.at[df.index[-1], "AgentFlow"] = agent_flow
 
     # Save result (your existing storage function)
     save_into_scraped_prices(df)
-  
+
 
 def process_and_save_data(driver):
-    global last_preco_teorico, last_status, volume_accumulated, last_valid_absorption
+    global last_preco_teorico, last_status, volume_accumulated
     """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
@@ -451,9 +320,12 @@ def process_and_save_data(driver):
 
         
         # Remove 'Estado Atual' and Preço Teórico columns
-        df = df.drop(columns=["Estado Atual", "Preço Teórico"])        
+        df = df.drop(columns=["Estado Atual", "Preço Teórico"])
         
-        scrap_pricebook(driver, df)
+        try:        
+            scrap_pricebook(driver, df)
+        except:
+            return
 
         # Rename columns to match the database format
         df.rename(columns={
@@ -504,29 +376,21 @@ def process_and_save_data(driver):
             df_scraped["time"] = pd.to_datetime(df_scraped["time"])
             df_scraped.set_index("time", inplace=True)
 
-            df_scraped_ohlc = df_scraped.resample("5T").agg({
-                "OrderBookScore": "mean",
-                "ClusterPairSpread": "mean",
+            df_scraped_ohlc = df_scraped.resample("5T").agg({               
                 "RawSpread": "mean",
                 "DensitySpread": "mean",
-                "Pressure" : "mean"
+                "Pressure" : "mean",
+                "AgentFlow" : "mean"
             })
 
             # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "OrderBookScore_Mean", "ClusterPairSpread_Mean", "RawSpread_Mean" , "DensitySpread_Mean", "Pressure_Mean"
+                "RawSpread_Mean" , "DensitySpread_Mean", "Pressure_Mean", "AgentFlow_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
 
-            df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")
-
-            df_resampled["DeltaDivergence"] = detect_smart_divergence(df_resampled)
-
-            value = detect_absorption_strength(df_resampled)
-            time1 = df_resampled['time'].iloc[-1]
-            last_valid_absorption[time1] = value         
-            df_resampled.at[df_resampled.index[-1], "Absorption"] = value 
+            df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")          
 
 
         # Save the newly aggregated data
@@ -536,15 +400,7 @@ def handle_exception(error=None, shutdown=True):
     if error:
         print("Traceback (most recent call last):")
         traceback.print_tb(error.__traceback__)  # Prints the stack trace
-    if shutdown:
-        print("\nInterrupted by user. Saving remaining absorption data...")
-        for time_key, absorption_value in last_valid_absorption.items():
-            DB_PRICES.update_one(
-                {'time': time_key},
-                {'$set': {'Absorption': absorption_value}},
-                upsert=True
-            )
-        print("Absorption data saved.")
+    if shutdown:       
         try:
             driver.quit()
             print("Selenium driver closed.")
@@ -555,7 +411,7 @@ def handle_exception(error=None, shutdown=True):
 
 def scrape_to_mongo():
     input("Remember to store 'this' inside getPriceBook() as the global variable temp2 ...")
-    input("Remember to store 'this' of this.asset.arrTrades as the global variable temp3 ...")
+    input("Remember to store 'this' of const e = this.asset.arrTrades as the global variable temp3 ...")
 
     show_message = True
 
