@@ -210,11 +210,17 @@ def compute_pressure(trades):
 
     
 
-def compute_raw_spread(buy_book, sell_book):
+def compute_raw_spread(buy_book, sell_book, current_price):
         
     best_bid = max(buy_book, key=lambda x: x["price"])['price']
     best_ask = min(sell_book, key=lambda x: x["price"])['price']
-    return best_ask - best_bid
+    dist_to_bid = current_price - best_bid
+    dist_to_ask = best_ask - current_price
+
+    if dist_to_bid > dist_to_ask:
+        return dist_to_bid  # price closer to ask → bid farther → positive
+    else:
+        return -dist_to_ask  # price closer to bid → ask farther → negative
     
     
 
@@ -258,7 +264,7 @@ def scrap_pricebook(driver, df):
     current_price = df["Último"].iloc[-1]
 
     # 2. Compute raw spread
-    raw_spread = compute_raw_spread(buy_book, sell_book)    
+    raw_spread = compute_raw_spread(buy_book, sell_book, current_price)    
     
     # 3. Compute pressure
     pressure = compute_pressure(recent_trades)
