@@ -217,10 +217,7 @@ def compute_raw_spread(buy_book, sell_book, current_price):
     dist_to_bid = current_price - best_bid
     dist_to_ask = best_ask - current_price
 
-    if dist_to_bid > dist_to_ask:
-        return dist_to_bid  # price closer to ask → bid farther → positive
-    else:
-        return -dist_to_ask  # price closer to bid → ask farther → negative
+    return dist_to_bid - dist_to_ask
     
     
 
