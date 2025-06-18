@@ -379,21 +379,29 @@ def process_and_save_data(driver):
             df_scraped["time"] = pd.to_datetime(df_scraped["time"])
             df_scraped.set_index("time", inplace=True)
 
-            df_scraped_ohlc = df_scraped.resample("5T").agg({               
-                "RawSpread": "mean",
-                "DensitySpread": "mean",
-                "Pressure" : "mean",
-                "AgentFlow" : "mean"
-            })
+            def compute_time_weighted(df_group, col):
+                df_group = df_group.copy()
+                df_group["minutes_since_open"] = ((df_group.index - df_group.index.min()) / pd.Timedelta(minutes=1)).astype(float) + 1
+                return (df_group[col] * df_group["minutes_since_open"]).sum() / df_group["minutes_since_open"].sum()
 
-            # Rename columns to _Mean
-            df_scraped_ohlc.columns = [
-                "RawSpread_Mean" , "DensitySpread_Mean", "Pressure_Mean", "AgentFlow_Mean"
-            ]
+            grouped = df_scraped.groupby(pd.Grouper(freq="5T"))
+            weighted_rows = []
 
-            df_scraped_ohlc.reset_index(inplace=True)            
+            for time_idx, group in grouped:
+                if group.empty:
+                    continue
+                row = {
+                    "time": time_idx,
+                    "RawSpread_Mean": group["RawSpread"].mean(),
+                    "DensitySpread_Mean": group["DensitySpread"].mean(),
+                    "Pressure_Mean": compute_time_weighted(group, "Pressure"),
+                    "AgentFlow_Mean": compute_time_weighted(group, "AgentFlow")
+                }
+                weighted_rows.append(row)
 
-            df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")          
+            df_scraped_ohlc = pd.DataFrame(weighted_rows)
+
+            df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")         
 
 
         # Save the newly aggregated data
