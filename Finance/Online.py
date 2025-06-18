@@ -240,7 +240,7 @@ def scrap_pricebook(driver, df):
     sell_book = driver.execute_script(js_price_book_sell)
 
     if not buy_book or not sell_book:
-        input("Manually update temp2 by assigning 'this' of getPriceBook() in the console ...")
+        return False
 
     js_trades_script = """return temp3.asset.arrTrades.map(entry => ({
         dtDate: entry.dtDate.toString(),
@@ -256,7 +256,7 @@ def scrap_pricebook(driver, df):
     recent_trades = driver.execute_script(js_trades_script)
 
     if not recent_trades:
-        input("Manually update temp3 by assigning 'this' of this.asset.arrTrades in the console ...")
+        return False
        
     current_price = df["Último"].iloc[-1]
 
@@ -282,6 +282,8 @@ def scrap_pricebook(driver, df):
 
     # Save result (your existing storage function)
     save_into_scraped_prices(df)
+
+    return True
 
 
 def process_and_save_data(driver):
@@ -326,7 +328,9 @@ def process_and_save_data(driver):
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
         
         try:        
-            scrap_pricebook(driver, df)
+            success = scrap_pricebook(driver, df)
+            if not success:
+                return
         except:
             return
 
