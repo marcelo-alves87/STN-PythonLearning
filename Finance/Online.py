@@ -222,6 +222,7 @@ def compute_raw_spread(buy_book, sell_book, current_price):
     
 
 def scrap_pricebook(driver, df):
+    
     # JavaScript to scrape order book
     # Warning: These things can be asynchronous!
     js_price_book_buy = """return temp2.priceBook.arrPriceBookOriginal.buy.map(entry => ({
@@ -253,11 +254,32 @@ def scrap_pricebook(driver, df):
         nTradeType: entry.nTradeType
     }));"""
                                             
-    recent_trades = driver.execute_script(js_trades_script)
+    all_trades = driver.execute_script(js_trades_script)
 
-    if not recent_trades:
+    if not all_trades:
         return False
     
+    reference_time = df["Data/Hora"].iloc[-1]
+    window_seconds = 30
+
+    def clean_js_date_string(js_date_str):
+        # Remove everything inside or after parentheses (e.g., timezone names)
+        cleaned = re.sub(r"\s*\(.*?\)", "", js_date_str)
+        dtDate = parser.parse(cleaned).replace(tzinfo=None)
+        return dtDate - timedelta(hours=3)
+
+    recent_trades = []
+    #This filter still includes a bit of old data.
+    for t in all_trades:
+        if "dtDate" in t:
+            try:
+                trade_time = clean_js_date_string(t["dtDate"])
+                delta = (reference_time - trade_time).total_seconds()
+                if 0 <= delta <= window_seconds:
+                    recent_trades.append(t)
+            except Exception as e:
+                return False  
+ 
     current_price = df["Último"].iloc[-1]
 
     # 2. Compute raw spread
