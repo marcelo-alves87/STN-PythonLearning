@@ -54,7 +54,7 @@ def get_page_source(driver):
     try:
         return driver.page_source
     except WebDriverException:
-        time.sleep(1)
+        time.sleep(5)
         return get_page_source(driver)
 
 def get_page_df(driver):
@@ -103,8 +103,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean", "Pressure_Mean",
-        "AgentFlow_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "ClusterGap_Mean"
     }
     
 
@@ -151,6 +150,37 @@ def convert_numeric(value):
     else:   
         return value
 
+def compute_cluster_gap(trades):
+    """Compute cluster gap metrics from recent trades."""
+    buy_clusters = set()
+    sell_clusters = set()
+
+    for t in trades:
+        if "nQuantity" not in t:
+            continue
+        qty = t["nQuantity"]
+        if t.get("bBuyerAgressor") is True:
+            buy_clusters.add(qty)
+        elif t.get("bBuyerAgressor") is False:
+            sell_clusters.add(qty)
+
+    def avg_gap(cluster_set):
+        if len(cluster_set) < 2:
+            return 0.0
+        sorted_vals = sorted(cluster_set)
+        gaps = [b - a for a, b in zip(sorted_vals, sorted_vals[1:])]
+        return sum(gaps) / len(gaps)
+
+    buy_gap = avg_gap(buy_clusters)
+    sell_gap = avg_gap(sell_clusters)
+
+    total = buy_gap + sell_gap
+    if total == 0:
+        return 0.0
+
+    return round((buy_gap - sell_gap) / total, 4)
+
+
 def compute_density_spread(buy_book, sell_book):
     """
     Computes a normalized DensitySpread: (buy_density - sell_density) / (buy_density + sell_density)
@@ -176,10 +206,23 @@ def compute_density_spread(buy_book, sell_book):
 
     return round((buy_density - sell_density) / total, 4)
 
+def compute_raw_spread(buy_book, sell_book, current_price):
+        
+    best_bid = max(buy_book, key=lambda x: x["price"])['price']
+    best_ask = min(sell_book, key=lambda x: x["price"])['price']
+    dist_to_bid = current_price - best_bid
+    dist_to_ask = best_ask - current_price
+
+    total = dist_to_bid + dist_to_ask
+    if total == 0:
+        return 0.0
+
+    return round((dist_to_bid - dist_to_ask) / total, 4)
+
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'Pressure', 'AgentFlow']].copy()
+    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'ClusterGap']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -200,25 +243,6 @@ def save_into_scraped_prices(df):
     # 6. Execute the bulk write
     if operations:
         result = DB_SCRAPED_PRICES.bulk_write(operations)
-
-
-def compute_pressure(trades):
-    buy_qty = sum(t["nQuantity"] for t in trades if t.get("bBuyerAgressor") is True)
-    sell_qty = sum(t["nQuantity"] for t in trades if t.get("bBuyerAgressor") is False)
-    total = buy_qty + sell_qty
-    return round((buy_qty - sell_qty) / total, 4) if total > 0 else 0.0
-
-    
-
-def compute_raw_spread(buy_book, sell_book, current_price):
-        
-    best_bid = max(buy_book, key=lambda x: x["price"])['price']
-    best_ask = min(sell_book, key=lambda x: x["price"])['price']
-    dist_to_bid = current_price - best_bid
-    dist_to_ask = best_ask - current_price
-
-    return dist_to_bid - dist_to_ask
-    
     
 
 def scrap_pricebook(driver, df):
@@ -253,54 +277,28 @@ def scrap_pricebook(driver, df):
         nSellAgent: entry.nSellAgent,
         nTradeType: entry.nTradeType
     }));"""
-                                            
+
+  
     all_trades = driver.execute_script(js_trades_script)
 
     if not all_trades:
         return False
-    
-    reference_time = df["Data/Hora"].iloc[-1]
-    window_seconds = 30
-
-    def clean_js_date_string(js_date_str):
-        # Remove everything inside or after parentheses (e.g., timezone names)
-        cleaned = re.sub(r"\s*\(.*?\)", "", js_date_str)
-        dtDate = parser.parse(cleaned).replace(tzinfo=None)
-        return dtDate - timedelta(hours=3)
-
-    recent_trades = []
-    #This filter still includes a bit of old data.
-    for t in all_trades:
-        if "dtDate" in t:
-            try:
-                trade_time = clean_js_date_string(t["dtDate"])
-                delta = (reference_time - trade_time).total_seconds()
-                if 0 <= delta <= window_seconds:
-                    recent_trades.append(t)
-            except Exception as e:
-                return False  
  
     current_price = df["Último"].iloc[-1]
 
     # 2. Compute raw spread
     raw_spread = compute_raw_spread(buy_book, sell_book, current_price)    
-    
-    # 3. Compute pressure
-    pressure = compute_pressure(recent_trades)
 
-    # 4. Compute DensitySpread
+    # 3. Compute DensitySpread
     density_spread = compute_density_spread(buy_book, sell_book)
 
-    # 5. Compute AgentFlow (net unique buy - sell agents)
-    buy_agents = set(t["nBuyAgent"] for t in recent_trades if t.get("bBuyerAgressor") is True and pd.notnull(t["nBuyAgent"]))
-    sell_agents = set(t["nSellAgent"] for t in recent_trades if t.get("bBuyerAgressor") is False and pd.notnull(t["nSellAgent"]))
-    agent_flow = len(buy_agents) - len(sell_agents)
+    # 4. Compute Cluster Gap
+    cluster_gap = compute_cluster_gap(all_trades)
 
     # 3. Save into latest row
     df.at[df.index[-1], "RawSpread"] = raw_spread
     df.at[df.index[-1], "DensitySpread"] = density_spread
-    df.at[df.index[-1], "Pressure"] = pressure
-    df.at[df.index[-1], "AgentFlow"] = agent_flow
+    df.at[df.index[-1], "ClusterGap"] = cluster_gap
 
     # Save result (your existing storage function)
     save_into_scraped_prices(df)
@@ -406,13 +404,12 @@ def process_and_save_data(driver):
             df_scraped_ohlc = df_scraped.resample("5T").agg({               
                 "RawSpread": "mean",
                 "DensitySpread": "mean",
-                "Pressure" : "mean",
-                "AgentFlow" : "mean"
+                "ClusterGap": "mean"
             })
 
             # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "RawSpread_Mean" , "DensitySpread_Mean", "Pressure_Mean", "AgentFlow_Mean"
+                "RawSpread_Mean" , "DensitySpread_Mean", "ClusterGap_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
