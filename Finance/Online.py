@@ -210,14 +210,8 @@ def compute_raw_spread(buy_book, sell_book, current_price):
         
     best_bid = max(buy_book, key=lambda x: x["price"])['price']
     best_ask = min(sell_book, key=lambda x: x["price"])['price']
-    dist_to_bid = current_price - best_bid
-    dist_to_ask = best_ask - current_price
 
-    total = dist_to_bid + dist_to_ask
-    if total == 0:
-        return 0.0
-
-    return round((dist_to_bid - dist_to_ask) / total, 4)
+    return best_ask - best_bid
 
 def save_into_scraped_prices(df):
 
@@ -283,7 +277,7 @@ def scrap_pricebook(driver, df):
 
     if not all_trades:
         return False
- 
+
     current_price = df["Último"].iloc[-1]
 
     # 2. Compute raw spread
