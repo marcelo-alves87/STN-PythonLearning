@@ -178,7 +178,25 @@ def display_pivot_points_table(pivot_points):
     print(f"\nPivot Points:")
     print(tabulate(table, headers=["Level", "Value"], tablefmt="grid"))
 
+def get_trading_hours(df):
+    if df.empty:
+        print("\nNo data available for trading hours.")
+        return None, None, None
 
+    first = df.iloc[0]["Datetime"]
+    last = df.iloc[-1]["Datetime"]
+
+    # Convert datetime to numerical representation (seconds since midnight)
+    seconds_since_midnight = (df["Datetime"] - df["Datetime"].dt.normalize()).dt.total_seconds()
+    avg_seconds = seconds_since_midnight.mean()
+
+    # Convert back to time
+    avg_time = first.normalize() + pd.to_timedelta(avg_seconds, unit="s")
+
+    # Format time to display only HH:MM
+    return first.strftime('%H:%M'), avg_time.strftime('%H:%M'), last.strftime('%H:%M')
+
+    
 
 # Main function
 def main(date=None):
@@ -217,8 +235,15 @@ def main(date=None):
         ["Average of Max/Min Close Prices", "", f"{avg_close_price:.2f}"]
     ]
 
-    # Print the table
-    print(f"\nMax/Min Prices for {last_date}:\n")
+    #Print First and Last trading hours
+    first, avg, last = get_trading_hours(last_day_data)
+
+    if first and avg and last:
+        print(f"\nTrading Hours for {last_date}:\n")
+        print(tabulate([[first, avg, last]], headers=["First Hour", "Avg Hour", "Last Hour"], tablefmt="grid"))
+
+    # Print the Max/Min prices table
+    print(f"\nMax/Min Prices\n")
     print(tabulate(min_max_table, headers=["Type", "Price", "Average"], tablefmt="grid"))
 
     insights, pivot_points = simulate_prices_and_insights(df)
@@ -241,5 +266,5 @@ def main(date=None):
 
 if __name__ == "__main__":
     #Example of usage
-    #main('2025-02-20')
-    main('2025-02-24')
+    #main('2025-03-20')
+    main('2025-05-29')

@@ -281,11 +281,8 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 #find_example_registers(10)
 #simulate_daily_trading('2025-03-19', rate=0.5)
 #update_with_fake_avg_values()
-export_to_csv('2025-05-30')
+#export_to_csv('2025-06-06')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
-
-
-
 
 

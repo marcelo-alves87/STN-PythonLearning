@@ -24,10 +24,12 @@ URL = "https://rico.com.vc/"
 PAUSE_FLAG_FILE = "pause.flag"
 DB_CLIENT = MongoClient("localhost", 27017)
 DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing aggregated prices
-DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices # MongoDB collection for storing scraped prices
+DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices
+DB_SCRAPED_TIMES_TRADES = DB_CLIENT.mongodb.times_trades
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
+
 
 # Global persistent cluster trackers
 buy_cluster_tracker = defaultdict(int)
@@ -103,7 +105,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean", "ClusterGap_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "VolumeConcentration_Mean"
     }
     
 
@@ -150,36 +152,35 @@ def convert_numeric(value):
     else:   
         return value
 
-def compute_cluster_gap(trades):
-    """Compute cluster gap metrics from recent trades."""
-    buy_clusters = set()
-    sell_clusters = set()
-
+def compute_volume_concentration(trades):
+    trade_records = []
+        
     for t in trades:
         if "nQuantity" not in t:
             continue
-        qty = t["nQuantity"]
-        if t.get("bBuyerAgressor") is True:
-            buy_clusters.add(qty)
-        elif t.get("bBuyerAgressor") is False:
-            sell_clusters.add(qty)
-
-    def avg_gap(cluster_set):
-        if len(cluster_set) < 2:
+        elif t.get("nTradeType") in (2, 3):
+            trade_records.append({                    
+                "buy_agent": t.get("nBuyAgent"),
+                "sell_agent": t.get("nSellAgent"),
+                "quantity": t.get("nQuantity", 0)
+            })
+        
+    if trade_records:
+        
+        df_trades = pd.DataFrame(trade_records)
+        buy_volumes = df_trades.groupby("buy_agent")["quantity"].sum()
+        sell_volumes = df_trades.groupby("sell_agent")["quantity"].sum()
+        
+        max_buy = buy_volumes.max() if not buy_volumes.empty else 0
+        max_sell = sell_volumes.max() if not sell_volumes.empty else 0
+        
+        total = max_buy + max_sell
+        if total == 0:
             return 0.0
-        sorted_vals = sorted(cluster_set)
-        gaps = [b - a for a, b in zip(sorted_vals, sorted_vals[1:])]
-        return sum(gaps) / len(gaps)
 
-    buy_gap = avg_gap(buy_clusters)
-    sell_gap = avg_gap(sell_clusters)
-
-    total = buy_gap + sell_gap
-    if total == 0:
-        return 0.0
-
-    return round((buy_gap - sell_gap) / total, 4)
-
+        return round((max_buy - max_sell) / total, 4)
+    else:
+        return 0
 
 def compute_density_spread(buy_book, sell_book):
     """
@@ -216,7 +217,7 @@ def compute_raw_spread(buy_book, sell_book, current_price):
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'ClusterGap']].copy()
+    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'VolumeConcentration', 'nQuoteNumber']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -261,23 +262,32 @@ def scrap_pricebook(driver, df):
     if not buy_book or not sell_book:
         return False
 
-    js_trades_script = """return temp3.asset.arrTrades.map(entry => ({
-        dtDate: entry.dtDate.toString(),
-        nPrice: entry.nPrice,
-        nQuantity: entry.nQuantity,
-        bBuyerAgressor: entry.bBuyerAgressor,
-        nQuoteNumber: entry.nQuoteNumber,
-        nBuyAgent: entry.nBuyAgent,
-        nSellAgent: entry.nSellAgent,
-        nTradeType: entry.nTradeType
-    }));"""
-
+    doc = DB_SCRAPED_TIMES_TRADES.find_one(
+        {"nQuoteNumber": {"$exists": True}},
+        sort=[("nQuoteNumber", -1)]
+    )
+    last_quote_number = doc["nQuoteNumber"] if doc else 0
+    
+    js_trades_script = f"""
+    return temp3.asset.arrTrades
+        .filter(entry => entry.nQuoteNumber > {last_quote_number})
+        .map(entry => ({{
+            dtDate: entry.dtDate.toString(),
+            nPrice: entry.nPrice,
+            nQuantity: entry.nQuantity,
+            bBuyerAgressor: entry.bBuyerAgressor,
+            nQuoteNumber: entry.nQuoteNumber,
+            nBuyAgent: entry.nBuyAgent,
+            nSellAgent: entry.nSellAgent,
+            nTradeType: entry.nTradeType
+        }}));
+    """
   
     all_trades = driver.execute_script(js_trades_script)
 
     if not all_trades:
         return False
-
+    
     current_price = df["Último"].iloc[-1]
 
     # 2. Compute raw spread
@@ -286,13 +296,17 @@ def scrap_pricebook(driver, df):
     # 3. Compute DensitySpread
     density_spread = compute_density_spread(buy_book, sell_book)
 
-    # 4. Compute Cluster Gap
-    cluster_gap = compute_cluster_gap(all_trades)
+    # 4. Compute Volume Concentration
+    volume_conc = compute_volume_concentration(all_trades)
+
+    # 5. Get the maximum nQuoteNumber from the list
+    max_quote_number = max((t["nQuoteNumber"] for t in all_trades if "nQuoteNumber" in t), default=0)
 
     # 3. Save into latest row
     df.at[df.index[-1], "RawSpread"] = raw_spread
     df.at[df.index[-1], "DensitySpread"] = density_spread
-    df.at[df.index[-1], "ClusterGap"] = cluster_gap
+    df.at[df.index[-1], "VolumeConcentration"] = volume_conc
+    df.at[df.index[-1], "nQuoteNumber"] = max_quote_number
 
     # Save result (your existing storage function)
     save_into_scraped_prices(df)
@@ -394,16 +408,17 @@ def process_and_save_data(driver):
         if not df_scraped.empty:
             df_scraped["time"] = pd.to_datetime(df_scraped["time"])
             df_scraped.set_index("time", inplace=True)
+            df_scraped.drop(columns=["nQuoteNumber"], errors="ignore", inplace=True)
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({               
                 "RawSpread": "mean",
                 "DensitySpread": "mean",
-                "ClusterGap": "mean"
+                "VolumeConcentration": "mean"
             })
 
             # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "RawSpread_Mean" , "DensitySpread_Mean", "ClusterGap_Mean"
+                "RawSpread_Mean" , "DensitySpread_Mean", "VolumeConcentration_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
@@ -447,7 +462,7 @@ def scrape_to_mongo():
                     print("Running scraper ...")
                     print("Stop its execution typing CTRL + C ...")
                     show_message = False
-
+                    
                 process_and_save_data(driver)
                 time.sleep(1)
 
