@@ -25,7 +25,6 @@ PAUSE_FLAG_FILE = "pause.flag"
 DB_CLIENT = MongoClient("localhost", 27017)
 DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing aggregated prices
 DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices
-DB_SCRAPED_TIMES_TRADES = DB_CLIENT.mongodb.times_trades
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
@@ -262,7 +261,7 @@ def scrap_pricebook(driver, df):
     if not buy_book or not sell_book:
         return False
 
-    doc = DB_SCRAPED_TIMES_TRADES.find_one(
+    doc = DB_SCRAPED_PRICES.find_one(
         {"nQuoteNumber": {"$exists": True}},
         sort=[("nQuoteNumber", -1)]
     )
