@@ -183,8 +183,10 @@ def compute_volume_concentration(trades):
 
 def compute_density_spread(buy_book, sell_book):
     """
-    Computes a normalized DensitySpread: (buy_density - sell_density) / (buy_density + sell_density)
-    Density = total quantity / price span for each side.
+    Computes a normalized DensitySpread:
+    (buy_density - sell_density) / (buy_density + sell_density)
+
+    Handles zero spans as infinite density, and avoids NaN by controlling edge cases.
     """
     if not buy_book or not sell_book:
         return 0.0
@@ -197,14 +199,23 @@ def compute_density_spread(buy_book, sell_book):
     buy_span = max(buy_prices) - min(buy_prices)
     sell_span = max(sell_prices) - min(sell_prices)
 
-    buy_density = buy_qty / buy_span if buy_span > 0 else 0
-    sell_density = sell_qty / sell_span if sell_span > 0 else 0
+    buy_density = float('inf') if buy_span == 0 else buy_qty / buy_span
+    sell_density = float('inf') if sell_span == 0 else sell_qty / sell_span
+
+    # Handle edge cases to avoid NaN
+    if math.isinf(buy_density) and math.isinf(sell_density):
+        return 0.0
+    elif math.isinf(buy_density):
+        return 1.0
+    elif math.isinf(sell_density):
+        return -1.0
 
     total = buy_density + sell_density
     if total == 0:
         return 0.0
 
     return round((buy_density - sell_density) / total, 4)
+
 
 def compute_raw_spread(buy_book, sell_book, current_price):
         
@@ -352,11 +363,13 @@ def process_and_save_data(driver):
         # Remove 'Estado Atual' and Preço Teórico columns
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
         
-        try:        
+        try:
+            
             success = scrap_pricebook(driver, df)
             if not success:
                 return            
-        except:
+        except Exception as e:
+            print(e)
             return
 
         # Rename columns to match the database format
@@ -461,7 +474,7 @@ def scrape_to_mongo():
                     print("Running scraper ...")
                     print("Stop its execution typing CTRL + C ...")
                     show_message = False
-                    
+
                 process_and_save_data(driver)
                 time.sleep(1)
 
