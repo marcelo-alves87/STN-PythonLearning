@@ -22,6 +22,7 @@ from datetime import timedelta
 # Constants
 URL = "https://rico.com.vc/"
 PAUSE_FLAG_FILE = "pause.flag"
+DEBUG_FLAG_FILE = "debug.flag"
 DB_CLIENT = MongoClient("localhost", 27017)
 DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing aggregated prices
 DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices
@@ -474,6 +475,9 @@ def scrape_to_mongo():
                     print("Running scraper ...")
                     print("Stop its execution typing CTRL + C ...")
                     show_message = False
+
+                if os.path.exists(DEBUG_FLAG_FILE):
+                    pdb.set_trace()
 
                 process_and_save_data(driver)
                 time.sleep(1)
