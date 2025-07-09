@@ -153,34 +153,47 @@ def convert_numeric(value):
         return value
 
 def compute_volume_concentration(trades):
-    trade_records = []
-        
-    for t in trades:
-        if "nQuantity" not in t:
-            continue
-        elif t.get("nTradeType") in (2, 3):
-            trade_records.append({                    
-                "buy_agent": t.get("nBuyAgent"),
-                "sell_agent": t.get("nSellAgent"),
-                "quantity": t.get("nQuantity", 0)
-            })
-        
-    if trade_records:
-        
-        df_trades = pd.DataFrame(trade_records)
-        buy_volumes = df_trades.groupby("buy_agent")["quantity"].sum()
-        sell_volumes = df_trades.groupby("sell_agent")["quantity"].sum()
-        
-        max_buy = buy_volumes.max() if not buy_volumes.empty else 0
-        max_sell = sell_volumes.max() if not sell_volumes.empty else 0
-        
-        total = max_buy + max_sell
-        if total == 0:
-            return 0.0
+    """
+    Computes volume concentration based on the normalized difference between
+    average buy and sell volume per trade, without time-based aggregation.
+    """
 
-        return round((max_buy - max_sell) / total, 4)
-    else:
-        return 0
+    if not trades:
+        return 0.0
+
+    # Filter and extract relevant fields
+    records = [
+        {
+            "nQuantity": t.get("nQuantity"),
+            "bBuyerAgressor": t.get("bBuyerAgressor")
+        }
+        for t in trades
+        if "nQuantity" in t and "bBuyerAgressor" in t
+    ]
+
+    if not records:
+        return 0.0
+
+    df = pd.DataFrame(records)
+    df["bBuyerAgressor"] = df["bBuyerAgressor"].astype(bool)
+
+    buy_qty = df[df["bBuyerAgressor"]]["nQuantity"].sum()
+    sell_qty = df[~df["bBuyerAgressor"]]["nQuantity"].sum()
+    buy_count = df[df["bBuyerAgressor"]].shape[0]
+    sell_count = df[~df["bBuyerAgressor"]].shape[0]
+
+    if buy_count == 0 or sell_count == 0:
+        return 0.0  # avoid divide-by-zero in normalization
+
+    buy_avg = buy_qty / buy_count
+    sell_avg = sell_qty / sell_count
+
+    denominator = buy_avg + sell_avg
+    if denominator == 0:
+        return 0.0
+
+    concentration = (buy_avg - sell_avg) / denominator
+    return round(concentration, 4)
 
 def compute_density_spread(buy_book, sell_book):
     """
@@ -249,7 +262,6 @@ def save_into_scraped_prices(df):
     # 6. Execute the bulk write
     if operations:
         result = DB_SCRAPED_PRICES.bulk_write(operations)
-    
 
 def scrap_pricebook(driver, df):
     
@@ -277,11 +289,17 @@ def scrap_pricebook(driver, df):
         {"nQuoteNumber": {"$exists": True}},
         sort=[("nQuoteNumber", -1)]
     )
-    last_quote_number = doc["nQuoteNumber"] if doc else 0
+    last_quote_number = doc["nQuoteNumber"] if doc else -1
+
+    today_str = dt.datetime.now().strftime("%Y-%m-%d")
     
     js_trades_script = f"""
     return temp3.asset.arrTrades
-        .filter(entry => entry.nQuoteNumber > {last_quote_number})
+        .filter(entry => {{
+            const quoteDate = new Date(entry.dtDate);
+            const dateStr = quoteDate.toISOString().slice(0, 10);
+            return entry.nQuoteNumber > {last_quote_number} && dateStr === "{today_str}";
+        }})
         .map(entry => ({{
             dtDate: entry.dtDate.toString(),
             nPrice: entry.nPrice,
@@ -561,7 +579,7 @@ def get_data_to_csv():
                 df["Datetime"] = df["Datetime"] - dt.timedelta(hours=3)
 
                 #Remove pos-market data
-                df = df[df["Datetime"].dt.time <= dt.time(17, 50)]
+                df = df[df["Datetime"].dt.time <= dt.time(16, 50)]
  
                 folder_path = "stock_dfs"
                 os.makedirs(folder_path, exist_ok=True)

@@ -286,26 +286,8 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 #print(collection.index_information())
 
 
-# Query for documents that contain the field "DensitySpread_Mean"
-query = {"DensitySpread_Mean": {"$exists": True}}
-documents = list(collection.find(query))
 
-# Convert to DataFrame and process
-if documents:
-    df = pd.DataFrame(documents)
 
-    # Drop MongoDB _id field if it exists
-    if "_id" in df.columns:
-        df.drop(columns=["_id", "ativo"], inplace=True)
 
-    # Round all numeric columns to 4 decimal places
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].round(4)
 
-    # Export to CSV
-    output_file = "densityspread_mean_export.csv"
-    df.to_csv(output_file, index=False)
-    print(f"Exported {len(df)} records to '{output_file}'.")
-else:
-    print("No records found with 'DensitySpread_Mean' field.")
 
