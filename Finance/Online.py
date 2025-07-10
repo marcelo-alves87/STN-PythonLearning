@@ -578,8 +578,14 @@ def get_data_to_csv():
                 df = pd.DataFrame(data)
                 df["Datetime"] = df["Datetime"] - dt.timedelta(hours=3)
 
+                if not df.empty:
+                    print(f"Last time getted: {df['Datetime'].iloc[-1]}")
+
                 #Remove pos-market data
                 df = df[df["Datetime"].dt.time <= dt.time(16, 50)]
+
+                if not df.empty:
+                    print(f"Getting data until: {df['Datetime'].iloc[-1]}")
  
                 folder_path = "stock_dfs"
                 os.makedirs(folder_path, exist_ok=True)
