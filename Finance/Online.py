@@ -105,7 +105,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean", "VolumeConcentration_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "Pressure_Mean"
     }
     
 
@@ -152,11 +152,7 @@ def convert_numeric(value):
     else:   
         return value
 
-def compute_volume_concentration(trades):
-    """
-    Computes volume concentration based on the normalized difference between
-    average buy and sell volume per trade, without time-based aggregation.
-    """
+def compute_pressure(trades):
 
     if not trades:
         return 0.0
@@ -179,21 +175,14 @@ def compute_volume_concentration(trades):
 
     buy_qty = df[df["bBuyerAgressor"]]["nQuantity"].sum()
     sell_qty = df[~df["bBuyerAgressor"]]["nQuantity"].sum()
-    buy_count = df[df["bBuyerAgressor"]].shape[0]
-    sell_count = df[~df["bBuyerAgressor"]].shape[0]
+    
 
-    if buy_count == 0 or sell_count == 0:
-        return 0.0  # avoid divide-by-zero in normalization
-
-    buy_avg = buy_qty / buy_count
-    sell_avg = sell_qty / sell_count
-
-    denominator = buy_avg + sell_avg
+    denominator = buy_qty + sell_qty
     if denominator == 0:
         return 0.0
 
-    concentration = (buy_avg - sell_avg) / denominator
-    return round(concentration, 4)
+    pressure = (buy_qty - sell_qty) / denominator
+    return round(pressure, 4)
 
 def compute_density_spread(buy_book, sell_book):
     """
@@ -241,7 +230,7 @@ def compute_raw_spread(buy_book, sell_book, current_price):
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'VolumeConcentration', 'nQuoteNumber']].copy()
+    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'Pressure', 'nQuoteNumber']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -325,8 +314,8 @@ def scrap_pricebook(driver, df):
     # 3. Compute DensitySpread
     density_spread = compute_density_spread(buy_book, sell_book)
 
-    # 4. Compute Volume Concentration
-    volume_conc = compute_volume_concentration(all_trades)
+    # 4. Compute Pressure
+    pressure = compute_pressure(all_trades)
 
     # 5. Get the maximum nQuoteNumber from the list
     max_quote_number = max((t["nQuoteNumber"] for t in all_trades if "nQuoteNumber" in t), default=0)
@@ -334,7 +323,7 @@ def scrap_pricebook(driver, df):
     # 3. Save into latest row
     df.at[df.index[-1], "RawSpread"] = raw_spread
     df.at[df.index[-1], "DensitySpread"] = density_spread
-    df.at[df.index[-1], "VolumeConcentration"] = volume_conc
+    df.at[df.index[-1], "Pressure"] = pressure
     df.at[df.index[-1], "nQuoteNumber"] = max_quote_number
 
     # Save result (your existing storage function)
@@ -361,12 +350,13 @@ def process_and_save_data(driver):
         df["Preço Teórico"] = df["Preço Teórico"].apply(convert_numeric)
         preco_teorico = df.iloc[-1]["Preço Teórico"]
         now = dt.datetime.today().strftime("%H:%M:%S")
-             
-        if last_preco_teorico is None or last_status is None or last_preco_teorico != preco_teorico or last_status != status:
-            print(f"({now}) {status}: {preco_teorico:.2f}")
+
+        if pd.notna(preco_teorico) and pd.notna(status):             
+            if last_preco_teorico is None or last_status is None or last_preco_teorico != preco_teorico or last_status != status:
+                print(f"({now}) {status}: {preco_teorico:.2f}")
                
-        last_preco_teorico = preco_teorico
-        last_status = status
+            last_preco_teorico = preco_teorico
+            last_status = status
             
     else:
        
@@ -444,12 +434,12 @@ def process_and_save_data(driver):
             df_scraped_ohlc = df_scraped.resample("5T").agg({               
                 "RawSpread": "mean",
                 "DensitySpread": "mean",
-                "VolumeConcentration": "mean"
+                "Pressure": "mean"
             })
 
             # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "RawSpread_Mean" , "DensitySpread_Mean", "VolumeConcentration_Mean"
+                "RawSpread_Mean" , "DensitySpread_Mean", "Pressure_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
