@@ -12,42 +12,67 @@ tickers = tickers[tickers != 'Codigo']
 yahoo_tickers = [ticker + '.SA' for ticker in tickers]
 
 # Create output folder
-output_folder = 'ibov_5min_data'
+output_folder = 'ibov_data'
 os.makedirs(output_folder, exist_ok=True)
 
-# Set date range (this week)
-today = datetime.now()
-start_of_week = today - timedelta(days=today.weekday())
-start_str = start_of_week.strftime('%Y-%m-%d')
-end_str = today.strftime('%Y-%m-%d')
+# Set date range (last 30 days)
+end_date = datetime.now()
+start_date = end_date - timedelta(days=30)
+start_str = start_date.strftime('%Y-%m-%d')
+end_str = end_date.strftime('%Y-%m-%d')
 
 # Download with retry logic
-def download_with_retry(ticker, retries=3, delay=5):
+def download_with_retry(ticker, retries=1, delay=5):
     for attempt in range(retries):
         try:
-            df = yf.download(ticker, interval='5m', start=start_str, end=end_str, progress=False)
+            df = yf.download(ticker, interval='1d', start=start_str, end=end_str, progress=False, auto_adjust=True)
+            print(f"[{ticker}] downloaded successfully")
             return df
         except Exception as e:
             print(f"[{ticker}] Attempt {attempt+1} failed: {e}")
             time.sleep(delay)
     return None
 
-# Loop through tickers
-for ticker_yf in yahoo_tickers:
+# Step 1: Calculate average volume for sorting
+volume_data = []
+
+for ticker in yahoo_tickers:
+    df = download_with_retry(ticker)
+    if df is not None and not df.empty:
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        try:
+            avg_volume = float(df['Volume'].mean())
+        except Exception:
+            avg_volume = 0.0
+        volume_data.append((ticker, avg_volume))
+        print(f"[{ticker}] downloaded successfully")
+    else:
+        volume_data.append((ticker, 0.0))
+        print(f"[{ticker}] No data or download failed.")
+
+# Step 2: Sort tickers by avg volume (descending)
+sorted_tickers = [ticker for ticker, _ in sorted(volume_data, key=lambda x: x[1], reverse=True)]
+
+# Optional: Show top tickers by volume
+print("\nTop tickers by average volume:")
+for ticker, vol in sorted(volume_data, key=lambda x: x[1], reverse=True):
+    print(f"{ticker}: {vol:,.0f}")
+
+# Step 3: Download and save CSVs in sorted order
+for ticker_yf in sorted_tickers:
     ticker_clean = ticker_yf.replace('.SA', '')
-    print(f"Downloading: {ticker_yf}")
+    print(f"\nDownloading full data for: {ticker_yf}")
     df = download_with_retry(ticker_yf)
     if df is not None and not df.empty:
-        # Flatten columns if MultiIndex is present
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df.reset_index(inplace=True)
-        df = df[['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume']]
-        df['Datetime'] = df['Datetime'] - timedelta(hours=3)
+        df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
+        df['Date'] = pd.to_datetime(df['Date']) - timedelta(hours=3)
         df[['Open', 'High', 'Low', 'Close', 'Volume']] = df[['Open', 'High', 'Low', 'Close', 'Volume']].round(2)
         output_path = os.path.join(output_folder, f"{ticker_clean}.csv")
         df.to_csv(output_path, index=False)
         print(f"Saved to {output_path}")
     else:
         print(f"[{ticker_yf}] No data or download failed.")
-    #time.sleep(2)  # Respect rate limit
