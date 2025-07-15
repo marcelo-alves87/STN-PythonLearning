@@ -26,6 +26,8 @@ DEBUG_FLAG_FILE = "debug.flag"
 DB_CLIENT = MongoClient("localhost", 27017)
 DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing aggregated prices
 DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices
+DB_OFFER_BOOK = DB_CLIENT.mongodb.offer_book
+DB_TIMES_TRADES = DB_CLIENT.mongodb.times_trades
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
@@ -105,7 +107,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean", "Pressure_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "Pressure_Mean", "PassivePressure_Mean"
     }
     
 
@@ -152,50 +154,45 @@ def convert_numeric(value):
     else:   
         return value
 
-def compute_pressure(trades, best_bid, best_ask):
-    
+def compute_pressure(trades):
     """
-    Returns total aggressive buy and sell quantities.
-    No normalization here — raw volumes only.
+    Compute normalized net pressure using bBuyerAggressor field.
+    Pressure = (buy_qty - sell_qty) / total_qty
+    Returns: float in range [-1, 1]
     """
     buy_qty = 0
     sell_qty = 0
 
     for t in trades:
-        price = t.get("nPrice")
         qty = t.get("nQuantity")
+        is_buy_aggressor = t.get("bBuyerAgressor")
 
-        if price is None or qty is None:
+        if qty is None or is_buy_aggressor is None:
             continue
 
-        if price >= best_ask:
+        if is_buy_aggressor:
             buy_qty += qty
-        elif price <= best_bid:
+        else:
             sell_qty += qty
-        # Ignore ambiguous mid-spread trades
 
-    return buy_qty, sell_qty
+    return {
+        "BuyQty": buy_qty,
+        "SellQty": sell_qty
+    }
 
-
-def compute_density_spread(buy_book, sell_book, levels=5):
-    
+def compute_density_components(buy_book, sell_book, levels=20):
     """
-    Computes a normalized DensitySpread:
-    (buy_density - sell_density) / (buy_density + sell_density)
-
-    Focuses on top `levels` of book for both sides.
+    Returns raw components (not final ratio) for proper aggregation:
+    - buy_qty, buy_span, sell_qty, sell_span
     """
-
     if not buy_book or not sell_book:
-        return 0.0
+        return None
 
-    # Sort descending for buy (higher bid is better), ascending for sell (lower ask is better)
     buy_book_sorted = sorted(buy_book, key=lambda x: x["price"], reverse=True)[:levels]
     sell_book_sorted = sorted(sell_book, key=lambda x: x["price"])[:levels]
 
-    # Compute total quantity and span for each side
-    buy_qty = sum(entry["quantity"] for entry in buy_book_sorted)
-    sell_qty = sum(entry["quantity"] for entry in sell_book_sorted)
+    buy_qty = sum(entry["qty"] for entry in buy_book_sorted)
+    sell_qty = sum(entry["qty"] for entry in sell_book_sorted)
 
     buy_prices = [entry["price"] for entry in buy_book_sorted]
     sell_prices = [entry["price"] for entry in sell_book_sorted]
@@ -203,32 +200,52 @@ def compute_density_spread(buy_book, sell_book, levels=5):
     buy_span = max(buy_prices) - min(buy_prices) if len(buy_prices) > 1 else 0.01
     sell_span = max(sell_prices) - min(sell_prices) if len(sell_prices) > 1 else 0.01
 
-    # Avoid zero spans to prevent division by zero
-    buy_span = buy_span if buy_span > 0 else 0.01
-    sell_span = sell_span if sell_span > 0 else 0.01
+    buy_span = max(buy_span, 0.01)
+    sell_span = max(sell_span, 0.01)
 
-    buy_density = buy_qty / buy_span
-    sell_density = sell_qty / sell_span
+    return {
+        "buy_qty": buy_qty,
+        "buy_span": buy_span,
+        "sell_qty": sell_qty,
+        "sell_span": sell_span
+    }
 
-    # Normalize difference
-    total = buy_density + sell_density
-    if total == 0:
-        return 0.0
+def compute_passive_pressure(buy_book, sell_book, levels=20):
+    """
+    Returns raw components for passive pressure:
+    {
+        'passive_buy_qty': ...,  # Sum of top buy quantities
+        'passive_sell_qty': ...  # Sum of top sell quantities
+    }
 
-    return round((buy_density - sell_density) / total, 4)
+    Do NOT normalize here — normalization should be done after aggregation.
+    """
+    if not buy_book or not sell_book:
+        return {"passive_buy_qty": 0, "passive_sell_qty": 0}
+
+    top_buys = sorted(buy_book, key=lambda x: x["price"], reverse=True)[:levels]
+    top_sells = sorted(sell_book, key=lambda x: x["price"])[:levels]
+
+    passive_buy_qty = sum(entry.get("qty", 0) for entry in top_buys)
+    passive_sell_qty = sum(entry.get("qty", 0) for entry in top_sells)
+
+    return {
+        "passive_buy_qty": passive_buy_qty,
+        "passive_sell_qty": passive_sell_qty
+    }
 
 
-def compute_raw_spread(buy_book, sell_book, current_price):
+def compute_raw_spread(buy_book, sell_book):
         
     best_bid = max(buy_book, key=lambda x: x["price"])['price']
     best_ask = min(sell_book, key=lambda x: x["price"])['price']
 
-    return best_bid, best_ask
+    return best_ask - best_bid
 
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'BuyQty', 'SellQty', 'nQuoteNumber']].copy()
+    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'Pressure', 'PassivePressure', 'nQuoteNumber']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -250,20 +267,66 @@ def save_into_scraped_prices(df):
     if operations:
         result = DB_SCRAPED_PRICES.bulk_write(operations)
 
+def save_offer_book(buy_book, sell_book, df):
+    now = df['Data/Hora'].iloc[-1]
+    current_price = df['Último'].iloc[-1]
+
+    # Limit both books to top 20 levels
+    top_buy_book = sorted(buy_book, key=lambda x: x["price"], reverse=True)[:20]
+    top_sell_book = sorted(sell_book, key=lambda x: x["price"])[:20]
+
+    # Clean and normalize fields
+    def clean_book(book):
+        return [
+            {
+                "price": level.get("price"),
+                "quantity": level.get("qty") or level.get("quantity"),
+                "count": level.get("count", 1),
+                "nCounterId": level.get("nCounterId"),
+                "agent": level.get("agent"),
+            }
+            for level in book
+        ]
+
+    snapshot = {
+        "time": now,
+        "current_price": current_price,
+        "buy_book": clean_book(top_buy_book),
+        "sell_book": clean_book(top_sell_book)
+    }
+
+    try:
+        DB_OFFER_BOOK.insert_one(snapshot)
+        # print(f"Saved book snapshot at {now.strftime('%H:%M:%S')}")
+    except Exception as e:
+        print(f"Error saving offer book snapshot: {e}")
+
+
+def save_times_trades_book(all_trades):
+    try:
+        DB_TIMES_TRADES.insert_many(all_trades)        
+    except Exception as e:
+        print(f"Error saving trades: {e}")
+
+
 def scrap_pricebook(driver, df):
     
     # JavaScript to scrape order book
     # Warning: These things can be asynchronous!
-    js_price_book_buy = """return temp2.priceBook.arrPriceBookOriginal.buy.map(entry => ({
-        price: entry.nPrice,
-        quantity: entry.nQuantity,
-        count: entry.nCount
+    js_price_book_buy = """return temp2.asset.offerBook.book.arrLimitedBuy.map(item => ({
+        nCounterId: item.obj.nCounterID,
+        price: item.obj.nPrice,
+        qty: item.obj.nQty,
+        agent: item.obj.nAgent,
+        time: item.obj.dtDate.toString()
     }));"""
 
-    js_price_book_sell = """return temp2.priceBook.arrPriceBookOriginal.sell.map(entry => ({
-        price: entry.nPrice,
-        quantity: entry.nQuantity,
-        count: entry.nCount
+    js_price_book_sell = """return temp2.asset.offerBook.book.arrLimitedSell.map(item => ({
+        nCounterId: item.obj.nCounterID,
+        price: item.obj.nPrice,
+        qty: item.obj.nQty,
+        agent: item.obj.nAgent,
+        time: item.obj.dtDate.toString()
     }));"""
 
     buy_book = driver.execute_script(js_price_book_buy)
@@ -271,6 +334,8 @@ def scrap_pricebook(driver, df):
 
     if not buy_book or not sell_book:
         return False
+
+    save_offer_book(buy_book, sell_book, df)
 
     doc = DB_SCRAPED_PRICES.find_one(
         {"nQuoteNumber": {"$exists": True}},
@@ -281,7 +346,7 @@ def scrap_pricebook(driver, df):
     today_str = dt.datetime.now().strftime("%Y-%m-%d")
     
     js_trades_script = f"""
-    return temp3.asset.arrTrades
+    return temp2.asset.arrTrades
         .filter(entry => {{
             const quoteDate = new Date(entry.dtDate);
             const dateStr = quoteDate.toISOString().slice(0, 10);
@@ -303,27 +368,39 @@ def scrap_pricebook(driver, df):
 
     if not all_trades:
         return False
+
+    save_times_trades_book(all_trades)
     
-    current_price = df["Último"].iloc[-1]
 
     # 2. Compute raw spread
-    best_bid, best_ask = compute_raw_spread(buy_book, sell_book, current_price)    
+    spread = compute_raw_spread(buy_book, sell_book)    
 
     # 3. Compute DensitySpread
-    density_spread = compute_density_spread(buy_book, sell_book)
+    density_spread = compute_density_components(buy_book, sell_book)
 
     # 4. Compute Pressure
-    buy_qty, sell_qty = compute_pressure(all_trades, best_bid, best_ask)
+    pressure = compute_pressure(all_trades)
+
+    # 5. Compute Passive Pressure
+    passive_pressure = compute_passive_pressure(buy_book, sell_book)
 
     # 5. Get the maximum nQuoteNumber from the list
     max_quote_number = max((t["nQuoteNumber"] for t in all_trades if "nQuoteNumber" in t), default=0)
 
     # 3. Save into latest row
-    df.at[df.index[-1], "RawSpread"] = best_ask - best_bid
-    df.at[df.index[-1], "DensitySpread"] = density_spread
-    df.at[df.index[-1], "BuyQty"] = buy_qty
-    df.at[df.index[-1], "SellQty"] = sell_qty
-    df.at[df.index[-1], "nQuoteNumber"] = max_quote_number
+    df.loc[df.index[-1], [
+        "RawSpread",
+        "DensitySpread",
+        "Pressure",
+        "PassivePressure",
+        "nQuoteNumber"
+    ]] = [
+        spread,
+        density_spread,
+        pressure,
+        passive_pressure,
+        max_quote_number
+    ]
 
     # Save result (your existing storage function)
     save_into_scraped_prices(df)
@@ -430,31 +507,63 @@ def process_and_save_data(driver):
             df_scraped.set_index("time", inplace=True)
             df_scraped.drop(columns=["nQuoteNumber"], errors="ignore", inplace=True)
 
-            df_scraped_ohlc = df_scraped.resample("5T").agg({               
+            # Extract nested raw fields
+            df_scraped[["buy_qty", "buy_span", "sell_qty", "sell_span"]] = pd.json_normalize(df_scraped["DensitySpread"])
+            df_scraped[["BuyQty", "SellQty"]] = pd.json_normalize(df_scraped["Pressure"])
+            df_scraped[["passive_buy_qty", "passive_sell_qty"]] = pd.json_normalize(df_scraped["PassivePressure"])
+
+            # Drop now-redundant nested objects
+            df_scraped.drop(columns=["DensitySpread", "Pressure", "PassivePressure"], inplace=True, errors="ignore")
+
+            # Resample raw values
+            df_scraped_ohlc = df_scraped.resample("5T").agg({
                 "RawSpread": "mean",
-                "DensitySpread": "mean",
+                "buy_qty": "sum",
+                "buy_span": "sum",
+                "sell_qty": "sum",
+                "sell_span": "sum",
                 "BuyQty": "sum",
-                "SellQty": "sum"
+                "SellQty": "sum",
+                "passive_buy_qty": "sum",
+                "passive_sell_qty": "sum"
             })
 
-            # Compute normalized pressure BEFORE renaming columns
+            # Compute Pressure_Mean
             df_scraped_ohlc["Pressure_Mean"] = (
                 (df_scraped_ohlc["BuyQty"] - df_scraped_ohlc["SellQty"]) /
                 (df_scraped_ohlc["BuyQty"] + df_scraped_ohlc["SellQty"]).replace(0, numpy.nan)
             ).fillna(0).round(4)
 
-            # Now it's safe to drop raw quantities
-            df_scraped_ohlc.drop(columns=["BuyQty", "SellQty"], inplace=True)
+            # Compute PassivePressure_Mean
+            df_scraped_ohlc["PassivePressure_Mean"] = (
+                (df_scraped_ohlc["passive_buy_qty"] - df_scraped_ohlc["passive_sell_qty"]) /
+                (df_scraped_ohlc["passive_buy_qty"] + df_scraped_ohlc["passive_sell_qty"]).replace(0, numpy.nan)
+            ).fillna(0).round(4)
 
-            # Rename remaining columns
-            df_scraped_ohlc.rename(columns={
-                "RawSpread": "RawSpread_Mean",
-                "DensitySpread": "DensitySpread_Mean"
-            }, inplace=True)
+            # Compute DensitySpread_Mean
+            buy_density = df_scraped_ohlc["buy_qty"] / df_scraped_ohlc["buy_span"].replace(0, numpy.nan)
+            sell_density = df_scraped_ohlc["sell_qty"] / df_scraped_ohlc["sell_span"].replace(0, numpy.nan)
+            total_density = buy_density + sell_density
 
-            #  Reset index and merge
+            df_scraped_ohlc["DensitySpread_Mean"] = (
+                (buy_density - sell_density) / total_density.replace(0, numpy.nan)
+            ).fillna(0).round(4)
+
+            # Drop raw intermediate columns
+            df_scraped_ohlc.drop(columns=[
+                "BuyQty", "SellQty",
+                "buy_qty", "buy_span", "sell_qty", "sell_span",
+                "passive_buy_qty", "passive_sell_qty"
+            ], inplace=True)
+
+            # Final touches
+            df_scraped_ohlc.rename(columns={"RawSpread": "RawSpread_Mean"}, inplace=True)
             df_scraped_ohlc.reset_index(inplace=True)
+
+            # Merge back into full DataFrame
             df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")
+
+
 
 
 
@@ -475,8 +584,7 @@ def handle_exception(error=None, shutdown=True):
 
 
 def scrape_to_mongo():
-    input("Remember to store 'this' inside getPriceBook() as the global variable temp2 ...")
-    input("Remember to store 'this' of const e = this.asset.arrTrades as the global variable temp3 ...")
+    input("Remember to store 'this' of const e = this.asset.arrTrades as the global variable temp2 ...")
 
     show_message = True
 
@@ -610,6 +718,8 @@ def get_data_to_csv():
 
 def delete_scraped_collection():
     DB_SCRAPED_PRICES.delete_many({})
+    DB_OFFER_BOOK.delete_many({})
+    DB_TIMES_TRADES.delete_many({})
 
 if __name__ == "__main__":
     warnings.simplefilter(action="ignore")
