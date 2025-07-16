@@ -285,6 +285,62 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 #insert_from_uploaded_csv()
 #print(collection.index_information())
 
+import json
+
+# Step 1: Get all nQuoteNumbers (executed orders)
+quote_numbers = set(db.times_trades.distinct("nQuoteNumber"))
+
+# Step 2: Find one duplicated nCounterId that also appears in times_trades
+pipeline = [
+    {"$match": {"nCounterId": {"$in": list(quote_numbers)}}},
+    {"$group": {"_id": "$nCounterId", "count": {"$sum": 1}}},
+    {"$match": {"count": {"$gt": 1}}},
+    {"$sort": {"count": -1}},
+    {"$limit": 1}
+]
+duplicate_doc = list(db.offer_book.aggregate(pipeline))
+
+if not duplicate_doc:
+    print("No matching duplicated nCounterId found that also exists in times_trades.")
+    exit()
+
+example_id = duplicate_doc[0]["_id"]
+print(f"Analyzing nCounterId: {example_id} (Count: {duplicate_doc[0]['count']})")
+
+# Step 3: Get all entries for that nCounterId
+entries = list(db.offer_book.find({"nCounterId": example_id}, {"_id": 0}))
+
+# Step 4: Convert datetime fields to strings for JSON serialization
+def convert_datetime(obj):
+    if isinstance(obj, dict):
+        return {k: convert_datetime(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_datetime(v) for v in obj]
+    elif isinstance(obj, dt.datetime):
+        return obj.isoformat()
+    else:
+        return obj
+
+# Step 5: Remove exact duplicates using JSON and keep one per variant
+normalized_entries = [convert_datetime(doc) for doc in entries]
+unique_jsons = {json.dumps(doc, sort_keys=True) for doc in normalized_entries}
+unique_docs = [json.loads(doc) for doc in unique_jsons]
+
+# Step 6: Sort by time field (assumed ISO string format)
+unique_docs_sorted = sorted(
+    unique_docs,
+    key=lambda x: dt.datetime.fromisoformat(x["time"]) if "time" in x else datetime.min
+)
+
+# Step 7: Print sorted results
+print(f"\nFound {len(unique_docs_sorted)} distinct field combinations for nCounterId {example_id} (sorted by time):\n")
+for i, doc in enumerate(unique_docs_sorted, 1):
+    print(f"--- Variant {i} ---")
+    for k, v in doc.items():
+        print(f"{k}: {v}")
+    print()
+
+
 
 
 

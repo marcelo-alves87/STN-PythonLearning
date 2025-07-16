@@ -23,6 +23,19 @@ end_str = end_date.strftime('%Y-%m-%d')
 
 # Download with retry logic
 def download_with_retry(ticker, retries=1, delay=5):
+    ticker_clean = ticker.replace('.SA', '')
+    output_path = os.path.join(output_folder, f"{ticker_clean}.csv")
+    
+    # Check if file already exists
+    if os.path.exists(output_path):
+        try:
+            df = pd.read_csv(output_path, parse_dates=['Date'])
+            print(f"[{ticker}] loaded from cache")
+            return df
+        except Exception as e:
+            print(f"[{ticker}] Failed to read cached file: {e}")
+    
+    # If not cached, attempt download
     for attempt in range(retries):
         try:
             df = yf.download(ticker, interval='1d', start=start_str, end=end_str, progress=False, auto_adjust=True)
@@ -32,6 +45,7 @@ def download_with_retry(ticker, retries=1, delay=5):
             print(f"[{ticker}] Attempt {attempt+1} failed: {e}")
             time.sleep(delay)
     return None
+
 
 # Step 1: Calculate average volume for sorting
 volume_data = []
