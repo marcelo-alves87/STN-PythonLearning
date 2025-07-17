@@ -107,7 +107,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "Liquidity_Mean"
     }
     
 
@@ -154,31 +154,37 @@ def convert_numeric(value):
     else:   
         return value
 
-def compute_pressure(trades):
-    """
-    Compute normalized net pressure using bBuyerAggressor field.
-    Pressure = (buy_qty - sell_qty) / total_qty
-    Returns: float in range [-1, 1]
-    """
-    buy_qty = 0
-    sell_qty = 0
+def compute_liquidity(buy_book, sell_book, df):
 
-    for t in trades:
-        qty = t.get("nQuantity")
-        is_buy_aggressor = t.get("bBuyerAgressor")
+    current_price = df['Último'].iloc[-1]
+    
 
-        if qty is None or is_buy_aggressor is None:
-            continue
+    def adaptive_weighted_score(book, current_price, side='buy'):
 
-        if is_buy_aggressor:
-            buy_qty += qty
-        else:
-            sell_qty += qty
+        distances = [abs(level['price'] - current_price) for level in book]
+        max_distance = max(distances) 
 
-    return {
-        "BuyQty": buy_qty,
-        "SellQty": sell_qty
-    }
+        score = 0.0
+        for level in book:
+            price = level['price']
+            qty = level['qty']
+            distance = price - current_price
+
+            if side == 'buy':
+                weight = 1 + (distance / max_distance)
+            else:  # sell
+                weight = 1 - (distance / max_distance)
+
+            weight = max(0, weight)
+            score += qty * weight
+
+        return score
+
+    support = adaptive_weighted_score(buy_book, current_price, side='buy')
+    resistance = adaptive_weighted_score(sell_book, current_price, side='sell')
+
+    total = support + resistance
+    return (support - resistance)/total if total > 0 else 0
 
 def compute_density_spread(buy_book, sell_book):
     """
@@ -216,7 +222,7 @@ def compute_raw_spread(buy_book, sell_book):
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'nQuoteNumber']].copy()
+    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'nQuoteNumber', 'Liquidity']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -349,8 +355,8 @@ def scrap_pricebook(driver, df):
     # 3. Compute DensitySpread
     density_spread = compute_density_spread(buy_book, sell_book)
 
-    # 4. Compute Pressure
-    #pressure = compute_pressure(all_trades)
+    # 4. Compute Liquidity
+    liquidity = compute_liquidity(buy_book, sell_book, df)
 
     # 5. Compute Passive Pressure
     #passive_pressure = compute_passive_pressure(buy_book, sell_book)
@@ -362,11 +368,13 @@ def scrap_pricebook(driver, df):
     df.loc[df.index[-1], [
         "RawSpread",
         "DensitySpread",
-        "nQuoteNumber"
+        "nQuoteNumber",
+        "Liquidity"
     ]] = [
         spread,
         density_spread,
-        max_quote_number
+        max_quote_number,
+        liquidity
     ]
 
     # Save result (your existing storage function)
@@ -476,12 +484,13 @@ def process_and_save_data(driver):
 
             df_scraped_ohlc = df_scraped.resample("5T").agg({               
                 "RawSpread": "mean",
-                "DensitySpread": "mean"
+                "DensitySpread": "mean",
+                "Liquidity": "mean"
             })
 
             # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "RawSpread_Mean" , "DensitySpread_Mean"
+                "RawSpread_Mean" , "DensitySpread_Mean", "Liquidity_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
