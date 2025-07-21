@@ -107,7 +107,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean", "Liquidity_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean"
     }
     
 
@@ -153,6 +153,33 @@ def convert_numeric(value):
         return float(value / 1e2)
     else:   
         return value
+
+def compute_pressure(trades):
+    """
+    Compute normalized net pressure using bBuyerAggressor field.
+    Pressure = (buy_qty - sell_qty) / total_qty
+    Returns: float in range [-1, 1]
+    """
+    buy_qty = 0
+    sell_qty = 0
+
+    for t in trades:
+        trade_type = t.get('nTradeType')
+        if trade_type and trade_type != 4:
+            qty = t.get("nQuantity") 
+            is_buy_aggressor = t.get("bBuyerAgressor")
+
+            if qty is None or is_buy_aggressor is None:
+                continue
+
+            if is_buy_aggressor:
+                buy_qty += qty
+            else:
+                sell_qty += qty
+
+    total = buy_qty + sell_qty
+    return (buy_qty - sell_qty)/total if total > 0 else 0
+
 
 def compute_liquidity(buy_book, sell_book, df):
 
@@ -222,7 +249,7 @@ def compute_raw_spread(buy_book, sell_book):
 def save_into_scraped_prices(df):
 
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'nQuoteNumber', 'Liquidity']].copy()
+    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'nQuoteNumber', 'Liquidity', 'Pressure']].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -358,8 +385,8 @@ def scrap_pricebook(driver, df):
     # 4. Compute Liquidity
     liquidity = compute_liquidity(buy_book, sell_book, df)
 
-    # 5. Compute Passive Pressure
-    #passive_pressure = compute_passive_pressure(buy_book, sell_book)
+    # 5. Compute Pressure
+    pressure = compute_pressure(all_trades)
 
     # 5. Get the maximum nQuoteNumber from the list
     max_quote_number = max((t["nQuoteNumber"] for t in all_trades if "nQuoteNumber" in t), default=0)
@@ -369,12 +396,14 @@ def scrap_pricebook(driver, df):
         "RawSpread",
         "DensitySpread",
         "nQuoteNumber",
-        "Liquidity"
+        "Liquidity",
+        "Pressure"
     ]] = [
         spread,
         density_spread,
         max_quote_number,
-        liquidity
+        liquidity,
+        pressure
     ]
 
     # Save result (your existing storage function)
@@ -485,12 +514,13 @@ def process_and_save_data(driver):
             df_scraped_ohlc = df_scraped.resample("5T").agg({               
                 "RawSpread": "mean",
                 "DensitySpread": "mean",
-                "Liquidity": "mean"
+                "Liquidity": "mean",
+                "Pressure": "mean"
             })
 
             # Rename columns to _Mean
             df_scraped_ohlc.columns = [
-                "RawSpread_Mean" , "DensitySpread_Mean", "Liquidity_Mean"
+                "RawSpread_Mean" , "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean"
             ]
 
             df_scraped_ohlc.reset_index(inplace=True)            
