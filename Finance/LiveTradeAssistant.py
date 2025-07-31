@@ -194,11 +194,15 @@ def run_analysis():
                 f"Only if there's an entry opportunity, tell me the direction (long or short), take-profit, stop-loss, and contextual R1–R4 and S1–S4 levels based on the previous data. "
                 f"If not, just analyze the candle. Give me only the conclusion. "
                 f"Please, analyze your strategy carefully, and try to avoid traps. Please indicate when you see a trap. "
+                f"Be especially cautious when DensitySpread_Mean is positive, as this may suggest liquidity is more easily accessed at lower price levels. "
+                f"In such cases, a rising price might be a trap to attract buyers before sellers re-enter aggressively. "
+                f"Likewise, a negative DensitySpread_Mean may indicate buy-side liquidity is more accessible above, so a falling price could be a trap to attract sellers. "
                 f"If an entry has already been defined, continue analyzing the strategy and indicate the right time to exit. "
                 f"Also, let me know when we might still be holding the position after price touches any contextual level. "
                 f"If the strategy is no longer valid, reset everything and look for a new opportunity:      "
                 f"{latest_line}"
             )
+
             response = send_prompt_to_chatgpt(prompt)
             print_output(response)
 
