@@ -201,46 +201,6 @@ def update_with_fake_avg_values():
 
     print("MongoDB documents updated with fake spread/imbalance values.")
 
-def export_to_csv(input_date=None, output_path="./mongo_export.csv"):
-    # Fetch all documents from the collection
-    cursor = collection.find()
-    data = list(cursor)
-
-    if not data:
-        print("No data found in MongoDB to export.")
-        return
-
-    if os.path.exists(output_path):
-        os.remove(output_path)
-
-    # Convert to DataFrame
-    df = pd.DataFrame(data)
-
-    if input_date:
-        df['time'] = pd.to_datetime(df['time'])  # Ensure 'time' is datetime
-        df = df[df['time'].dt.date == pd.to_datetime(input_date).date()]
-
-    # Drop Ativo column
-    column_to_remove = "ativo"
-
-    if column_to_remove in df.columns:
-        df = df.drop(columns=[column_to_remove])
-
-
-    # Drop MongoDB's internal _id field
-    if '_id' in df.columns:
-        df.drop(columns=['_id'], inplace=True)
-
-    # Drop columns with all NaN values
-    df.dropna(axis=1, how='all', inplace=True)
-
-    # Round all numeric columns to 2 decimal places
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].round(2)
-
-    # Save to CSV
-    df.to_csv(output_path, index=False)
-    print(f"Exported {len(df)} records to {output_path}")
 
 def insert_from_uploaded_csv(file_path="mongo_export.csv"):
     try:
@@ -272,6 +232,45 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
         print(f"Failed to insert from CSV: {e}")
 
 
+def export_data_to_csv():    
+
+    # Format volume with k, M, B
+    def format_volume(value):
+        if value >= 1_000_000_000:
+            return f"{value / 1_000_000_000:.2f}B"
+        elif value >= 1_000_000:
+            return f"{value / 1_000_000:.2f}M"
+        elif value >= 1_000:
+            return f"{value / 1_000:.2f}k"
+        return str(value)
+
+
+    # Fetch and process documents
+    records = []
+    for doc in collection.find():
+        record = {}
+        # Format time
+        if "time" in doc:
+            if isinstance(doc["time"], dt.datetime):
+                record["time"] = doc["time"].strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                record["time"] = dt.datetime.strptime(str(doc["time"]), "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d %H:%M:%S")
+
+        for key, value in doc.items():
+            if key in ["_id", "ativo", "time"]:
+                continue
+            if isinstance(value, (int, float)):
+                if key == "volume":
+                    record[key] = format_volume(value)
+                else:
+                    record[key] = round(value, 2)
+        records.append(record)
+
+    # Convert to DataFrame and export
+    df = pd.DataFrame(records)
+    df.to_csv("exported_prices.csv", index=False)
+    print("CSV export completed.")
+
     
 
 # Example usage:
@@ -284,11 +283,7 @@ def insert_from_uploaded_csv(file_path="mongo_export.csv"):
 #export_to_csv('2025-06-06')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
-
-
-
-
-
+export_data_to_csv()
 
 
 

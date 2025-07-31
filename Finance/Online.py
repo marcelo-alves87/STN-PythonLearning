@@ -18,6 +18,7 @@ import traceback
 from dateutil import parser
 import re
 from datetime import timedelta
+import subprocess
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -678,6 +679,9 @@ def get_data_to_csv():
     finally:        
         print("Scraping of last prices completed.")
 
+def run_assistant():
+    subprocess.Popen(["python", "LiveTradeAssistant.py"])
+
 def delete_scraped_collection():
     DB_SCRAPED_PRICES.delete_many({})
     DB_OFFER_BOOK.delete_many({})
@@ -688,5 +692,6 @@ if __name__ == "__main__":
     delete_scraped_collection()
     driver = setup_scraper()
     get_data_to_csv()
+    run_assistant()
     scrape_to_mongo()
     driver.quit()
