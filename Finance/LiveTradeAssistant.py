@@ -1,11 +1,11 @@
-import tkinter as tk
-from tkinter import messagebox
 from pymongo import MongoClient
 import pandas as pd
 from datetime import datetime, timedelta
 import threading
 import time
 import pdb
+import signal
+import sys
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -14,6 +14,16 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+
+# Graceful exit handler
+def cleanup_and_exit(signum=None, frame=None):
+    print("\n🔻 Gracefully shutting down...")
+    try:
+        driver.quit()
+        print("✅ Selenium driver closed.")
+    except Exception as e:
+        print(f"⚠️ Failed to close driver: {e}")
+    sys.exit(0)
 
 # MongoDB setup
 client = MongoClient("mongodb://localhost:27017")
@@ -41,31 +51,6 @@ chrome_options.add_argument(r"--user-data-dir=C:\\ChromeSession")
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=chrome_options)
 driver.get("https://chat.openai.com")
-
-# Tkinter setup
-root = tk.Tk()
-root.title("Live Trade Assistant")
-root.geometry("700x500")
-
-text_frame = tk.Frame(root, bg="#f9f9f9")
-text_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
-
-text_widget = tk.Text(
-    text_frame,
-    wrap=tk.WORD,
-    font=("Segoe UI", 12),
-    bg="white",
-    fg="#222222",
-    relief=tk.FLAT,
-    padx=10,
-    pady=10,
-    spacing1=5,
-    spacing2=5,
-    spacing3=5
-)
-text_widget.pack(expand=True, fill=tk.BOTH)
-text_widget.insert(tk.END, "Initializing...")
-text_widget.pack(expand=True, fill=tk.BOTH)
 
 last_checked_time = None
 entry_defined = False
@@ -120,7 +105,38 @@ def format_candle_line(doc):
     rawspread = doc.get("RawSpread_Mean", "")
     liquidity = doc.get("Liquidity_Mean", "")
     pressure = doc.get("Pressure_Mean", "")
-    return f"{ts},{close},{high},{low},{open_},{volume},{density},{rawspread},{liquidity},{pressure}"
+
+    header = (
+        "| time | close | high | low | open | volume | Density | RawSpread | Liquidity | Pressure |"
+    )
+    values = (
+        f"| {ts} | {close} | {high} | {low} | {open_} | {volume} | "
+        f"{density} | {rawspread} | {liquidity} | {pressure} |"
+    )
+    return f"{header} {values}"
+
+import textwrap
+
+def print_output(response, wrap_width=100):
+    now = datetime.now().strftime('%H:%M')
+    raw_lines = response.strip().split('\n')
+    
+    # Wrap long lines
+    wrapped_lines = []
+    for line in raw_lines:
+        wrapped_lines.extend(textwrap.wrap(line, width=wrap_width) or [""])
+
+    width = max(len(line) for line in wrapped_lines + [f" {now} "])
+    border = '+' + '-' * (width + 2) + '+'
+
+    print(border)
+    print(f"| {now.ljust(width)} |")
+    print(border)
+    for line in wrapped_lines:
+        print(f"| {line.ljust(width)} |")
+    print(border + '\n', flush=True)
+
+
 
 def run_analysis():
     global last_checked_time, entry_defined
@@ -137,42 +153,56 @@ def run_analysis():
                     "$gte": start_prev_day,
                     "$lt": end_prev_day
                 }
-            }).sort("time", 1))
-            prev_lines = [format_candle_line(doc) for doc in prev_docs]
-            prev_data = "".join(prev_lines)
+            }).sort("time", 1))            
+            # Extract OHLC from previous day
+            if prev_docs:
+                open_prev_day = prev_docs[0]["open"]
+                close_prev_day = prev_docs[-1]["close"]
+                high_prev_day = max(doc["high"] for doc in prev_docs)
+                low_prev_day = min(doc["low"] for doc in prev_docs)
+            else:
+                open_prev_day = close_prev_day = high_prev_day = low_prev_day = "N/A"
+            
+            # Format as inline readable summary
+            prev_day_ohlc_line = (
+                f"(Prev Day OHLC - Open: {open_prev_day}, High: {high_prev_day}, "
+                f"Low: {low_prev_day}, Close: {close_prev_day})"
+            )
             curr_line = format_candle_line(first_doc)
+            timestamp = datetime.now().strftime("%H:%M:%S")
 
             prompt = (
-                f"Please analyze the first 5-minute candle from {TODAY} using the previous trading day's data and give me only the conclusion."
-                f"Here is the previous trading day data:"
-                f"time,close,high,low,open,volume,DensitySpread_Mean,RawSpread_Mean,Liquidity_Mean,Pressure_Mean"
-                f"{prev_data}"
-                f"Here is the first candle of the day:"
+                f"Now it's {timestamp}. Please analyze the first 5-minute candle from {TODAY} using the previous trading day's data and give me only the conclusion. "
+                f"Remember, the candle might not be closing yet."
+                f"Here is the previous trading day data summary: "
+                f"{prev_day_ohlc_line}"
+                f"Here is the first candle of the day: "
                 f"{curr_line}"
             )
             
             response = send_prompt_to_chatgpt(prompt)
-            text_widget.delete("1.0", tk.END)
-            text_widget.insert(tk.END, response)
+            print_output(response)
             last_checked_time = str(first_doc["time"])
         else:
             time.sleep(60)
+            now = datetime.now().strftime('%H:%M')
             latest = get_latest_data()
             latest_line = format_candle_line(latest)
             prompt = (
-                f"Continue analyzing this 5-minute candle. Only if there's an entry opportunity, tell me the direction, take-profit, stop-loss, "
-                f"and contextual R1–R4 and S1–S4 levels based on the previous data. If not, just analyze the candle. Remember: give me only the conclusion."
-                f" If an entry has already been defined, continue analyzing the strategy and indicate the right time to exit. If the strategy is no longer valid, reset everything and look for a new opportunity:"
+                f"Continue analyzing this 5-minute candle in context with previous ones. The current time is {now}. "
+                f"Since data is aggregated, this may or may not represent a new candle. "
+                f"Only if there's an entry opportunity, tell me the direction (long or short), take-profit, stop-loss, and contextual R1–R4 and S1–S4 levels based on the previous data. "
+                f"If not, just analyze the candle. Give me only the conclusion. "
+                f"Please, analyze your strategy carefully, and try to avoid traps. Please indicate when you see a trap. "
+                f"If an entry has already been defined, continue analyzing the strategy and indicate the right time to exit. "
+                f"Also, let me know when we might still be holding the position after price touches any contextual level. "
+                f"If the strategy is no longer valid, reset everything and look for a new opportunity:      "
                 f"{latest_line}"
             )
             response = send_prompt_to_chatgpt(prompt)
-            text_widget.delete("1.0", tk.END)
-            text_widget.insert(tk.END, response)
+            print_output(response)
 
-def start_thread():
-    thread = threading.Thread(target=run_analysis, daemon=True)
-    thread.start()
-
-start_thread()
-root.mainloop()
-driver.quit()
+try:
+    run_analysis()
+except KeyboardInterrupt:
+    cleanup_and_exit()

@@ -19,6 +19,7 @@ from dateutil import parser
 import re
 from datetime import timedelta
 import subprocess
+import threading
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -32,7 +33,7 @@ DB_TIMES_TRADES = DB_CLIENT.mongodb.times_trades
 last_preco_teorico = None
 last_status = None
 volume_accumulated = 0
-
+assistant_process = None
 
 # Global persistent cluster trackers
 buy_cluster_tracker = defaultdict(int)
@@ -533,12 +534,16 @@ def process_and_save_data(driver):
         save_to_mongo(df_resampled)
 
 
-def handle_exception(error=None, shutdown=True):    
+def handle_exception(error=None, shutdown=True):
+    global assistant_process
     if error:
         print("Traceback (most recent call last):")
         traceback.print_tb(error.__traceback__)  # Prints the stack trace
     if shutdown:       
         try:
+            if assistant_process and assistant_process.poll() is None:
+                assistant_process.terminate()
+                print("LiveTradeAssistant process terminated.")
             driver.quit()
             print("Selenium driver closed.")
         except Exception as e:
@@ -679,8 +684,24 @@ def get_data_to_csv():
     finally:        
         print("Scraping of last prices completed.")
 
+def monitor_assistant_output():
+    global assistant_process
+    if assistant_process and assistant_process.stdout:
+        for line in assistant_process.stdout:
+            if line.strip():
+                timestamp = dt.datetime.now().strftime("%H:%M:%S")
+                print(f"[{timestamp}] 📈 Assistant: {line.strip()}")
+
+
 def run_assistant():
-    subprocess.Popen(["python", "LiveTradeAssistant.py"])
+    global assistant_process
+    assistant_process = subprocess.Popen(
+        ["python", "LiveTradeAssistant.py"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+    threading.Thread(target=monitor_assistant_output, daemon=True).start()
 
 def delete_scraped_collection():
     DB_SCRAPED_PRICES.delete_many({})
@@ -692,6 +713,6 @@ if __name__ == "__main__":
     delete_scraped_collection()
     driver = setup_scraper()
     get_data_to_csv()
-    run_assistant()
+    #run_assistant()
     scrape_to_mongo()
     driver.quit()
