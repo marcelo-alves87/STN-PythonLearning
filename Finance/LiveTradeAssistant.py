@@ -6,14 +6,12 @@ import time
 import pdb
 import signal
 import sys
-from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import undetected_chromedriver as uc
+import textwrap
 
 # Graceful exit handler
 def cleanup_and_exit(signum=None, frame=None):
@@ -37,25 +35,32 @@ while True:
     first_doc = next(cursor, None)
     if not first_doc:
         time.sleep(30)
-        #print(f"❌ No trading data found for today (starting from {today_start}).")
         continue
     else:
         break
+
 FIRST_CANDLE = str(first_doc["time"])
 TODAY = FIRST_CANDLE[:10]  # yyyy-mm-dd
 
-# Selenium setup
-chrome_options = Options()
-chrome_options.binary_location = r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-chrome_options.add_argument(r"--user-data-dir=C:\\ChromeSession")
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=chrome_options)
+# Selenium setup using undetected_chromedriver
+options = uc.ChromeOptions()
+options.binary_location = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+options.add_argument("--user-data-dir=C:\ChromeSession")
+
+driver = uc.Chrome(options=options)
+
+driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+    "source": """
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined
+    })
+    """
+})
+
 driver.get("https://chat.openai.com")
 
 last_checked_time = None
 entry_defined = False
-
-# ChatGPT interaction
 
 def wait_for_stable_response(timeout=30, stable_duration=1.0):
     wait = WebDriverWait(driver, timeout)
@@ -115,13 +120,10 @@ def format_candle_line(doc):
     )
     return f"{header} {values}"
 
-import textwrap
-
 def print_output(response, wrap_width=100):
     now = datetime.now().strftime('%H:%M')
     raw_lines = response.strip().split('\n')
-    
-    # Wrap long lines
+
     wrapped_lines = []
     for line in raw_lines:
         wrapped_lines.extend(textwrap.wrap(line, width=wrap_width) or [""])
@@ -136,14 +138,11 @@ def print_output(response, wrap_width=100):
         print(f"| {line.ljust(width)} |")
     print(border + '\n', flush=True)
 
-
-
 def run_analysis():
     global last_checked_time, entry_defined
 
     while True:
         if not last_checked_time:
-            # Get all candles from previous trading day for context            
             FIRST_CANDLE_DT = datetime.strptime(FIRST_CANDLE, "%Y-%m-%d %H:%M:%S")
             last_day = collection.find({"time": {"$lt": FIRST_CANDLE_DT}}).sort("time", -1).limit(1)[0]["time"].strftime("%Y-%m-%d")
             start_prev_day = pd.to_datetime(last_day)
@@ -153,8 +152,7 @@ def run_analysis():
                     "$gte": start_prev_day,
                     "$lt": end_prev_day
                 }
-            }).sort("time", 1))            
-            # Extract OHLC from previous day
+            }).sort("time", 1))
             if prev_docs:
                 open_prev_day = prev_docs[0]["open"]
                 close_prev_day = prev_docs[-1]["close"]
@@ -162,8 +160,7 @@ def run_analysis():
                 low_prev_day = min(doc["low"] for doc in prev_docs)
             else:
                 open_prev_day = close_prev_day = high_prev_day = low_prev_day = "N/A"
-            
-            # Format as inline readable summary
+
             prev_day_ohlc_line = (
                 f"(Prev Day OHLC - Open: {open_prev_day}, High: {high_prev_day}, "
                 f"Low: {low_prev_day}, Close: {close_prev_day})"
@@ -174,13 +171,12 @@ def run_analysis():
             prompt = (
                 f"Now it's {timestamp}. Please analyze the first 5-minute candle from {TODAY} using the previous trading day's data and give me only the conclusion. "
                 f"Remember, the candle might not be closing yet. "
-                f"Respond only with a very concise and powerful conclusion. "
                 f"Here is the previous trading day data summary: "
                 f"{prev_day_ohlc_line}"
                 f"Here is the first candle of the day: "
                 f"{curr_line}"
             )
-            
+
             response = send_prompt_to_chatgpt(prompt)
             print_output(response)
             last_checked_time = str(first_doc["time"])
@@ -192,21 +188,19 @@ def run_analysis():
             prompt = (
                 f"Continue analyzing this 5-minute candle in context with previous ones. The current time is {now}. "
                 f"Since data is aggregated, this may or may not represent a new candle. "
-                f"Only if there's an entry opportunity, tell me the direction (long or short), take-profit, stop-loss, and contextual R1–R4 and S1–S4 levels based on previous data. "
+                f"If there's an entry opportunity, tell me in details the direction (long or short), take-profit, stop-loss, and contextual R1–R2 and S1–S2 levels based on previous data. "
                 f"If not, just analyze the candle and give me only the conclusion. "
-                f"Analyze the strategy carefully and avoid traps. Indicate clearly when a trap is detected. "
                 f"Pay close attention to DensitySpread_Mean: when positive, it may suggest liquidity is more accessible below, making upward moves *potential* bull traps; "
                 f"when negative, it may suggest easier liquidity above, making downward moves *potential* bear traps. "
                 f"However, rising prices with positive Density or falling prices with negative Density are not necessarily traps — context and confirmation matter. "
                 f"If an entry has already been defined, update the strategy and indicate if it's time to exit or continue holding. "
                 f"Let me know if we're still holding a position after hitting any contextual level. "
                 f"If the setup is no longer valid, reset and search for a new opportunity. "
-                f"Respond only with a very concise and powerful conclusion:     "
                 f"{latest_line}"
             )
 
             response = send_prompt_to_chatgpt(prompt)
-            print_output(response)
+            #print_output(response)
 
 try:
     run_analysis()
