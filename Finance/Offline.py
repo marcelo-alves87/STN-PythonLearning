@@ -283,7 +283,8 @@ def export_data_to_csv():
 #export_to_csv('2025-06-06')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
-export_data_to_csv()
+#export_data_to_csv()
 
+os.system(f'%PY_HOME%/python.exe LiveTradeAssistant.py')
 
 
