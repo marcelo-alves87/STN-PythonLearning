@@ -119,15 +119,15 @@ def format_candle_lines(docs):
     ]
     for doc in docs:
         ts = pd.to_datetime(doc["time"]).strftime("%Y-%m-%d %H:%M:%S")
-        close = doc["close"]
-        high = doc["high"]
-        low = doc["low"]
-        open_ = doc["open"]
-        volume = doc["volume"]
-        density = doc.get("DensitySpread_Mean", "")
-        rawspread = doc.get("RawSpread_Mean", "")
-        liquidity = doc.get("Liquidity_Mean", "")
-        pressure = doc.get("Pressure_Mean", "")
+        close = round(doc["close"], 2)
+        high = round(doc["high"], 2)
+        low = round(doc["low"], 2)
+        open_ = round(doc["open"], 2)
+        volume = round(doc["volume"], 2)
+        density = round(doc.get("DensitySpread_Mean", 0), 2) if "DensitySpread_Mean" in doc else ""
+        rawspread = round(doc.get("RawSpread_Mean", 0), 2) if "RawSpread_Mean" in doc else ""
+        liquidity = round(doc.get("Liquidity_Mean", 0), 2) if "Liquidity_Mean" in doc else ""
+        pressure = round(doc.get("Pressure_Mean", 0), 2) if "Pressure_Mean" in doc else ""
 
         line = (
             f"| {ts} | {close} | {high} | {low} | {open_} | {volume} | "
@@ -214,6 +214,9 @@ def run_analysis(date=None):
 
     prompt_previous_date(date=date, first_candle=today_start)
 
+    if date:
+        input('Waiting for the user ...')
+
     while True:
         docs = list(collection.find({"time": {"$gt": today_start}}).sort("time", 1))
         if not docs:
@@ -262,19 +265,18 @@ def run_analysis(date=None):
         else:
 
             prompt = (
-                f"Predict a cost-effective bull or bear entry based on potential price movements not yet achieved. "
-                f"The current time is {now_str}. The candle data below includes the most recently closed 5-minute candle, and in many cases also the currently forming candle. "
-                f"Use this information to analyze the short-term price action and underlying order flow conditions. "
-                f"Apply conditional logic — for example, 'If price rises to X and DensitySpread_Mean is positive with strong Pressure, then enter long.' "
-                f"Base your prediction on confluence between price levels and key indicators such as DensitySpread_Mean, Pressure_Mean, Liquidity_Mean, and RawSpread_Mean. "
-                f"Only suggest an entry if it appears efficient, well-supported by multiple indicators, and likely to produce an edge — avoid speculative or overly frequent signals. "
-                f"Never suggest an entry if RawSpread_Mean is greater than or equal to 0.09. "
-                f"If a valid setup is forming, clearly state: the entry price, direction (long or short), stop-loss, take-profit, and relevant contextual levels (R1–R4, S1–S4). "
-                f"If no setup is present, explain what confluence or conditions would be required for a trade to become viable. "
-                f"Interpret DensitySpread_Mean carefully: a positive value may suggest easier liquidity below (potential bull traps), while a negative value may point to easier liquidity above (potential bear traps). "
-                f"These clues must be interpreted in market context and confirmed by additional evidence. "
-                f"If already in a position, recommend whether to hold, exit, or reverse based on current market behavior. "
-                f"Keep the response structured, forward-looking, and concise.\n\n"
+                f"Continue analyzing this 5-minute candle in context with the list below. The current time is {now_str}. "
+                f"Since data is aggregated, this may or may not represent a new candle. "
+                f"If there's an entry opportunity, tell me in details the direction (long or short), take-profit, stop-loss, and contextual R1–R2 and S1–S2 levels based on previous data. "
+                f"If not, just analyze the candle and give me only the conclusion. "
+                f"Pay close attention to DensitySpread_Mean: when positive, it may suggest liquidity is more accessible below, making upward moves *potential* bull traps; "
+                f"when negative, it may suggest easier liquidity above, making downward moves *potential* bear traps. "
+                f"However, rising prices with positive Density or falling prices with negative Density are not necessarily traps — context and confirmation matter. "
+                f"Do not identify entry opportunities when RawSpread is greater or equal to 0.09, as the spread makes the cost of entry too high. "
+                f"If an entry has already been defined, update the strategy and indicate if it's time to exit or continue holding. "
+                f"Let me know if we're still holding a position after hitting any contextual level. "
+                f"If the setup is no longer valid, reset and search for a new opportunity. "
+                f"Keep the response concise but informative, avoiding complex analysis. "
                 f"{latest_lines}"
             )
 
@@ -295,6 +297,6 @@ def run_analysis(date=None):
 
 
 try:
-    run_analysis()
+    run_analysis('2025-08-05')
 except KeyboardInterrupt:
     cleanup_and_exit()
