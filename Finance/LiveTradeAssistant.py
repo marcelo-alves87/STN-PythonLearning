@@ -137,42 +137,73 @@ def format_candle_lines(docs):
     return " ".join(lines)
 
 def prompt_previous_date(date, first_candle):
-    last_day = collection.find({"time": {"$lt": first_candle}}).sort("time", -1).limit(1)[0]["time"].strftime("%Y-%m-%d")
-    start_prev_day = pd.to_datetime(last_day)
-    end_prev_day = start_prev_day + pd.Timedelta(days=1)
-    prev_docs = list(collection.find({
-        "time": {
-            "$gte": start_prev_day,
-            "$lt": end_prev_day
-        }
-    }).sort("time", 1))
-    if prev_docs:
-        open_prev_day = prev_docs[0]["open"]
-        close_prev_day = prev_docs[-1]["close"]
-        high_prev_day = max(doc["high"] for doc in prev_docs)
-        low_prev_day = min(doc["low"] for doc in prev_docs)
-    else:
-        open_prev_day = close_prev_day = high_prev_day = low_prev_day = "N/A"
+    # Get the 5 most recent unique trading days before first_candle
+    
+    last_docs = list(collection.find({"time": {"$lt": first_candle}}).sort("time", -1))
 
-    prev_day_ohlc_line = (
-        f"(Prev Day OHLC - Open: {open_prev_day}, High: {high_prev_day}, "
-        f"Low: {low_prev_day}, Close: {close_prev_day})"
-    )
+    unique_days = []
+    seen = set()
+
+    for doc in last_docs:
+        day_str = doc["time"].strftime("%Y-%m-%d")
+        if day_str not in seen:
+            seen.add(day_str)
+            unique_days.append(day_str)
+        if len(unique_days) == 5:
+            break
+
+    
+
+    # Generate OHLC summary for each of the last 5 days
+    summaries = []
+    for day_str in reversed(unique_days):  # reverse to go from oldest to newest
+        start_day = pd.to_datetime(day_str)
+        end_day = start_day + pd.Timedelta(days=1)
+
+        day_docs = list(collection.find({
+            "time": {
+                "$gte": start_day,
+                "$lt": end_day
+            }
+        }).sort("time", 1))
+
+        if day_docs:
+            open_price = day_docs[0]["open"]
+            close_price = day_docs[-1]["close"]
+            high_price = max(doc["high"] for doc in day_docs)
+            low_price = min(doc["low"] for doc in day_docs)
+
+            summary = (
+                f"[{day_str} OHLC - Open: {open_price}, High: {high_price}, "
+                f"Low: {low_price}, Close: {close_price}]"
+            )
+        else:
+            summary = f"[{day_str} OHLC - No data available]"
+
+        summaries.append(summary)
+
+    prev_day_ohlc_lines = " ".join(summaries)
 
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
 
     prompt = (
-        f"Now it's {date}. Please analyze the previous trading day's data and give me only the conclusion. "
-        f"Keep the response concise but informative, avoiding complex analysis. "
-        f"Here is the previous trading day data summary: "
-        f"{prev_day_ohlc_line}"
+        f"Now it's {date}. Analyze the previous 5 trading days' data and provide a concise conclusion about market context and evolving bias. "
+        f"Identify any significant levels or patterns that may influence today's trading decisions, but do not speculate about future entries yet. "
+        f"Keep the response short, clear, and focused — avoid complex analysis. "
+        f"Here is the summary of the last 5 trading days:    "
+        f"{prev_day_ohlc_lines}"
     )
-
-
-    send_prompt_to_chatgpt(prompt)
     
+    send_prompt_to_chatgpt(prompt)
 
+def get_latest_mongo_doc():
+    return client["mongodb"]["scraped_prices"].find_one(sort=[("time", -1)])
+
+def round_down_to_nearest_5(dt):
+    return dt.replace(minute=(dt.minute // 5) * 5, second=0, microsecond=0)
+
+    
 def run_analysis(date=None):
 
     # Get dynamic first candle time
@@ -182,64 +213,83 @@ def run_analysis(date=None):
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     prompt_previous_date(date=date, first_candle=today_start)
-    
+
     while True:
-        cursor = collection.find({"time": {"$gt": today_start}}).sort("time", 1)
-        candle = next(cursor, None)
-        if not candle:
+        docs = list(collection.find({"time": {"$gt": today_start}}).sort("time", 1))
+        if not docs:
             time.sleep(30)
             continue
         else:
             break
 
+    count = 0
+    first_data = (len(docs) == 1) if not date else True
+    candle = docs[count]
     last_processed_minute = None
-    submit_prompt = True
 
     while True:
-        now = datetime.now()
-        current_minute = now.replace(second=0, microsecond=0)
-        now_str = now.strftime('%H:%M')
-
+        
         if date:
             current_time = candle["time"]
             now_str = current_time.strftime('%H:%M')
+            today = current_time.strftime('%Y-%m-%d')
             latest = get_today_data(current_timestamp=now_str, date=date)
         else:
-            latest = get_today_data()
+            latest_doc = get_latest_mongo_doc()
+            mongo_time = latest_doc['time']            
+            candle_time = round_down_to_nearest_5(mongo_time)
+            if last_processed_minute is None or candle_time > last_processed_minute:
+                current_time = mongo_time
+                now_str = current_time.strftime('%H:%M')
+                today = current_time.strftime('%Y-%m-%d')
+                latest = get_today_data()
+                last_processed_minute = candle_time
+            else:
+                time.sleep(1)
+                continue
 
         latest_lines = format_candle_lines(latest)
 
-        prompt = (
-            f"Continue analyzing this 5-minute candle in context with the list below. The current time is {now_str}. "
-            f"Since data is aggregated, this may or may not represent a new candle. "
-            f"If there's an entry opportunity, tell me in details the direction (long or short), take-profit, stop-loss, and contextual R1–R2 and S1–S2 levels based on previous data. "
-            f"If not, just analyze the candle and give me only the conclusion. "
-            f"Pay close attention to DensitySpread_Mean: when positive, it may suggest liquidity is more accessible below, making upward moves *potential* bull traps; "
-            f"when negative, it may suggest easier liquidity above, making downward moves *potential* bear traps. "
-            f"However, rising prices with positive Density or falling prices with negative Density are not necessarily traps — context and confirmation matter. "
-            f"Do not identify entry opportunities when RawSpread is greater or equal to 0.09, as the spread makes the cost of entry too high. "
-            f"If an entry has already been defined, update the strategy and indicate if it's time to exit or continue holding. "
-            f"Let me know if we're still holding a position after hitting any contextual level. "
-            f"If the setup is no longer valid, reset and search for a new opportunity. "
-            f"Keep the response concise but informative, avoiding complex analysis. "
-            f"{latest_lines}"
-        )
+        if first_data:
 
-        if submit_prompt:
-            send_prompt_to_chatgpt(prompt)
+            prompt = (
+                f"This is the first 5-minute candle of today ({today}) at {now_str}. "
+                f"Please analyze this candle in the context of market open behavior. "
+                f"Identify any early signs of bullish or bearish sentiment based on this single candle.         "
+                f"{latest_lines}"
+            )
+            first_data = False
+        else:
+
+            prompt = (
+                f"Predict a cost-effective bull or bear entry based on potential price movements not yet achieved. "
+                f"The current time is {now_str}. The candle data below includes the most recently closed 5-minute candle, and in many cases also the currently forming candle. "
+                f"Use this information to analyze the short-term price action and underlying order flow conditions. "
+                f"Apply conditional logic — for example, 'If price rises to X and DensitySpread_Mean is positive with strong Pressure, then enter long.' "
+                f"Base your prediction on confluence between price levels and key indicators such as DensitySpread_Mean, Pressure_Mean, Liquidity_Mean, and RawSpread_Mean. "
+                f"Only suggest an entry if it appears efficient, well-supported by multiple indicators, and likely to produce an edge — avoid speculative or overly frequent signals. "
+                f"Never suggest an entry if RawSpread_Mean is greater than or equal to 0.09. "
+                f"If a valid setup is forming, clearly state: the entry price, direction (long or short), stop-loss, take-profit, and relevant contextual levels (R1–R4, S1–S4). "
+                f"If no setup is present, explain what confluence or conditions would be required for a trade to become viable. "
+                f"Interpret DensitySpread_Mean carefully: a positive value may suggest easier liquidity below (potential bull traps), while a negative value may point to easier liquidity above (potential bear traps). "
+                f"These clues must be interpreted in market context and confirmed by additional evidence. "
+                f"If already in a position, recommend whether to hold, exit, or reverse based on current market behavior. "
+                f"Keep the response structured, forward-looking, and concise.\n\n"
+                f"{latest_lines}"
+            )
+
+
+
+
+        send_prompt_to_chatgpt(prompt)
 
         if date:
             input('Waiting for the user ...')
-            candle = next(cursor, None)
-        else:
-            # Update last processed minute only after prompt was sent
-            if current_minute != last_processed_minute:
-                last_processed_minute = current_minute
-                submit_prompt = True
+            count += 1
+            if count < len(docs):
+                candle = docs[count]
             else:
-                submit_prompt = False
-
-            time.sleep(1)
+                break
 
             
 
