@@ -265,10 +265,11 @@ def run_analysis(date=None):
         else:
 
             prompt = (
-                f"Continue analyzing this 5-minute candle in context with the list below. The current time is {now_str}. "
-                f"Since data is aggregated, this may or may not represent a new candle. "
-                f"If there's an entry opportunity, tell me in details the direction (long or short), take-profit, stop-loss, and contextual R1–R2 and S1–S2 levels based on previous data. "
-                f"If not, just analyze the candle and give me only the conclusion. "
+                f"Analyze the most recently *closed* 5-minute candle in the context of the list below. The current time is {now_str}. "
+                f"If a newer candle exists, it's very import consider its OHLCV values in your analysis — do not analyze it as a completed candle. "
+                f"Base your conclusions primarily on the last fully closed candle and the recent OHLC opened candle, if it exists. "
+                f"If there's an entry opportunity, explain clearly the direction (long or short), take-profit, stop-loss, and contextual R1–R2 and S1–S2 levels based on previous data. "
+                f"If not, just analyze the closed candle and provide only the conclusion. "
                 f"Pay close attention to DensitySpread_Mean: when positive, it may suggest liquidity is more accessible below, making upward moves *potential* bull traps; "
                 f"when negative, it may suggest easier liquidity above, making downward moves *potential* bear traps. "
                 f"However, rising prices with positive Density or falling prices with negative Density are not necessarily traps — context and confirmation matter. "
@@ -276,10 +277,9 @@ def run_analysis(date=None):
                 f"If an entry has already been defined, update the strategy and indicate if it's time to exit or continue holding. "
                 f"Let me know if we're still holding a position after hitting any contextual level. "
                 f"If the setup is no longer valid, reset and search for a new opportunity. "
-                f"Keep the response concise but informative, avoiding complex analysis. "
+                f"Keep the response concise but informative, avoiding overly complex reasoning. "
                 f"{latest_lines}"
             )
-
 
 
 
@@ -297,6 +297,6 @@ def run_analysis(date=None):
 
 
 try:
-    run_analysis('2025-08-05')
+    run_analysis()
 except KeyboardInterrupt:
     cleanup_and_exit()
