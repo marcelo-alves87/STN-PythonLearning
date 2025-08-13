@@ -18,8 +18,6 @@ import traceback
 from dateutil import parser
 import re
 from datetime import timedelta
-import subprocess
-import threading
 
 # Constants
 URL = "https://rico.com.vc/"
@@ -684,25 +682,6 @@ def get_data_to_csv():
     finally:        
         print("Scraping of last prices completed.")
 
-def monitor_assistant_output():
-    global assistant_process
-    if assistant_process and assistant_process.stdout:
-        for line in assistant_process.stdout:
-            if line.strip():
-                timestamp = dt.datetime.now().strftime("%H:%M:%S")
-                print(f"[{timestamp}] 📈 Assistant: {line.strip()}")
-
-
-def run_assistant():
-    global assistant_process
-    assistant_process = subprocess.Popen(
-        ["python", "LiveTradeAssistant.py"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
-    )
-    threading.Thread(target=monitor_assistant_output, daemon=True).start()
-
 def delete_scraped_collection():
     DB_SCRAPED_PRICES.delete_many({})
     DB_OFFER_BOOK.delete_many({})
@@ -713,6 +692,5 @@ if __name__ == "__main__":
     delete_scraped_collection()
     driver = setup_scraper()
     get_data_to_csv()
-    #run_assistant()
     scrape_to_mongo()
     driver.quit()

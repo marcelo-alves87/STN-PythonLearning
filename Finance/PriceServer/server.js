@@ -92,6 +92,53 @@ app.get('/*.json', (req, res) => {
   //res.send('Welcome to my server!');
 });
 
+// New endpoint to fetch data from 'prices_interpretation' collection based on labels
+app.get('/interpretation', (req, res) => {
+    // Website you wish to allow to connect
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Request methods you wish to allow
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+
+    // Request headers you wish to allow
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+
+    // Set to true if you need the website to include cookies in the requests sent
+    // to the API (e.g. in case you use sessions)
+    res.setHeader('Access-Control-Allow-Credentials', false);
+    res.setHeader('Content-Type', 'application/json');
+
+    const { DensitySpread_Label, Liquidity_Label, Pressure_Label } = req.query;
+
+    // Validate the input
+    if (!DensitySpread_Label || !Liquidity_Label || !Pressure_Label) {
+        res.status(400).send({ error: "Missing required query parameters." });
+        return;
+    }
+
+    // Connect to the 'prices_interpretation' collection
+    const interpretationCollection = db.collection("prices_interpretation");
+
+    // Build the query based on the labels provided
+    const query = {
+        DensitySpread_Label: DensitySpread_Label,
+        Liquidity_Label: Liquidity_Label,
+        Pressure_Label: Pressure_Label,
+    };
+
+    // Find a single document matching the query
+    interpretationCollection.findOne(query).then((data) => {
+        if (data) {
+            res.end(JSON.stringify(data));
+        } else {
+            res.status(404).send({ error: "Document not found." });
+        }
+    }).catch((err) => {
+        console.log(err.Message);
+        res.status(500).send({ error: "An error occurred while retrieving data." });
+    });
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

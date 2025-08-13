@@ -271,6 +271,24 @@ def export_data_to_csv():
     df.to_csv("exported_prices.csv", index=False)
     print("CSV export completed.")
 
+def remove_midnight_records():
+
+    # Get all distinct dates in the collection
+    all_dates = collection.distinct("time")
+    
+    for date in all_dates:
+        # Convert to datetime if it's a string
+        if isinstance(date, str):
+            date = datetime.fromisoformat(date.replace("Z", "+00:00"))
+        
+        # Build midnight datetime for that day
+        midnight = date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Delete the midnight record if exists
+        result = collection.delete_one({"time": midnight})
+        
+        if result.deleted_count > 0:
+            print(f"Removed midnight record for {midnight.date()}")
     
 
 # Example usage:
@@ -284,7 +302,8 @@ def export_data_to_csv():
 #insert_from_uploaded_csv()
 #print(collection.index_information())
 #export_data_to_csv()
+#remove_midnight_records()
 
-os.system(f'%PY_HOME%/python.exe LiveTradeAssistant.py')
+
 
 
