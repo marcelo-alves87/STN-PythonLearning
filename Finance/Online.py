@@ -107,7 +107,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean", "AgentDensity_Mean"
     }
     
 
@@ -177,66 +177,80 @@ def compute_pressure(trades):
             else:
                 sell_qty += qty
 
-    total = buy_qty + sell_qty
-    return (buy_qty - sell_qty)/total if total > 0 else 0
+    return buy_qty, sell_qty
 
 
-def compute_liquidity(buy_book, sell_book, df):
-
-    current_price = df['Último'].iloc[-1]
-    
-
-    def adaptive_weighted_score(book, current_price, side='buy'):
-
-        distances = [abs(level['price'] - current_price) for level in book]
-        max_distance = max(distances) 
-
-        score = 0.0
-        for level in book:
-            price = level['price']
-            qty = level['qty']
-            distance = price - current_price
-
-            if side == 'buy':
-                weight = 1 + (distance / max_distance)
-            else:  # sell
-                weight = 1 - (distance / max_distance)
-
-            weight = max(0, weight)
-            score += qty * weight
-
-        return score
-
-    support = adaptive_weighted_score(buy_book, current_price, side='buy')
-    resistance = adaptive_weighted_score(sell_book, current_price, side='sell')
-
-    total = support + resistance
-    return (support - resistance)/total if total > 0 else 0
-
-def compute_density_spread(buy_book, sell_book):
+# ---------- 1) SNAPSHOT: compute raw Support / Resistance (+ instantaneous Liquidity) ----------
+def compute_liquidity_components(buy_book, sell_book, current_price):
     """
-    Computes a normalized DensitySpread: (buy_density - sell_density) / (buy_density + sell_density)
-    Density = total quantity / price span for each side.
+    Compute raw side scores at *this instant*:
+      Support  = adaptive weighted score of buy_book
+      Resistance = adaptive weighted score of sell_book
+    Return (instant_liquidity, support, resistance) where:
+      instant_liquidity = (Support - Resistance) / (Support + Resistance)  (0 if denom==0)
+    """
+    def _score(book, side):
+        if not book:
+            return 0.0
+        # distances for scaling
+        dists = []
+        for lv in book:
+            p = lv.get("price")
+            if p is None: 
+                continue
+            try:
+                dists.append(abs(float(p) - current_price))
+            except (TypeError, ValueError):
+                continue
+        maxd = max(dists) if dists else 0.0
+        if maxd == 0.0:
+            maxd = 1.0  # avoid divide-by-zero; makes weights default to 1.0
+
+        s = 0.0
+        for lv in book:
+            p = lv.get("price")
+            q = lv.get("qty", lv.get("quantity", 0))
+            try:
+                p = float(p); q = float(q or 0)
+            except (TypeError, ValueError):
+                continue
+            if q <= 0:
+                continue
+            d = p - current_price
+            if side == "buy":
+                w = max(0.0, 1.0 + (d / maxd))
+            else:
+                w = max(0.0, 1.0 - (d / maxd))
+            s += q * w
+        return float(s)
+
+    support    = _score(buy_book,  "buy")
+    resistance = _score(sell_book, "sell")
+    
+    return support, resistance
+
+def compute_density_components(buy_book, sell_book):
+    """
+    Return raw BuyDensity and SellDensity for the *current* snapshot.
+    Density = sum(qty) / price_span (guarded against zero spans)
     """
     if not buy_book or not sell_book:
-        return 0.0
+        return 0.0, 0.0
 
-    buy_prices = [entry["price"] for entry in buy_book]
-    sell_prices = [entry["price"] for entry in sell_book]
-    buy_qty = sum(entry["qty"] for entry in buy_book)
-    sell_qty = sum(entry["qty"] for entry in sell_book)
+    buy_prices  = [e.get("price") for e in buy_book if e.get("price") is not None]
+    sell_prices = [e.get("price") for e in sell_book if e.get("price") is not None]
+    if not buy_prices or not sell_prices:
+        return 0.0, 0.0
 
-    buy_span = max(buy_prices) - min(buy_prices)
+    buy_qty  = sum(float(e.get("qty", e.get("quantity", 0)) or 0) for e in buy_book)
+    sell_qty = sum(float(e.get("qty", e.get("quantity", 0)) or 0) for e in sell_book)
+
+    buy_span  = max(buy_prices)  - min(buy_prices)
     sell_span = max(sell_prices) - min(sell_prices)
 
-    buy_density = buy_qty / buy_span if buy_span > 0 else 0
-    sell_density = sell_qty / sell_span if sell_span > 0 else 0
-
-    total = buy_density + sell_density
-    if total == 0:
-        return 0.0
-
-    return round((buy_density - sell_density) / total, 4)
+    buy_den  = (buy_qty  / buy_span)  if buy_span  > 0 else 0.0
+    sell_den = (sell_qty / sell_span) if sell_span > 0 else 0.0
+    return buy_den, sell_den
 
 
 def compute_raw_spread(buy_book, sell_book):
@@ -247,9 +261,23 @@ def compute_raw_spread(buy_book, sell_book):
     return best_ask - best_bid
 
 def save_into_scraped_prices(df):
-
+    
     # 1. Assume df_scraped is already defined
-    df_scraped = df[['Data/Hora', 'RawSpread', 'DensitySpread', 'nQuoteNumber', 'Liquidity', 'Pressure']].copy()
+    df_scraped = df[[
+        "Data/Hora",
+        "RawSpread",
+        "BuyDensity",
+        "SellDensity",
+        "nQuoteNumber",
+        "Support",
+        "Resistance",
+        "Pressure_BuyQty",
+        "Pressure_SellQty",
+        "AD_BuyVol",
+        "AD_SellVol",
+        "AD_BuyAgents",
+        "AD_SellAgents",
+    ]].copy()
 
     # 2. Rename column and convert to datetime
     df_scraped.rename(columns={'Data/Hora': 'time'}, inplace=True)
@@ -313,6 +341,59 @@ def save_times_trades_book(all_trades):
         print(f"Error saving trades: {e}")
 
 
+def compute_agent_density(all_trades):
+    """
+    Snapshot Agent Density from the just-scraped trades list.
+    Returns a dict with:
+      - AgentDensity: normalized diff between (buy_vol/#buy_agents) and (sell_vol/#sell_agents)
+      - AD_BuyVol, AD_SellVol: raw volumes per aggressor side (snapshot)
+      - AD_BuyAgents, AD_SellAgents: # unique agents on each side (snapshot)
+      - AD_BuyDict, AD_SellDict: dicts keyed by agent id with Σ(nQuoteNumber)
+    Notes:
+      * This is a per-snapshot measure. For exact 5-min values, recompute from DB in aggregation.
+    """
+    if not all_trades:
+        return 0
+
+    df = pd.DataFrame(all_trades)
+
+    # keep only normal on-book trade types if present
+    if "nTradeType" in df.columns:
+        df = df[df["nTradeType"].isin([2, 3])]
+
+    # safe numeric casting
+    for c in ["nQuoteNumber", "nQuantity", "nBuyAgent", "nSellAgent"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # --- agent dictionaries (Σ of quotes per agent) ---
+    buy_dict = (
+        df.dropna(subset=["nBuyAgent", "nQuoteNumber"])
+          .groupby("nBuyAgent")["nQuoteNumber"].sum()
+          .astype(float).to_dict()
+    )
+    sell_dict = (
+        df.dropna(subset=["nSellAgent", "nQuoteNumber"])
+          .groupby("nSellAgent")["nQuoteNumber"].sum()
+          .astype(float).to_dict()
+    )
+
+    # --- volumes by aggressor side ---
+    buy_vol  = float(pd.to_numeric(df.loc[df["bBuyerAgressor"] == True,  "nQuantity"], errors="coerce").sum())
+    sell_vol = float(pd.to_numeric(df.loc[df["bBuyerAgressor"] == False, "nQuantity"], errors="coerce").sum())
+
+    # --- unique agents present in this snapshot ---
+    n_buy_agents  = int(df["nBuyAgent"].nunique(dropna=True))
+    n_sell_agents = int(df["nSellAgent"].nunique(dropna=True))
+
+    return {
+        # RAW (store these for correct 5m calc)
+        "AD_BuyVol": buy_vol,
+        "AD_SellVol": sell_vol,
+        "AD_BuyAgents": n_buy_agents,
+        "AD_SellAgents": n_sell_agents
+    }
+
 def scrap_pricebook(driver, df):
     
     # JavaScript to scrape order book
@@ -367,7 +448,7 @@ def scrap_pricebook(driver, df):
             nTradeType: entry.nTradeType
         }}));
     """
-  
+    pdb.set_trace()
     all_trades = driver.execute_script(js_trades_script)
 
     if not all_trades:
@@ -380,13 +461,17 @@ def scrap_pricebook(driver, df):
     spread = compute_raw_spread(buy_book, sell_book)    
 
     # 3. Compute DensitySpread
-    density_spread = compute_density_spread(buy_book, sell_book)
-
+    bd, sd = compute_density_components(buy_book, sell_book)
+    
     # 4. Compute Liquidity
-    liquidity = compute_liquidity(buy_book, sell_book, df)
+    support, resistance = compute_liquidity_components(buy_book, sell_book, float(df['Último'].iloc[-1]))
 
     # 5. Compute Pressure
-    pressure = compute_pressure(all_trades)
+    press_buy, press_sell = compute_pressure(all_trades)
+
+    # 6. Agent Density
+    ad = compute_agent_density(all_trades)
+    
 
     # 5. Get the maximum nQuoteNumber from the list
     max_quote_number = max((t["nQuoteNumber"] for t in all_trades if "nQuoteNumber" in t), default=0)
@@ -394,22 +479,91 @@ def scrap_pricebook(driver, df):
     # 3. Save into latest row
     df.loc[df.index[-1], [
         "RawSpread",
-        "DensitySpread",
-        "nQuoteNumber",
-        "Liquidity",
-        "Pressure"
+        "nQuoteNumber",        
+        "Pressure_BuyQty",     
+        "Pressure_SellQty",
+        "AD_BuyVol","AD_SellVol","AD_BuyAgents","AD_SellAgents",
+        "BuyDensity","SellDensity",
+        "Support", "Resistance"
     ]] = [
         spread,
-        density_spread,
         max_quote_number,
-        liquidity,
-        pressure
+        press_buy,
+        press_sell,
+        ad.get("AD_BuyVol", 0.0), ad.get("AD_SellVol", 0.0),
+        int(ad.get("AD_BuyAgents", 0) or 0), int(ad.get("AD_SellAgents", 0) or 0),
+        bd, sd,
+        support, resistance
     ]
 
     # Save result (your existing storage function)
     save_into_scraped_prices(df)
 
     return True
+
+def tw_normalized_diff(df_snap: pd.DataFrame, pos_col: str, neg_col: str, freq="5T"):
+    """
+    Time-weighted normalized diff per bucket for two state variables.
+    Treat each snapshot as piecewise-constant until the next one.
+    """
+    if df_snap.empty or not {pos_col, neg_col}.issubset(df_snap.columns):
+        return pd.DataFrame(columns=["time", f"{pos_col}_TWMean", f"{neg_col}_TWMean", "NormDiff"]).set_index("time")
+
+    df = df_snap[[pos_col, neg_col]].sort_index().copy()
+    start = df.index[0].floor(freq)
+    end   = df.index[-1].ceil(freq)
+    buckets = pd.date_range(start, end, freq=freq)
+
+    rows = []
+    idx = df.index
+
+    for B in buckets:
+        B_end = B + pd.Timedelta(freq)
+
+        # carry value at bucket start (last snapshot at or before B)
+        i = idx.searchsorted(B, side="right") - 1
+        times = []
+        vals  = []
+        if i >= 0:
+            times.append(B)
+            vals.append(df.iloc[i][[pos_col, neg_col]].values)
+
+        # snapshots strictly inside (B, B_end)
+        inner = df.loc[(idx > B) & (idx < B_end)]
+        for t, r in inner.iterrows():
+            times.append(t)
+            vals.append(r[[pos_col, neg_col]].values)
+
+        if not times:
+            continue
+
+        # integrate piecewise-constant until bucket end
+        tw_pos = tw_neg = 0.0
+        for j in range(len(times)):
+            t0 = times[j]
+            t1 = times[j+1] if j+1 < len(times) else B_end
+            dt = (t1 - t0).total_seconds()
+            if dt <= 0: 
+                continue
+            p, n = vals[j]
+            tw_pos += float(p) * dt
+            tw_neg += float(n) * dt
+
+        total = (B_end - times[0]).total_seconds()
+        if total <= 0:
+            continue
+
+        pos_mean = tw_pos / total
+        neg_mean = tw_neg / total
+        denom = pos_mean + neg_mean
+        norm = 0.0 if denom == 0 else (pos_mean - neg_mean) / denom
+
+        rows.append({"time": B,
+                     f"{pos_col}_TWMean": pos_mean,
+                     f"{neg_col}_TWMean": neg_mean,
+                     "NormDiff": norm})
+
+    return pd.DataFrame(rows).set_index("time").sort_index()
 
 
 def process_and_save_data(driver):
@@ -506,26 +660,71 @@ def process_and_save_data(driver):
 
         scraped_data = list(DB_SCRAPED_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
         df_scraped = pd.DataFrame(scraped_data)
+        pdb.set_trace()
         if not df_scraped.empty:
             df_scraped["time"] = pd.to_datetime(df_scraped["time"])
-            df_scraped.set_index("time", inplace=True)
-            df_scraped.drop(columns=["nQuoteNumber"], errors="ignore", inplace=True)
+            df_snap = df_scraped.set_index("time").sort_index()
+            df_snap.drop(columns=["nQuoteNumber"], errors="ignore", inplace=True)
 
-            df_scraped_ohlc = df_scraped.resample("5T").agg({               
+            # 5T resample for flows & pieces (no ratio means here)
+            agg_map = {
                 "RawSpread": "mean",
-                "DensitySpread": "mean",
-                "Liquidity": "mean",
-                "Pressure": "mean"
-            })
+                "Pressure_BuyQty": "sum",
+                "Pressure_SellQty": "sum",
+                "AD_BuyVol": "sum",
+                "AD_SellVol": "sum",
+                "AD_BuyAgents": "max",   # snapshot approx for the union
+                "AD_SellAgents": "max",
+            }
+            use_map = {k: v for k, v in agg_map.items() if k in df_snap.columns}
+            df5 = df_snap.resample("5T").agg(use_map)
+            df5.index.name = "time"  # ensure a stable name for merge later
 
-            # Rename columns to _Mean
-            df_scraped_ohlc.columns = [
-                "RawSpread_Mean" , "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean"
-            ]
+            # Pressure (compute once from totals)
+            if {"Pressure_BuyQty", "Pressure_SellQty"}.issubset(df5.columns):
+                B = df5.pop("Pressure_BuyQty").fillna(0.0).astype("float64")
+                S = df5.pop("Pressure_SellQty").fillna(0.0).astype("float64")
+                den = B + S
+                pressure = pd.Series(0.0, index=df5.index, dtype="float64")
+                m = den != 0
+                pressure[m] = (B[m] - S[m]) / den[m]
+                df5["Pressure_Mean"] = pressure
 
-            df_scraped_ohlc.reset_index(inplace=True)            
+            # AgentDensity (sum vols + max agent counts; compute once)
+            ad_cols = {"AD_BuyVol", "AD_SellVol", "AD_BuyAgents", "AD_SellAgents"}
+            if ad_cols.issubset(df5.columns):
+                BV = df5.pop("AD_BuyVol").fillna(0.0).astype("float64")
+                SV = df5.pop("AD_SellVol").fillna(0.0).astype("float64")
+                NB = df5.pop("AD_BuyAgents").fillna(0).astype(int).clip(lower=1)
+                NS = df5.pop("AD_SellAgents").fillna(0).astype(int).clip(lower=1)
+                vpb = BV / NB
+                vps = SV / NS
+                den2 = vpb + vps
+                agentdensity = pd.Series(0.0, index=df5.index, dtype="float64")
+                m2 = den2 != 0
+                agentdensity[m2] = (vpb[m2] - vps[m2]) / den2[m2]
+                df5["AgentDensity_Mean"] = agentdensity
 
-            df_resampled = pd.merge(df_resampled, df_scraped_ohlc, on="time", how="left")          
+            # Liquidity (TIME-WEIGHTED from snapshots)
+            if {"Support", "Resistance"}.issubset(df_snap.columns):
+                tw_liq = tw_normalized_diff(df_snap, pos_col="Support", neg_col="Resistance", freq="5T")
+                tw_liq.rename(columns={"NormDiff": "Liquidity_Mean"}, inplace=True)
+                df5 = df5.merge(tw_liq[["Liquidity_Mean"]], left_index=True, right_index=True, how="left")
+
+            # DensitySpread (TIME-WEIGHTED from snapshots)
+            if {"BuyDensity", "SellDensity"}.issubset(df_snap.columns):
+                tw_ds = tw_normalized_diff(df_snap, pos_col="BuyDensity", neg_col="SellDensity", freq="5T")
+                tw_ds.rename(columns={"NormDiff": "DensitySpread_Mean"}, inplace=True)
+                df5 = df5.merge(tw_ds[["DensitySpread_Mean"]], left_index=True, right_index=True, how="left")
+
+            # Rename any remaining simple means
+            df5.rename(columns={"RawSpread": "RawSpread_Mean"}, inplace=True)
+
+            df5 = df5.reset_index()  # 'time' stays as a column thanks to index.name set above
+            df_resampled = pd.merge(df_resampled, df5, on="time", how="left")
+
+
+         
 
 
         # Save the newly aggregated data
@@ -691,6 +890,6 @@ if __name__ == "__main__":
     warnings.simplefilter(action="ignore")
     delete_scraped_collection()
     driver = setup_scraper()
-    get_data_to_csv()
+    #get_data_to_csv()
     scrape_to_mongo()
     driver.quit()

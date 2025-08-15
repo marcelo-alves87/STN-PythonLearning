@@ -244,10 +244,17 @@ def export_data_to_csv():
             return f"{value / 1_000:.2f}k"
         return str(value)
 
+    # only docs where all three fields exist (and not None)
+    query = {
+        "DensitySpread_Mean":   {"$exists": True},
+        "Liquidity_Mean": {"$exists": True},
+        "Pressure_Mean":  {"$exists": True},
+    }
+
 
     # Fetch and process documents
     records = []
-    for doc in collection.find():
+    for doc in collection.find(query):
         record = {}
         # Format time
         if "time" in doc:
@@ -301,7 +308,7 @@ def remove_midnight_records():
 #export_to_csv('2025-06-06')
 #insert_from_uploaded_csv()
 #print(collection.index_information())
-#export_data_to_csv()
+export_data_to_csv()
 #remove_midnight_records()
 
 
