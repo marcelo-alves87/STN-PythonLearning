@@ -448,7 +448,7 @@ def scrap_pricebook(driver, df):
             nTradeType: entry.nTradeType
         }}));
     """
-    pdb.set_trace()
+    
     all_trades = driver.execute_script(js_trades_script)
 
     if not all_trades:
@@ -660,7 +660,7 @@ def process_and_save_data(driver):
 
         scraped_data = list(DB_SCRAPED_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
         df_scraped = pd.DataFrame(scraped_data)
-        pdb.set_trace()
+        
         if not df_scraped.empty:
             df_scraped["time"] = pd.to_datetime(df_scraped["time"])
             df_snap = df_scraped.set_index("time").sort_index()
@@ -890,6 +890,6 @@ if __name__ == "__main__":
     warnings.simplefilter(action="ignore")
     delete_scraped_collection()
     driver = setup_scraper()
-    #get_data_to_csv()
+    get_data_to_csv()
     scrape_to_mongo()
     driver.quit()
