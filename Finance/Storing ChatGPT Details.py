@@ -24,9 +24,9 @@ CHROME_BINARY = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 USER_DATA_DIR = r"C:\ChromeSession"   # requires an already logged-in profile
 CHATGPT_URL = "https://chat.openai.com"
 
-BAND7 = [
-    "+Muito Alto", "+Alto", "+Médio", "0",
-    "-Médio", "-Alto", "-Muito Alto"
+BAND5 = [
+    "+Alto", "+Médio", "0",
+    "-Médio", "-Alto"
 ]
 
 # ==========================
@@ -42,11 +42,12 @@ def ensure_unique_index(coll):
             [
                 ("DensitySpread_Label", 1),
                 ("Liquidity_Label", 1),
-                ("Pressure_Label", 1)
+                ("Pressure_Label", 1),
+                ("AgentDensity_Label", 1)
             ],
             unique=True
         )
-        print("✅ Unique index ensured on (DensitySpread_Label, Liquidity_Label, Pressure_Label)")
+        print("✅ Unique index ensured on (DensitySpread_Label, Liquidity_Label, Pressure_Label, AgentDensity_Label)")
     except Exception as e:
         print("⚠️ Could not create unique index:", e)
 
@@ -123,47 +124,59 @@ def parse_json_response(text):
 def main():
     db = connect_mongo()
     coll_out = db[COLL_OUT]
-    ensure_unique_index(coll_out)  # ← keep a single doc per label trio
+    ensure_unique_index(coll_out)  # ← keep a single doc per label quartet
 
     driver = start_browser()
     input("Pressione ENTER quando estiver autenticado no ChatGPT...")
 
-    total = 0
-    for ds_lab, liq_lab, press_lab in itertools.product(BAND7, repeat=3):
+    combos = list(itertools.product(BAND5, repeat=4))
+    total_combos = len(combos)   # sempre 7^4 = 2401
+    done = 0                     # quantos já passaram pelo loop
+    saved = 0                    # quantos realmente salvos/atualizados no Mongo
+
+    for ds_lab, liq_lab, press_lab, ad_lab in combos:
+        done += 1
+        print(f"\n🚀 Processando item {done}/{total_combos} ({ds_lab}, {liq_lab}, {press_lab}, {ad_lab})")
+
         # Skip if already present (saves tokens/time)
         if SKIP_EXISTING and coll_out.find_one({
             "DensitySpread_Label": ds_lab,
             "Liquidity_Label": liq_lab,
-            "Pressure_Label": press_lab
+            "Pressure_Label": press_lab,
+            "AgentDensity_Label": ad_lab
         }):
-            print(f"⏩ Já existe: ({ds_lab}, {liq_lab}, {press_lab}) — pulando.")
+            print(f"⏩ Já existe — pulando.")
             continue
 
         prompt = (
             "Você é um assistente de trading. Classifique os valores abaixo usando sua tabela de interpretação (INTERP7) "
-            "e responda SOMENTE em JSON com as chaves exatamente 'leitura', 'tendencia', 'observacoes' (sem texto extra): "
+            "e responda SOMENTE em JSON com as chaves exatamente 'leitura', 'tendencia', 'observacoes' (sem texto extra) "
+            "Obs.: A chave 'leitura' refere-se a Leitura do livro/fluxo, então deve conter algo similar a 'Resistência clara, pressão tenta romper' "
+            "E não use mais de uma resposta para eu escolher qual é a melhor "
             f"DensitySpread_Mean: {ds_lab} "
             f"Liquidity_Mean: {liq_lab} "
-            f"Pressure_Mean: {press_lab}"
+            f"Pressure_Mean: {press_lab} "
+            f"AgentDensity_Mean: {ad_lab}"
         )
 
-        print(f"\n📨 Enviando para combo ({ds_lab}, {liq_lab}, {press_lab})")
         try:
             send_prompt(driver, prompt)
             text = wait_for_stable_response(driver)
             parsed = parse_json_response(text)
-        except:
+        except Exception as e:
+            print("⚠️ Erro ao obter resposta:", e)
             continue
+
         if not parsed:
             print("❌ Falha no parse; seguindo adiante.")
             time.sleep(1.0)
             continue
 
         out_doc = {
-            # "created_at": datetime.utcnow(),   # opcional
             "DensitySpread_Label": ds_lab,
             "Liquidity_Label": liq_lab,
             "Pressure_Label": press_lab,
+            "AgentDensity_Label": ad_lab,
             **parsed,
         }
 
@@ -171,23 +184,24 @@ def main():
             print("💡 DRY_RUN - não salvando no Mongo. Documento seria:\n",
                   json.dumps(out_doc, ensure_ascii=False, indent=2))
         else:
-            # Upsert pelo trio de labels (composto)
             coll_out.update_one(
                 {
                     "DensitySpread_Label": ds_lab,
                     "Liquidity_Label": liq_lab,
-                    "Pressure_Label": press_lab
+                    "Pressure_Label": press_lab,
+                    "AgentDensity_Label": ad_lab
                 },
                 {"$set": out_doc},
                 upsert=True
             )
-            print(f"✅ Gravado/atualizado em '{COLL_OUT}' com labels ({ds_lab}, {liq_lab}, {press_lab})")
-            total += 1
+            saved += 1
+            print(f"✅ Gravado/atualizado em '{COLL_OUT}'")
 
         time.sleep(3)  # mitigar rate-limit
 
     driver.quit()
-    print(f"\n✅ Finalizado. Documentos gravados/atualizados: {total}")
+    print(f"\n🎯 Finalizado. Processados: {done}/{total_combos}, Gravados/atualizados: {saved}")
+
 
 if __name__ == "__main__":
     main()

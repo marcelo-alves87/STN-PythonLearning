@@ -108,10 +108,10 @@ app.get('/interpretation', (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', false);
     res.setHeader('Content-Type', 'application/json');
 
-    const { DensitySpread_Label, Liquidity_Label, Pressure_Label } = req.query;
+    const { DensitySpread_Label, Liquidity_Label, Pressure_Label, AgentDensity_Label } = req.query;
 
     // Validate the input
-    if (!DensitySpread_Label || !Liquidity_Label || !Pressure_Label) {
+    if (!DensitySpread_Label || !Liquidity_Label || !Pressure_Label || !AgentDensity_Label) {
         res.status(400).send({ error: "Missing required query parameters." });
         return;
     }
@@ -124,6 +124,7 @@ app.get('/interpretation', (req, res) => {
         DensitySpread_Label: DensitySpread_Label,
         Liquidity_Label: Liquidity_Label,
         Pressure_Label: Pressure_Label,
+		AgentDensity_Label: AgentDensity_Label
     };
 
     // Find a single document matching the query
