@@ -1,5 +1,6 @@
 # permute_labels_to_mongo.py
 import sys
+import os
 import itertools
 import json
 import re
@@ -19,8 +20,8 @@ from selenium.webdriver.support import expected_conditions as EC
 MONGO_URI = "mongodb://localhost:27017"
 DB_NAME = "mongodb"
 COLL_OUT = "prices_interpretation"
-
-CHATGPT_URL = "https://chat.openai.com"
+CHATGPT_CONFIG_FILE = 'chatgpt_url.txt'
+CHATGPT_DEFAULT_URL = "https://chat.openai.com"
 
 BAND5 = [
     "+Alto", "+Médio", "0",
@@ -53,12 +54,21 @@ def ensure_unique_index(coll):
 # ==========================
 # BROWSER / CHATGPT
 # ==========================
+def get_url():
+    """Return the ChatGPT URL from config file if available, else default."""
+    if os.path.exists(CHATGPT_CONFIG_FILE):
+        with open(CHATGPT_CONFIG_FILE, "r", encoding="utf-8") as f:
+            url = f.read().strip()
+            if url:  # make sure it's not empty
+                return url
+    return CHATGPT_DEFAULT_URL
+
 def start_browser():
     options = uc.ChromeOptions()
     options.add_argument(r"--user-data-dir=C:\ChromeSessionGPT")
-
     driver = uc.Chrome(options=options)
-    driver.get("https://chat.openai.com")
+    url = get_url()
+    driver.get(url)
     return driver
 
 def send_prompt(driver, prompt):
@@ -112,6 +122,20 @@ def parse_json_response(text):
         "tendencia": data.get("tendencia", "").strip(),
         "observacoes": data.get("observacoes", "").strip(),
     }
+
+def save_chat_url_once(driver):
+    """Save the current chat URL into CHATGPT_CONFIG_FILE if file doesn't already exist."""
+    if not os.path.exists(CHATGPT_CONFIG_FILE):
+        try:
+            url = driver.current_url
+            if url and "/c/" in url:  # makes sure it's a chat URL
+                with open(CHATGPT_CONFIG_FILE, "w", encoding="utf-8") as f:
+                    f.write(url.strip())
+                #print(f"💾 Saved chat URL into {CHATGPT_CONFIG_FILE}")
+        except Exception as e:
+            #print(f"⚠️ Could not save chat URL: {e}")
+            pass
+
 
 def process_label_quartet(ds_lab, liq_lab, press_lab, ad_lab):
     global driver, coll_out
@@ -186,6 +210,7 @@ def main():
 
     driver = start_browser()
     process_label_quartet(ds_lab, liq_lab, press_lab, ad_lab)
+    save_chat_url_once(driver)
     driver.quit()
 
 if __name__ == "__main__":

@@ -45,9 +45,26 @@ function deleteLayoutFiles() {
     });
 }
 
+function deleteChatGptUrlFile() {
+    const filePath = path.join(__dirname, 'chatgpt_url.txt');
+
+    fs.unlink(filePath, (err) => {
+        if (err) {
+            if (err.code === 'ENOENT') {
+                // File does not exist
+                //console.log('chatgpt_url.txt not found in server directory.');
+            } else {
+                console.error('Error deleting chatgpt_url.txt:', err);
+            }
+        } else {
+            //console.log('Deleted chatgpt_url.txt successfully.');
+        }
+    });
+}
+
 
 deleteLayoutFiles();
-
+deleteChatGptUrlFile();
 
 app.get('/*.json', (req, res) => {
 	
@@ -115,7 +132,7 @@ app.get('/interpretation', async (req, res) => {
         return;
     }
 	
-	console.log(AgentImbalance_Label);
+	
     const collection = db.collection("prices_interpretation");
 
     try {
@@ -162,8 +179,14 @@ app.get('/interpretation', async (req, res) => {
             res.status(500).send({ error: "Failed to execute Python script." });
             return;
         }
-
-        res.status(500).send({ error: "Database error during lookup." });
+		if(stdout) {
+			console.log(stdout);
+		}
+		if(stderr) {
+			console.log(stderr);
+		}
+		
+        res.status(500).send({ error: "Database error during lookup." }); // notify front-end to continue
         
     });
 });
