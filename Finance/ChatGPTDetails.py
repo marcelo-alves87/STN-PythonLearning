@@ -182,46 +182,11 @@ def main():
     coll_out = db[COLL_OUT]
     ensure_unique_index(coll_out)
 
-    existing = coll_out.find_one({
-        "DensitySpread_Label": ds_lab,
-        "Liquidity_Label": liq_lab,
-        "Pressure_Label": press_lab,
-        "AgentImbalance_Label": ad_lab
-    })
-
-    if existing:
-        #print("✅ Resultado encontrado no MongoDB:")
-        print(json.dumps({
-            "leitura": existing.get("leitura", ""),
-            "tendencia": existing.get("tendencia", ""),
-            "observacoes": existing.get("observacoes", "")
-        }, ensure_ascii=False, indent=2))
-        return
-
     #print("🧠 Resultado ainda não existe. Consultando o ChatGPT...")
 
     driver = start_browser()
     process_label_quartet(ds_lab, liq_lab, press_lab, ad_lab)
     driver.quit()
-
-    # Try to read again after insert
-    saved = coll_out.find_one({
-        "DensitySpread_Label": ds_lab,
-        "Liquidity_Label": liq_lab,
-        "Pressure_Label": press_lab,
-        "AgentImbalance_Label": ad_lab
-    })
-
-    if saved:
-        #print("✅ Novo resultado salvo:")
-        print(json.dumps({
-            "leitura": saved.get("leitura", ""),
-            "tendencia": saved.get("tendencia", ""),
-            "observacoes": saved.get("observacoes", "")
-        }, ensure_ascii=False, indent=2))
-    else:
-        pass
-        #print("⚠️ Algo deu errado. Nenhum dado retornado.")
 
 if __name__ == "__main__":
     main()

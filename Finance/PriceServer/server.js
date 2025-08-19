@@ -101,17 +101,12 @@ app.get('/*.json', (req, res) => {
 });
 
 // New endpoint to fetch data from 'prices_interpretation' collection based on labels
-app.get('/interpretation', (req, res) => {
+app.get('/interpretation', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
     res.setHeader('Access-Control-Allow-Credentials', false);
-	res.setHeader('Content-Type', 'application/json; charset=utf-8');
-	
-	if (isRunning) {
-		res.status(429).send({ error: "Interpreter is busy. Please try again shortly." });
-		return;
-	}
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
     const { DensitySpread_Label, Liquidity_Label, Pressure_Label, AgentImbalance_Label } = req.query;
 
@@ -119,36 +114,60 @@ app.get('/interpretation', (req, res) => {
         res.status(400).send({ error: "Missing required query parameters." });
         return;
     }
+	
+	console.log(AgentImbalance_Label);
+    const collection = db.collection("prices_interpretation");
+
+    try {
+        // Step 1: Look up existing interpretation
+        const existing = await collection.findOne({
+            DensitySpread_Label,
+            Liquidity_Label,
+            Pressure_Label,
+            AgentImbalance_Label
+        });
+
+        if (existing) {
+            res.end(JSON.stringify(existing));
+            return;
+        }
+
+        // Step 2: Check if Python is already running
+        if (isRunning) {
+            res.status(429).send({ error: "Interpreter is busy. Please try again shortly." });
+            return;
+        }
+
+    } catch (err) {
+        console.error("❌ MongoDB error:", err);
+        res.status(500).send({ error: "Database error during lookup." });
+        return;
+    }
 
     const args = [
         path.join(__dirname, "..", "ChatGPTDetails.py"),
-        `"${DensitySpread_Label}"`,
-		`"${Liquidity_Label}"`,
-		`"${Pressure_Label}"`,
-		`"${AgentImbalance_Label}"`
+        `${DensitySpread_Label}`,
+		`${Liquidity_Label}`,
+		`${Pressure_Label}`,
+		`${AgentImbalance_Label}`
     ];
-	
-	isRunning = true; // 🔒 trava
 
-    execFile("python", args, { cwd: process.cwd(), encoding: "utf8" }, (error, stdout, stderr) => {
-		isRunning = false; // 🔓 destrava quando terminar
-		
+    isRunning = true;
+
+    execFile("python", args, { cwd: process.cwd(), encoding: "utf8" }, async (error, stdout, stderr) => {
+        isRunning = false;
+
         if (error) {
             console.error("❌ Python exec error:", error);
             res.status(500).send({ error: "Failed to execute Python script." });
             return;
         }
 
-        try {
-            const parsed = JSON.parse(stdout);  // ensure it's a valid object
-			const result = JSON.stringify(parsed);
-            res.end(result);
-        } catch (e) {
-            console.error("❌ Failed to parse Python output:", stdout);
-            res.status(500).send({ error: "Invalid response from Python script." });
-        }
+        res.status(500).send({ error: "Database error during lookup." });
+        
     });
 });
+
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
