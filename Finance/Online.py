@@ -107,7 +107,7 @@ def save_to_mongo(df):
     # Define which fields are directly updatable from source data
     updatable_fields = {
         "open", "high", "low", "close", "volume", "ativo", "time",
-        "RawSpread_Mean", "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean", "AgentDensity_Mean"
+        "RawSpread_Mean", "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean", "AgentImbalance_Max"
     }
     
 
@@ -273,10 +273,8 @@ def save_into_scraped_prices(df):
         "Resistance",
         "Pressure_BuyQty",
         "Pressure_SellQty",
-        "AD_BuyVol",
-        "AD_SellVol",
-        "AD_BuyAgents",
-        "AD_SellAgents",
+        "BuyAgents",
+        "SellAgents",
     ]].copy()
 
     # 2. Rename column and convert to datetime
@@ -341,19 +339,24 @@ def save_times_trades_book(all_trades):
         print(f"Error saving trades: {e}")
 
 
-def compute_agent_density(all_trades):
+import pandas as pd
+
+def compute_agent_imbalance(all_trades):
     """
-    Snapshot Agent Density from the just-scraped trades list.
+    Snapshot Agent Imbalance from the just-scraped trades list.
+
     Returns a dict with:
-      - AgentDensity: normalized diff between (buy_vol/#buy_agents) and (sell_vol/#sell_agents)
-      - AD_BuyVol, AD_SellVol: raw volumes per aggressor side (snapshot)
-      - AD_BuyAgents, AD_SellAgents: # unique agents on each side (snapshot)
+      - AgentImbalance: normalized diff between (#buy_agents vs. #sell_agents)
+      - AD_BuyAgents, AD_SellAgents: unique agent counts on each side
       - AD_BuyDict, AD_SellDict: dicts keyed by agent id with Σ(nQuoteNumber)
     Notes:
       * This is a per-snapshot measure. For exact 5-min values, recompute from DB in aggregation.
     """
     if not all_trades:
-        return 0
+        return {
+            "AD_BuyAgents": 0,
+            "AD_SellAgents": 0,
+        }
 
     df = pd.DataFrame(all_trades)
 
@@ -362,7 +365,7 @@ def compute_agent_density(all_trades):
         df = df[df["nTradeType"].isin([2, 3])]
 
     # safe numeric casting
-    for c in ["nQuoteNumber", "nQuantity", "nBuyAgent", "nSellAgent"]:
+    for c in ["nQuoteNumber", "nBuyAgent", "nSellAgent"]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
@@ -378,21 +381,15 @@ def compute_agent_density(all_trades):
           .astype(float).to_dict()
     )
 
-    # --- volumes by aggressor side ---
-    buy_vol  = float(pd.to_numeric(df.loc[df["bBuyerAgressor"] == True,  "nQuantity"], errors="coerce").sum())
-    sell_vol = float(pd.to_numeric(df.loc[df["bBuyerAgressor"] == False, "nQuantity"], errors="coerce").sum())
-
-    # --- unique agents present in this snapshot ---
-    n_buy_agents  = int(df["nBuyAgent"].nunique(dropna=True))
-    n_sell_agents = int(df["nSellAgent"].nunique(dropna=True))
+    # --- unique agent counts ---
+    n_buy_agents  = int(df["nBuyAgent"].nunique(dropna=True)) if "nBuyAgent"  in df else 0
+    n_sell_agents = int(df["nSellAgent"].nunique(dropna=True)) if "nSellAgent" in df else 0
 
     return {
-        # RAW (store these for correct 5m calc)
-        "AD_BuyVol": buy_vol,
-        "AD_SellVol": sell_vol,
-        "AD_BuyAgents": n_buy_agents,
-        "AD_SellAgents": n_sell_agents
+        "BuyAgents": n_buy_agents,
+        "SellAgents": n_sell_agents
     }
+
 
 def scrap_pricebook(driver, df):
     
@@ -470,7 +467,7 @@ def scrap_pricebook(driver, df):
     press_buy, press_sell = compute_pressure(all_trades)
 
     # 6. Agent Density
-    ad = compute_agent_density(all_trades)
+    imbalance = compute_agent_imbalance(all_trades)
     
 
     # 5. Get the maximum nQuoteNumber from the list
@@ -482,7 +479,7 @@ def scrap_pricebook(driver, df):
         "nQuoteNumber",        
         "Pressure_BuyQty",     
         "Pressure_SellQty",
-        "AD_BuyVol","AD_SellVol","AD_BuyAgents","AD_SellAgents",
+        "BuyAgents","SellAgents",
         "BuyDensity","SellDensity",
         "Support", "Resistance"
     ]] = [
@@ -490,8 +487,7 @@ def scrap_pricebook(driver, df):
         max_quote_number,
         press_buy,
         press_sell,
-        ad.get("AD_BuyVol", 0.0), ad.get("AD_SellVol", 0.0),
-        int(ad.get("AD_BuyAgents", 0) or 0), int(ad.get("AD_SellAgents", 0) or 0),
+        int(imbalance.get("BuyAgents", 0) or 0), int(imbalance.get("SellAgents", 0) or 0),
         bd, sd,
         support, resistance
     ]
@@ -671,10 +667,8 @@ def process_and_save_data(driver):
                 "RawSpread": "mean",
                 "Pressure_BuyQty": "sum",
                 "Pressure_SellQty": "sum",
-                "AD_BuyVol": "sum",
-                "AD_SellVol": "sum",
-                "AD_BuyAgents": "max",   # snapshot approx for the union
-                "AD_SellAgents": "max",
+                "BuyAgents": "max",   # snapshot approx for the union
+                "SellAgents": "max",
             }
             use_map = {k: v for k, v in agg_map.items() if k in df_snap.columns}
             df5 = df_snap.resample("5T").agg(use_map)
@@ -690,20 +684,15 @@ def process_and_save_data(driver):
                 pressure[m] = (B[m] - S[m]) / den[m]
                 df5["Pressure_Mean"] = pressure
 
-            # AgentDensity (sum vols + max agent counts; compute once)
-            ad_cols = {"AD_BuyVol", "AD_SellVol", "AD_BuyAgents", "AD_SellAgents"}
+            ad_cols = {"BuyAgents", "SellAgents"}
             if ad_cols.issubset(df5.columns):
-                BV = df5.pop("AD_BuyVol").fillna(0.0).astype("float64")
-                SV = df5.pop("AD_SellVol").fillna(0.0).astype("float64")
-                NB = df5.pop("AD_BuyAgents").fillna(0).astype(int).clip(lower=1)
-                NS = df5.pop("AD_SellAgents").fillna(0).astype(int).clip(lower=1)
-                vpb = BV / NB
-                vps = SV / NS
-                den2 = vpb + vps
-                agentdensity = pd.Series(0.0, index=df5.index, dtype="float64")
-                m2 = den2 != 0
-                agentdensity[m2] = (vpb[m2] - vps[m2]) / den2[m2]
-                df5["AgentDensity_Mean"] = agentdensity
+                NB = df5.pop("BuyAgents").fillna(0).astype("int64")
+                NS = df5.pop("SellAgents").fillna(0).astype("int64")
+
+                denom = NB + NS
+                df5["AgentImbalance_Max"] = ((NB - NS).astype("float64") / denom.replace(0, numpy.nan)).fillna(0.0)
+
+
 
             # Liquidity (TIME-WEIGHTED from snapshots)
             if {"Support", "Resistance"}.issubset(df_snap.columns):
