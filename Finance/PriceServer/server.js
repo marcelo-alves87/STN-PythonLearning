@@ -45,26 +45,7 @@ function deleteLayoutFiles() {
     });
 }
 
-function deleteChatGptUrlFile() {
-    const filePath = path.join(__dirname, 'chatgpt_url.txt');
-
-    fs.unlink(filePath, (err) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                // File does not exist
-                //console.log('chatgpt_url.txt not found in server directory.');
-            } else {
-                console.error('Error deleting chatgpt_url.txt:', err);
-            }
-        } else {
-            //console.log('Deleted chatgpt_url.txt successfully.');
-        }
-    });
-}
-
-
 deleteLayoutFiles();
-deleteChatGptUrlFile();
 
 app.get('/*.json', (req, res) => {
 	
