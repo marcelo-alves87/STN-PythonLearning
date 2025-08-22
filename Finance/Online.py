@@ -30,6 +30,7 @@ DB_OFFER_BOOK = DB_CLIENT.mongodb.offer_book
 DB_TIMES_TRADES = DB_CLIENT.mongodb.times_trades
 last_preco_teorico = None
 last_status = None
+last_qtd_teorica = None
 volume_accumulated = 0
 assistant_process = None
 
@@ -85,7 +86,7 @@ def scrape_tickets(driver):
     """Scrape ticket data from the webpage and return as a DataFrame."""
     df = get_page_df(driver)
     df = df[
-        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual", "Preço Teórico"]
+        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual", "Preço Teórico", "Quantidade Teórica"]
     ]
     df["Data/Hora"] = pd.to_datetime(df["Data/Hora"], dayfirst=True, errors="coerce")
     return df
@@ -563,7 +564,7 @@ def tw_normalized_diff(df_snap: pd.DataFrame, pos_col: str, neg_col: str, freq="
 
 
 def process_and_save_data(driver):
-    global last_preco_teorico, last_status, volume_accumulated
+    global last_preco_teorico, last_status, last_qtd_teorica, volume_accumulated
     """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
@@ -574,20 +575,28 @@ def process_and_save_data(driver):
         print("No valid data to process.")
         return
 
-    elif "Aberto" != df.iloc[-1]["Estado Atual"]:        
-        
+    elif df.iloc[-1]["Estado Atual"] != "Aberto":
         status = df.iloc[-1]["Estado Atual"]
         df["Preço Teórico"] = df["Preço Teórico"].apply(convert_numeric)
         preco_teorico = df.iloc[-1]["Preço Teórico"]
+        df["Quantidade Teórica"] = df["Quantidade Teórica"].apply(convert_numeric)
+        qtd_teorica = df.iloc[-1]["Quantidade Teórica"]
         now = dt.datetime.today().strftime("%H:%M:%S")
 
-        if pd.notna(preco_teorico) and pd.notna(status):             
-            if last_preco_teorico is None or last_status is None or last_preco_teorico != preco_teorico or last_status != status:
-                print(f"({now}) {status}: {preco_teorico:.2f}")
-               
+        if pd.notna(preco_teorico) and pd.notna(status) and pd.notna(qtd_teorica):
+            if (
+                last_preco_teorico is None 
+                or last_status is None 
+                or last_qtd_teorica is None
+                or last_preco_teorico != preco_teorico 
+                or last_status != status 
+                or last_qtd_teorica != qtd_teorica
+            ):
+                print(f"({now}) {status}: {preco_teorico:.2f} | Qtde: {int(qtd_teorica)}")
+
             last_preco_teorico = preco_teorico
             last_status = status
-            
+            last_qtd_teorica = qtd_teorica
     else:
        
         # Reset Global Variables
