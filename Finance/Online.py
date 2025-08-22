@@ -845,7 +845,10 @@ def get_data_to_csv():
                     print(f"Last time getted: {df['Datetime'].iloc[-1]}")
 
                 #Remove pos-market data
-                df = df[df["Datetime"].dt.time <= dt.time(16, 50)]
+                df = df[
+                    (df["Datetime"].dt.time <= dt.time(16, 50)) &
+                    (df["Datetime"].dt.time != dt.time(0, 0))
+                ]
 
                 if not df.empty:
                     print(f"Getting data until: {df['Datetime'].iloc[-1]}")
