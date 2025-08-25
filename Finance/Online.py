@@ -86,7 +86,7 @@ def scrape_tickets(driver):
     """Scrape ticket data from the webpage and return as a DataFrame."""
     df = get_page_df(driver)
     df = df[
-        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual", "Preço Teórico", "Quantidade Teórica"]
+        ["Ativo", "Último", "Financeiro", "Data/Hora", "Estado Atual", "Preço Teórico", "Quantidade Teórica", "Variação Teórica"]
     ]
     df["Data/Hora"] = pd.to_datetime(df["Data/Hora"], dayfirst=True, errors="coerce")
     return df
@@ -579,8 +579,9 @@ def process_and_save_data(driver):
         status = df.iloc[-1]["Estado Atual"]
         df["Preço Teórico"] = df["Preço Teórico"].apply(convert_numeric)
         preco_teorico = df.iloc[-1]["Preço Teórico"]
-        df["Quantidade Teórica"] = df["Quantidade Teórica"].apply(convert_numeric)
+        df["Quantidade Teórica"] = df["Quantidade Teórica"]
         qtd_teorica = df.iloc[-1]["Quantidade Teórica"]
+        var_teorica = df.iloc[-1]["Variação Teórica"]
         now = dt.datetime.today().strftime("%H:%M:%S")
 
         if pd.notna(preco_teorico) and pd.notna(status) and pd.notna(qtd_teorica):
@@ -592,7 +593,7 @@ def process_and_save_data(driver):
                 or last_status != status 
                 or last_qtd_teorica != qtd_teorica
             ):
-                print(f"({now}) {status}: {preco_teorico:.2f} | Qtde: {int(qtd_teorica)}")
+                print(f"({now}) {status}: {preco_teorico:.2f} | Qtde: {qtd_teorica} | Var: {var_teorica}")
 
             last_preco_teorico = preco_teorico
             last_status = status
