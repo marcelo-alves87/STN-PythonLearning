@@ -281,7 +281,7 @@ def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP
             upsert=True,
         )
 
-        print(f"Inserted candle @ {doc_time.strftime('%H:%M')} with Close={data.get('Close')}, Volume={data.get('Volume')}")
+        print(f"Inserted candle @ {doc_time.strftime('%H:%M')} with Close={data.get('close')}, Volume={data.get('volume')}")
 
     print("✅ Simulation completed.")
 
@@ -295,7 +295,7 @@ def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP
 #export_data_to_csv()
 #insert_data_from_exported_csv()
 
-simulate_daily_trade('2025-08-19')
+simulate_daily_trade('2025-08-20')
 
 
 
