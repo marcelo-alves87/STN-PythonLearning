@@ -74,164 +74,6 @@ def find_example_registers(size=1):
 
 
 
-
-
-def simulate_daily_trading(date, rate=1, steps=5, prob_high_early=0.6, prob_bullish=0.55):
-    # Load 5-minute OHLC data
-    df = pd.read_csv('./stock_dfs/SBSP3.csv')
-    df['Datetime'] = pd.to_datetime(df['Datetime'])
-    df = df[df['Datetime'].dt.date == pd.to_datetime(date).date()]
-
-    if df.empty:
-        print(f"No data available for {date}")
-        return
-
-    for _, row in df.iterrows():
-        timestamp = row['Datetime'].replace(second=0, microsecond=0)
-        o, h, l, c = row['Open'], row['High'], row['Low'], row['Close']
-        v = row['Volume']
-
-        high_first = random.random() < prob_high_early
-        is_bullish = c > o if random.random() < prob_bullish else c < o
-
-        # Generate step path that includes the real high and low at random steps
-        remaining_steps = steps - 3  # open, high, low, close are fixed
-        mid_prices = []
-
-        for _ in range(remaining_steps):
-            mid = round(random.uniform(min(o, c), max(o, c)), 2)
-            mid = max(min(mid, h), l)
-            mid_prices.append(mid)
-
-        # Randomly choose steps to insert the real high and low
-        high_idx = random.randint(1, steps - 2)
-        low_idx = random.randint(1, steps - 2)
-        while low_idx == high_idx:
-            low_idx = random.randint(1, steps - 2)
-
-        # Build the full path
-        path = [None] * steps
-        path[0] = o
-        path[-1] = c
-        path[high_idx] = h
-        path[low_idx] = l
-
-        # Fill in midpoints
-        mid_idx = 0
-        for i in range(1, steps - 1):
-            if path[i] is None:
-                path[i] = mid_prices[mid_idx]
-                mid_idx += 1
-
-        print(f"\nSimulating candle @ {timestamp.time()} with {steps} steps")
-        high_so_far = o
-        low_so_far = o
-        volume_so_far = 0
-
-        for i in range(steps):
-            price = path[i]
-            high_so_far = max(high_so_far, price)
-            low_so_far = min(low_so_far, price)
-            volume_so_far += v / steps
-
-            partial_candle = {
-                "time": timestamp,
-                "open": o,
-                "high": round(high_so_far, 2),
-                "low": round(low_so_far, 2),
-                "close": round(price, 2),
-                "volume": round(volume_so_far),
-                "ativo": "SBSP3",
-                "status": f"step_{i + 1}/{steps}"
-            }
-
-            collection.update_one(
-                {"time": timestamp},
-                {"$set": partial_candle},
-                upsert=True
-            )
-
-            print(f" Step {i+1}: {price:.2f} (H: {high_so_far:.2f}, L: {low_so_far:.2f})")
-            time.sleep(rate)
-
-      
-        final_candle = {
-            "time": timestamp,
-            "open": o,
-            "high": h,
-            "low": l,
-            "close": c,
-            "volume": v,
-            "ativo": "SBSP3",
-            "status": "completed"
-        }
-
-        collection.update_one(
-            {"time": timestamp},
-            {"$set": final_candle}
-        )
-
-        print(f" Final candle saved @ {timestamp.time()}")
-
-    print("\n Simulation completed for", date)
-
-
-def update_with_fake_avg_values():
-
-
-    for doc in collection.find():
-        close_price = doc["close"]
-
-        fake_buy_price = round(close_price - np.random.uniform(0.01, 0.10), 2)
-        fake_sell_price = round(close_price + np.random.uniform(0.01, 0.10), 2)
-        fake_buy_qty = int(np.random.randint(1000, 5000))
-        fake_sell_qty = int(np.random.randint(1000, 5000))
-
-        collection.update_one(
-            {"_id": doc["_id"]},
-            {
-                "$set": {
-                    "AvgBuyPrice": 0,
-                    "AvgSellPrice": 0,
-                    "AvgBuyQty": 0,
-                    "AvgSellQty": 0
-                }
-            }
-        )
-
-    print("MongoDB documents updated with fake spread/imbalance values.")
-
-
-def insert_from_uploaded_csv(file_path="mongo_export.csv"):
-    try:
-        df = pd.read_csv(file_path)
-        if 'time' not in df.columns:
-            print("Error: 'time' column not found in the CSV.")
-            return
-
-        df['time'] = pd.to_datetime(df['time'], errors='coerce')
-        df.dropna(subset=['time'], inplace=True)
-
-        # Convert DataFrame rows into dictionaries and upsert one-by-one
-        inserted = 0
-        for _, row in df.iterrows():
-            record = row.to_dict()
-            timestamp = record['time']
-            del record['time']  # Remove 'time' from set to avoid overwrite conflicts
-
-            result = collection.update_one(
-                {'time': timestamp},
-                {'$set': record, '$setOnInsert': {'time': timestamp}},
-                upsert=True
-            )
-            if result.upserted_id or result.modified_count:
-                inserted += 1
-
-        print(f"Inserted/Updated {inserted} records from '{file_path}' into MongoDB.")
-    except Exception as e:
-        print(f"Failed to insert from CSV: {e}")
-
-
 def export_data_to_csv():    
 
     # Format volume with k, M, B
@@ -244,17 +86,9 @@ def export_data_to_csv():
             return f"{value / 1_000:.2f}k"
         return str(value)
 
-    # only docs where all three fields exist (and not None)
-    query = {
-        "DensitySpread_Mean":   {"$exists": True},
-        "Liquidity_Mean": {"$exists": True},
-        "Pressure_Mean":  {"$exists": True},
-    }
-
-
     # Fetch and process documents
     records = []
-    for doc in collection.find(query):
+    for doc in collection.find():
         record = {}
         # Format time
         if "time" in doc:
@@ -278,24 +112,174 @@ def export_data_to_csv():
     df.to_csv("exported_prices.csv", index=False)
     print("CSV export completed.")
 
-def remove_midnight_records():
 
-    # Get all distinct dates in the collection
-    all_dates = collection.distinct("time")
+#Helper methods
+
+# Parse volume with suffixes
+def _parse_volume(v):
+    if pd.isna(v):
+        return None
+    if isinstance(v, (int, np.integer)):
+        return int(v)
+    s = str(v).strip().lower().replace(",", "")
+    mult = 1
+    if s.endswith("k"):
+        mult = 1_000
+        s = s[:-1]
+    elif s.endswith("m"):
+        mult = 1_000_000
+        s = s[:-1]
+    elif s.endswith("b"):
+        mult = 1_000_000_000
+        s = s[:-1]
+    try:
+        return int(round(float(s) * mult))
+    except Exception:
+        return None
+
+
+def insert_data_from_exported_csv(date=None,csv_file_path="exported_prices.csv", ticket="SBSP3"):
+    """
+    Insert/upsert documents from an `exported_prices.csv` file back into the
+    MongoDB `prices` collection.
+
+    - Expects a `time` column in the format YYYY-MM-DD HH:MM:SS.
+    - Ensures Volume is stored as an integer, parsing suffixes like k/M/B.
+    - Includes extended metrics if present: AgentImbalance_Max, DensitySpread_Mean,
+      Liquidity_Mean, Pressure_Mean, RawSpread_Mean.
+
+    Args:
+        csv_file_path (str): Path to exported_prices.csv
+        ticket (str): Ticker symbol to set in the `ativo` field (default 'SBSP3')
+    """
+
+    if not os.path.exists(csv_file_path):
+        print(f"CSV not found: {csv_file_path}")
+        return
+
+    df = pd.read_csv(csv_file_path)
+
+    # Normalize column names
+    df.columns = [c.strip() for c in df.columns]
+
+    if "time" not in df.columns:
+        print("CSV does not contain a 'time' column.")
+        return
+    df["time"] = pd.to_datetime(df["time"], errors="coerce")
+
+    if date:
+        date = pd.to_datetime(date).date()
+        df = df[df['time'].dt.date < date]
     
-    for date in all_dates:
-        # Convert to datetime if it's a string
-        if isinstance(date, str):
-            date = datetime.fromisoformat(date.replace("Z", "+00:00"))
-        
-        # Build midnight datetime for that day
-        midnight = date.replace(hour=0, minute=0, second=0, microsecond=0)
+    df = df.dropna(subset=["time"]).copy()
 
-        # Delete the midnight record if exists
-        result = collection.delete_one({"time": midnight})
-        
-        if result.deleted_count > 0:
-            print(f"Removed midnight record for {midnight.date()}")
+    if "volume" in df.columns:
+        df["volume"] = df["volume"].apply(_parse_volume)
+    else:
+        df["volume"] = None
+
+    numeric_fields = [
+        "open", "high", "low", "close", "AgentImbalance_Max",
+        "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean", "RawSpread_Mean"
+    ]
+    for col in numeric_fields:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    upserted_count = 0
+    
+    for _, row in df.iterrows():
+        doc_time = row["time"]
+        data = {"time": doc_time, "ativo": ticket}
+
+        # Assign fields if present
+        for col in numeric_fields + ["volume"]:
+            if col in df.columns and not pd.isna(row.get(col)):
+                if col == "volume":
+                    data["volume"] = int(row[col]) if row[col] is not None else None
+                else:
+                    data[col] = float(row[col])
+
+        result = collection.update_one(
+            {"time": doc_time},
+            {"$set": data},
+            upsert=True,
+        )
+        if result.upserted_id or result.modified_count:
+            upserted_count += 1
+
+    print(f"{upserted_count} registros inseridos/atualizados a partir de '{csv_file_path}'.")
+
+
+def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP3"):
+    """
+    Simulate intraday trading by inserting one candle at a time from a CSV for a specific date.
+    Pressing Enter inserts the next candle into MongoDB.
+    """
+    erase_all_data()
+
+    insert_data_from_exported_csv(date=date, csv_file_path=csv_file_path, ticket=ticket)
+
+    # Load the entire CSV
+    if not os.path.exists(csv_file_path):
+        print(f"CSV file not found: {csv_file_path}")
+        return
+
+    df = pd.read_csv(csv_file_path)
+    df.columns = [c.strip() for c in df.columns]
+
+    if "time" not in df.columns:
+        print("CSV does not contain a 'time' column.")
+        return
+
+    df["time"] = pd.to_datetime(df["time"], errors="coerce")
+    date_obj = pd.to_datetime(date).date()
+    df = df[df["time"].dt.date == date_obj]
+    df = df.sort_values("time")
+    
+    if df.empty:
+        print(f"No candles found for date: {date}")
+        return
+
+    # Parse volume
+    if "volume" in df.columns:
+        df["volume"] = df["volume"].apply(_parse_volume)
+    else:
+        df["volume"] = None
+
+    numeric_fields = [
+        "open", "high", "low", "close", "AgentImbalance_Max",
+        "DensitySpread_Mean", "Liquidity_Mean", "Pressure_Mean", "RawSpread_Mean"
+    ]
+    for col in numeric_fields:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    print(f"Ready to simulate {len(df)} candles for {date}. Press Enter to insert each one.")
+
+    for idx, row in df.iterrows():
+        input(f"\n[{row['time']}] Press Enter to insert next candle...")
+
+        doc_time = row["time"]
+        data = {"time": doc_time, "ativo": ticket}
+
+        for col in numeric_fields + ["volume"]:
+            if col in df.columns and not pd.isna(row.get(col)):
+                if col == "volume":
+                    data["volume"] = int(row[col]) if row[col] is not None else None
+                else:
+                    data[col] = float(row[col])
+
+        result = collection.update_one(
+            {"time": doc_time},
+            {"$set": data},
+            upsert=True,
+        )
+
+        print(f"Inserted candle @ {doc_time.strftime('%H:%M')} with Close={data.get('Close')}, Volume={data.get('Volume')}")
+
+    print("✅ Simulation completed.")
+
     
 
 # Example usage:
@@ -303,14 +287,10 @@ def remove_midnight_records():
 #erase_all_data()
 #insert_data_from_csv()
 #find_example_registers(10)
-#simulate_daily_trading('2025-03-19', rate=0.5)
-#update_with_fake_avg_values()
-#export_to_csv('2025-06-06')
-#insert_from_uploaded_csv()
-#print(collection.index_information())
-export_data_to_csv()
-#remove_midnight_records()
+#export_data_to_csv()
+#insert_data_from_exported_csv()
 
+simulate_daily_trade('2025-08-19')
 
 
 
