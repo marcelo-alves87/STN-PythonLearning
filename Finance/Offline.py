@@ -257,8 +257,13 @@ def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP
 
     print(f"Ready to simulate {len(df)} candles for {date}. Press Enter to insert each one.")
 
+    auto_continue = False
+
     for idx, row in df.iterrows():
-        input(f"\n[{row['time']}] Press Enter to insert next candle...")
+        if not auto_continue:
+            user_input = input(f"\n[{row['time']}] Press Enter to insert next candle or 'C' to continue automatically: ").strip().lower()
+            if user_input == 'c':
+                auto_continue = True
 
         doc_time = row["time"]
         data = {"time": doc_time, "ativo": ticket}
