@@ -339,9 +339,6 @@ def save_times_trades_book(all_trades):
     except Exception as e:
         print(f"Error saving trades: {e}")
 
-
-import pandas as pd
-
 def compute_agent_imbalance(all_trades):
     """
     Snapshot Agent Imbalance from the just-scraped trades list.
@@ -391,6 +388,49 @@ def compute_agent_imbalance(all_trades):
         "SellAgents": n_sell_agents
     }
 
+def print_auction_summary(all_trades):
+
+    if not all_trades:
+        return
+
+    df = pd.DataFrame(all_trades)
+
+    # Filter by TradeType == 4 (Auction trades)
+    if "nTradeType" in df.columns:
+        df = df[df["nTradeType"] == 4]
+        if df.empty:
+            return
+
+    # Helper function to format numbers
+    def human_format(num):
+        for unit in ["", "k", "M", "B"]:
+            if abs(num) < 1000.0:
+                return f"{num:3.1f}{unit}"
+            num /= 1000.0
+        return f"{num:.1f}T"  # in case it reaches trillions
+
+    buyer_agents = defaultdict(int)
+    seller_agents = defaultdict(int)
+    buy_vol = 0
+    sell_vol = 0
+
+    for trade in df.to_dict("records"):  # use filtered trades
+        buyer_agents[trade["nBuyAgent"]] += 1
+        seller_agents[trade["nSellAgent"]] += 1
+        if trade.get("bBuyerAgressor"):            
+            buy_vol += trade["nQuantity"] * trade['nPrice']
+        else:
+            sell_vol += trade["nQuantity"] * trade['nPrice']
+            
+            
+
+    print("=== Post-Auction Summary ===")
+    print(f"Number of Trades: {len(df)}")
+    print(f"Number of Buyer Aggressors: {len(buyer_agents)}")
+    print(f"Volume (Buy side): R$ {human_format(buy_vol)}")
+    print(f"Number of Seller Aggressors: {len(seller_agents)}")
+    print(f"Volume (Sell side): R$ {human_format(sell_vol)}")
+    
 
 def scrap_pricebook(driver, df):
     
@@ -453,8 +493,9 @@ def scrap_pricebook(driver, df):
         return False
 
     #save_times_trades_book(all_trades)
-    
 
+    print_auction_summary(all_trades)
+    
     # 2. Compute raw spread
     spread = compute_raw_spread(buy_book, sell_book)    
 
@@ -862,6 +903,15 @@ def get_data_to_csv():
 
                 if not df.empty:
                     print(f"Getting data until: {df['Datetime'].iloc[-1]}")
+
+                    # Make python max and min price from last day  <-- added
+                    last_day = df["Datetime"].dt.date.iloc[-1]
+                    df_last_day = df[df["Datetime"].dt.date == last_day]
+
+                    max_price = df_last_day["High"].max()
+                    min_price = df_last_day["Low"].min()
+                    print(f"Max price on {last_day}: {max_price}")
+                    print(f"Min price on {last_day}: {min_price}")
  
                 folder_path = "stock_dfs"
                 os.makedirs(folder_path, exist_ok=True)
