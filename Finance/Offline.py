@@ -285,6 +285,26 @@ def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP
 
     print("✅ Simulation completed.")
 
+
+def remove_midnight_records():
+
+    # Get all distinct dates in the collection
+    all_dates = collection.distinct("time")
+    
+    for date in all_dates:
+        # Convert to datetime if it's a string
+        if isinstance(date, str):
+            date = datetime.fromisoformat(date.replace("Z", "+00:00"))
+        
+        # Build midnight datetime for that day
+        midnight = date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Delete the midnight record if exists
+        result = collection.delete_one({"time": midnight})
+        
+        if result.deleted_count > 0:
+            print(f"Removed midnight record for {midnight.date()}")
+
     
 
 # Example usage:
@@ -294,8 +314,8 @@ def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP
 #find_example_registers(10)
 #export_data_to_csv()
 #insert_data_from_exported_csv()
-
-simulate_daily_trade('2025-08-20')
+#simulate_daily_trade('2025-08-27')
+remove_midnight_records()
 
 
 

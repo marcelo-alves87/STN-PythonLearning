@@ -18,11 +18,16 @@ import traceback
 from dateutil import parser
 import re
 from datetime import timedelta
+import sys
+import winsound  # works on Windows
+import os
+import ast  # safely evaluate list/number from file
 
 # Constants
 URL = "https://rico.com.vc/"
 PAUSE_FLAG_FILE = "pause.flag"
 DEBUG_FLAG_FILE = "debug.flag"
+ALERT_FILE = "price_alert.txt"
 DB_CLIENT = MongoClient("localhost", 27017)
 DB_PRICES = DB_CLIENT.mongodb.prices  # MongoDB collection for storing aggregated prices
 DB_SCRAPED_PRICES = DB_CLIENT.mongodb.scraped_prices
@@ -225,6 +230,9 @@ def compute_liquidity_components(buy_book, sell_book, current_price):
             s += q * w
         return float(s)
 
+    if not buy_book or not sell_book:
+        return 0, 0
+    
     support    = _score(buy_book,  "buy")
     resistance = _score(sell_book, "sell")
     
@@ -255,6 +263,9 @@ def compute_density_components(buy_book, sell_book):
 
 
 def compute_raw_spread(buy_book, sell_book):
+
+    if not buy_book or not sell_book:
+        return 0
         
     best_bid = max(buy_book, key=lambda x: x["price"])['price']
     best_ask = min(sell_book, key=lambda x: x["price"])['price']
@@ -352,8 +363,8 @@ def compute_agent_imbalance(all_trades):
     """
     if not all_trades:
         return {
-            "AD_BuyAgents": 0,
-            "AD_SellAgents": 0,
+            "BuyAgents": 0,
+            "SellAgents": 0,
         }
 
     df = pd.DataFrame(all_trades)
@@ -455,9 +466,6 @@ def scrap_pricebook(driver, df):
     buy_book = driver.execute_script(js_price_book_buy)
     sell_book = driver.execute_script(js_price_book_sell)
 
-    if not buy_book or not sell_book:
-        return False
-
     #save_offer_book(buy_book, sell_book, df)
 
     doc = DB_SCRAPED_PRICES.find_one(
@@ -488,9 +496,6 @@ def scrap_pricebook(driver, df):
     """
     
     all_trades = driver.execute_script(js_trades_script)
-
-    if not all_trades:
-        return False
 
     #save_times_trades_book(all_trades)
 
@@ -603,6 +608,37 @@ def tw_normalized_diff(df_snap: pd.DataFrame, pos_col: str, neg_col: str, freq="
 
     return pd.DataFrame(rows).set_index("time").sort_index()
 
+def price_alert(df):
+
+    if os.path.exists(ALERT_FILE):
+
+        last_price = float(df['Último'].iloc[-1])
+
+        # Read target(s) from file
+        with open(ALERT_FILE, "r") as f:
+            content = f.read().strip()
+        target = ast.literal_eval(content)  # safe parse into float or list
+
+        triggered = False
+        if isinstance(target, (list, tuple)) and len(target) == 2:
+            low, high = min(target), max(target)
+            if low <= last_price <= high:
+                triggered = True
+        else:
+            if last_price == float(target):
+                triggered = True
+
+        if triggered:
+            now = dt.datetime.today().strftime("%H:%M:%S")
+            print(f"[{now}] 🔔 Price Alert! Last price {last_price} hit target {target}")
+            # Play system exclamation sound
+            if sys.platform.startswith("win"):
+                winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
+            else:
+                print("\a")  # bell for Linux/macOS
+
+            # Rename file so it won't trigger again
+            os.rename(ALERT_FILE, ALERT_FILE.replace(".txt", "_.txt"))
 
 def process_and_save_data(driver):
     global last_preco_teorico, last_status, last_qtd_teorica, volume_accumulated
@@ -643,12 +679,16 @@ def process_and_save_data(driver):
        
         # Reset Global Variables
         last_preco_teorico = None
-        last_status = None
+        last_status = None        
         
         # Convert price and volume columns to numeric values
         df["Último"] = df["Último"].apply(convert_numeric)
         df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
 
+        try:
+            price_alert(df)
+        except:
+            pass
         
         # Remove 'Estado Atual' and Preço Teórico columns
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
