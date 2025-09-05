@@ -694,13 +694,9 @@ def process_and_save_data(driver):
         df = df.drop(columns=["Estado Atual", "Preço Teórico"])
         
         try:
-            
-            success = scrap_pricebook(driver, df)
-            if not success:
-                return            
+            scraped_pricebook_success = scrap_pricebook(driver, df)            
         except Exception as e:
-            print(e)
-            return
+            scraped_pricebook_success = False
 
         # Rename columns to match the database format
         df.rename(columns={
@@ -748,7 +744,7 @@ def process_and_save_data(driver):
         scraped_data = list(DB_SCRAPED_PRICES.find({"time": {"$gte": today_start}}, {"_id": 0}))
         df_scraped = pd.DataFrame(scraped_data)
         
-        if not df_scraped.empty:
+        if scraped_pricebook_success and not df_scraped.empty:
             df_scraped["time"] = pd.to_datetime(df_scraped["time"])
             df_snap = df_scraped.set_index("time").sort_index()
             df_snap.drop(columns=["nQuoteNumber"], errors="ignore", inplace=True)
