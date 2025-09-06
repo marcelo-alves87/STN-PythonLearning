@@ -170,6 +170,15 @@ def insert_data_from_exported_csv(date=None,csv_file_path="exported_prices.csv",
     if date:
         date = pd.to_datetime(date).date()
         df = df[df['time'].dt.date < date]
+
+        # Make python max and min price from last day  <-- added
+        last_day = df["time"].dt.date.iloc[-1]
+        df_last_day = df[df["time"].dt.date == last_day]
+
+        max_price = df_last_day["high"].max()
+        min_price = df_last_day["low"].min()
+        print(f"Max price on {last_day}: {max_price}")
+        print(f"Min price on {last_day}: {min_price}")
     
     df = df.dropna(subset=["time"]).copy()
 
@@ -313,9 +322,9 @@ def remove_midnight_records():
 #insert_data_from_csv()
 #find_example_registers(10)
 #export_data_to_csv()
-#insert_data_from_exported_csv()
-#simulate_daily_trade('2025-08-27')
-remove_midnight_records()
+insert_data_from_exported_csv()
+#simulate_daily_trade('2025-08-08')
+#remove_midnight_records()
 
 
 
