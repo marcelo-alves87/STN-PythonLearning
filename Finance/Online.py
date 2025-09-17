@@ -77,6 +77,7 @@ def get_page_df(driver):
 def setup_scraper():
     """Set up Selenium WebDriver and navigate to the target URL."""
     options = webdriver.ChromeOptions()
+    #options.binary_location = r"C:\chrome-win64\chrome-win64\chrome.exe"  # Update this path
     options.add_argument("--incognito")
     options.add_argument("--disable-blink-features=AutomationControlled")
     service = Service(executable_path="chromedriver.exe")
@@ -345,10 +346,11 @@ def save_offer_book(buy_book, sell_book, df):
 
 
 def save_times_trades_book(all_trades):
-    try:
-        DB_TIMES_TRADES.insert_many(all_trades)        
-    except Exception as e:
-        print(f"Error saving trades: {e}")
+    if all_trades:
+        try:
+            DB_TIMES_TRADES.insert_many(all_trades)        
+        except Exception as e:
+            print(f"Error saving trades: {e}")
 
 def compute_agent_imbalance(all_trades):
     """
