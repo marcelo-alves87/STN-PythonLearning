@@ -220,7 +220,7 @@ def insert_data_from_exported_csv(date=None,csv_file_path="exported_prices.csv",
     print(f"{upserted_count} registros inseridos/atualizados a partir de '{csv_file_path}'.")
 
 
-def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP3"):
+def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP3", sleep=0):
     """
     Simulate intraday trading by inserting one candle at a time from a CSV for a specific date.
     Pressing Enter inserts the next candle into MongoDB.
@@ -292,6 +292,9 @@ def simulate_daily_trade(date, csv_file_path="exported_prices.csv", ticket="SBSP
 
         print(f"Inserted candle @ {doc_time.strftime('%H:%M')} with Close={data.get('close')}, Volume={data.get('volume')}")
 
+        if auto_continue:
+            time.sleep(sleep)
+
     print("✅ Simulation completed.")
 
 
@@ -323,7 +326,7 @@ def remove_midnight_records():
 #find_example_registers(10)
 #export_data_to_csv()
 insert_data_from_exported_csv()
-#simulate_daily_trade('2025-08-08')
+#simulate_daily_trade('2025-09-15', sleep=2)
 #remove_midnight_records()
 
 

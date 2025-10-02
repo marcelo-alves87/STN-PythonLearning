@@ -38,6 +38,7 @@ last_status = None
 last_qtd_teorica = None
 volume_accumulated = 0
 assistant_process = None
+show_open_market_msg = False
 
 # Global persistent cluster trackers
 buy_cluster_tracker = defaultdict(int)
@@ -643,7 +644,7 @@ def price_alert(df):
             os.rename(ALERT_FILE, ALERT_FILE.replace(".txt", "_.txt"))
 
 def process_and_save_data(driver):
-    global last_preco_teorico, last_status, last_qtd_teorica, volume_accumulated
+    global last_preco_teorico, last_status, last_qtd_teorica, volume_accumulated, show_open_market_msg
     """Process data, aggregate with previously saved records, and save to MongoDB."""
     df = scrape_tickets(driver)
 
@@ -655,6 +656,7 @@ def process_and_save_data(driver):
         return
 
     elif df.iloc[-1]["Estado Atual"] != "Aberto":
+        show_open_market_msg = True
         status = df.iloc[-1]["Estado Atual"]
         df["Preço Teórico"] = df["Preço Teórico"].apply(convert_numeric)
         preco_teorico = df.iloc[-1]["Preço Teórico"]
@@ -681,7 +683,11 @@ def process_and_save_data(driver):
        
         # Reset Global Variables
         last_preco_teorico = None
-        last_status = None        
+        last_status = None
+        if show_open_market_msg:
+            show_open_market_msg = False
+            now = dt.datetime.today().strftime("%H:%M:%S")
+            print(f"({now}): Market Open")
         
         # Convert price and volume columns to numeric values
         df["Último"] = df["Último"].apply(convert_numeric)
@@ -980,6 +986,6 @@ if __name__ == "__main__":
     warnings.simplefilter(action="ignore")
     delete_scraped_collection()
     driver = setup_scraper()
-    get_data_to_csv()
+    #get_data_to_csv()
     scrape_to_mongo()
     driver.quit()
