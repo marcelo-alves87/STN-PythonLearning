@@ -680,18 +680,21 @@ def process_and_save_data(driver):
             last_status = status
             last_qtd_teorica = qtd_teorica
     else:
-       
+
         # Reset Global Variables
         last_preco_teorico = None
         last_status = None
-        if show_open_market_msg:
-            show_open_market_msg = False
-            now = dt.datetime.today().strftime("%H:%M:%S")
-            print(f"({now}): Market Open")
-        
+       
         # Convert price and volume columns to numeric values
         df["Último"] = df["Último"].apply(convert_numeric)
         df["Financeiro"] = df["Financeiro"].apply(convert_numeric)
+
+        
+        if show_open_market_msg:
+            show_open_market_msg = False
+            now = dt.datetime.today().strftime("%H:%M:%S")
+            open_price = df.iloc[-1]["Último"]
+            print(f"({now}): Market Open | Open Price: {open_price:.2f}")
 
         try:
             price_alert(df)
